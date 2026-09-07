@@ -48,7 +48,11 @@ docs/deviations.md      Implementation deviation log
 tests/                  Configuration and policy validation
 ```
 
-Vocabulary: Nostromo's roster is the **crew**, the crew of the Nostromo. Buzz uses "team" for its own deployment grouping and labels the injected instructions block "Team Instructions"; those are Buzz's words and are left as is wherever the specs describe Buzz.
+Vocabulary: three words, three systems, kept deliberately separate.
+
+- **Crew** is Nostromo's roster, the crew of the Nostromo. It is the only word used for the seven agents.
+- **Squad** is a SquadOps concept: the agents SquadOps itself orchestrates inside a cycle. The crew builds SquadOps and is never a squad.
+- **Team** is Buzz's word for its own deployment grouping, and the heading Buzz stamps on the injected instructions block. It appears in the specs only where they describe Buzz.
 
 Secrets never live in this repository. Each host keeps its own agent secrets under `~/.config/nostromo/secrets/` with owner-only permissions.
 
