@@ -3,14 +3,22 @@
 # Exact model tags are pinned in docs/source-baseline.md as each runtime is commissioned.
 version: 1
 
+# Relay hostname fixes the NIP-05 domain for every handle below (Buzz binds handle domain
+# to relay host). Planned value; WP-2 confirms it. Private on the tailnet, never public.
+relay:
+  hostname: buzz.backspring.xyz
+  exposure: private-tailnet
+
 owner:
   display_name: Jason
   github_login: jasonLadd
+  nip05: jason@buzz.backspring.xyz
   buzz_pubkey: null   # WP-3
 
 agents:
   mother:
     display_name: Mother
+    nip05: mother@buzz.backspring.xyz
     capability: orchestration
     host: spark
     supervisor: herdr
@@ -24,6 +32,7 @@ agents:
 
   ash:
     display_name: Ash
+    nip05: ash@buzz.backspring.xyz
     capability: ideation_research
     host: mac
     supervisor: launchd
@@ -37,6 +46,7 @@ agents:
 
   ripley:
     display_name: Ripley
+    nip05: ripley@buzz.backspring.xyz
     capability: architecture
     host: spark
     supervisor: herdr
@@ -53,6 +63,7 @@ agents:
 
   dallas:
     display_name: Dallas
+    nip05: dallas@buzz.backspring.xyz
     capability: adversarial_review
     host: spark
     supervisor: herdr
@@ -67,6 +78,7 @@ agents:
 
   parker:
     display_name: Parker
+    nip05: parker@buzz.backspring.xyz
     capability: implementation
     host: spark
     supervisor: herdr
@@ -83,6 +95,7 @@ agents:
 
   brett:
     display_name: Brett
+    nip05: brett@buzz.backspring.xyz
     capability: verification
     host: spark
     supervisor: herdr
@@ -96,6 +109,7 @@ agents:
 
   lambert:
     display_name: Lambert
+    nip05: lambert@buzz.backspring.xyz
     capability: google_knowledge
     host: mac
     supervisor: launchd

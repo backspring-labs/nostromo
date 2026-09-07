@@ -1037,6 +1037,10 @@ If HTTPS/WSS with Caddy is simple within the private environment, use it.
 
 Otherwise an initial private `ws://` endpoint over Tailscale may be accepted for bootstrap, with TLS hardening before broader exposure.
 
+The relay hostname is `buzz.backspring.xyz`. A public DNS record may point it at the Jetson's Tailscale address; a Tailscale address is unroutable from the public Internet, so the name resolves everywhere and connects only from the tailnet. Obtain the TLS certificate with a DNS-01 challenge, since HTTP-01 needs public reachability. Do not enable Tailscale Funnel; that is the one setting that would make the relay public.
+
+The hostname also fixes the NIP-05 domain for every crew handle (§12.5), because Buzz binds a handle's domain to the relay host. Choose it once.
+
 Document the decision.
 
 ---
@@ -1071,7 +1075,8 @@ At minimum prove:
 - durable volume mounts are on NVMe;
 - migrations completed;
 - relay remains healthy after a container restart;
-- relay remains healthy after owner Mac disconnect.
+- relay remains healthy after owner Mac disconnect;
+- `GET /.well-known/nostr.json?name=probe` answers over HTTPS from the tailnet (an empty names map until WP-5) and does not answer from a non-tailnet network.
 
 Use the deployed version's canonical health endpoints, not guessed paths.
 
@@ -1606,7 +1611,9 @@ Brett
 Lambert
 ```
 
-Do not rely solely on display names for security or routing.
+Set each identity's NIP-05 handle with the pinned Buzz CLI profile command, `<agent>@buzz.backspring.xyz`, matching `crew/manifest.yaml`. The relay serves the NIP-05 lookup itself and requires the handle domain to equal the relay hostname chosen in §9.6.
+
+Do not rely solely on display names or NIP-05 handles for security or routing.
 
 Public keys remain authoritative.
 
@@ -1649,7 +1656,8 @@ Before any LLM runtime is attached, verify through Buzz/admin tooling that:
 - public keys match manifest;
 - none are duplicates;
 - owner identity is distinct;
-- channel membership is correct.
+- channel membership is correct;
+- each NIP-05 handle resolves through the relay's well-known endpoint to the manifest public key.
 
 ---
 
@@ -1659,6 +1667,7 @@ Commit:
 
 ```text
 public identity map
+NIP-05 handle map and resolution probe
 channel membership map
 allowlist generation result
 ```
@@ -3389,6 +3398,7 @@ Crew instructions: instructions.md
 - [ ] Brett key
 - [ ] Lambert key
 - [ ] public keys committed
+- [ ] NIP-05 handles set and resolve via the relay
 - [ ] private keys excluded
 - [ ] relay membership complete
 - [ ] control-channel membership complete
@@ -3546,6 +3556,7 @@ Current Buzz documentation establishes:
 - production stack use of Postgres, Redis, MinIO and durable git/media state;
 - `buzz-acp` as the WebSocket-to-ACP bridge;
 - unique Nostr keypairs per agent;
+- relay-served NIP-05 lookup with the handle domain bound to the relay hostname, settable per profile through the CLI;
 - membership registration;
 - configuration through `BUZZ_PRIVATE_KEY`, `BUZZ_RELAY_URL`, `BUZZ_ACP_AGENT_COMMAND`, `BUZZ_ACP_AGENT_ARGS`, optional MCP command and API token;
 - ACP child support for Codex and Claude;

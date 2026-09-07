@@ -35,6 +35,7 @@ REQUIRED_AGENT_FIELDS = {
     "workspace_profile",
     "respond_to",
     "buzz_pubkey",
+    "nip05",
 }
 
 LIFECYCLE_STATES = [  # NOSTROMO-0001 §14
@@ -136,6 +137,30 @@ def test_public_keys_are_hex64_when_set(agents, manifest):
     for name, key in candidates.items():
         if key is not None:
             assert hex64.match(key), f"{name} buzz_pubkey is not a 64-char hex pubkey"
+
+
+# --- NIP-05 handles (NOSTROMO-0001 §20, plan §12.5) ---------------------------------
+
+NIP05 = re.compile(r"^[a-z0-9._-]+@[a-z0-9.-]+$")
+
+
+def test_nip05_handles_follow_agent_name_at_relay_host(agents, manifest):
+    host = manifest["relay"]["hostname"]
+    for name, agent in agents.items():
+        handle = agent["nip05"]
+        assert NIP05.match(handle), f"{name}: {handle} is not local@domain"
+        local, domain = handle.split("@", 1)
+        assert local == name, f"{name}: NIP-05 local part must equal the agent name"
+        assert domain == host, f"{name}: NIP-05 domain must match relay hostname {host}"
+
+
+def test_nip05_handles_are_unique_including_owner(agents, manifest):
+    handles = [a["nip05"] for a in agents.values()] + [manifest["owner"]["nip05"]]
+    assert len(handles) == len(set(handles))
+
+
+def test_relay_is_private(manifest):
+    assert manifest["relay"]["exposure"] == "private-tailnet"
 
 
 # --- GitHub identity (NSTR-ID-006, plan §8.7) ----------------------------------------

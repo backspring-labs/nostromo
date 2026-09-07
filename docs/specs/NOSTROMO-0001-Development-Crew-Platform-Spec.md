@@ -869,6 +869,8 @@ Each Nostromo agent MUST receive a unique, stable Buzz/Nostr keypair.
 
 The stable public identity SHOULD be recorded in the Nostromo crew manifest.
 
+Each agent SHOULD also carry a NIP-05 handle of the form `<agent>@<relay hostname>`, recorded in the crew manifest and served by the relay. The handle is a display and verification convenience; the public key remains authoritative for routing and security. Because Buzz binds the handle domain to the relay hostname, that hostname is chosen once and treated as stable.
+
 The private key MUST NOT be committed to GitHub.
 
 An agent's stable identity MUST survive:
@@ -1443,6 +1445,7 @@ It SHOULD represent fields such as:
 logical agent name
 capability
 Buzz public key
+NIP-05 handle
 host affinity
 harness
 model/provider
