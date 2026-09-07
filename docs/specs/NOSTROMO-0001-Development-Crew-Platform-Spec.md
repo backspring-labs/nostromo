@@ -17,7 +17,7 @@ Nostromo is a persistent, multi-agent software development crew whose initial mi
 
 Nostromo is intentionally **external to SquadOps**. It must not depend on SquadOps-native agent orchestration in order to build SquadOps, and it does not replace the SquadOps Improvement Proposal (SIP) process or other product governance. Nostromo is the development organization and runtime environment; SquadOps remains the product and retains its own architecture and approval mechanisms.
 
-The crew will collaborate through **Buzz**, execute persistent development sessions through **Herdr** on a DGX Spark, use a mix of local and cloud model providers, and maintain its own version-controlled team definition in a private GitHub repository. A Jetson Orin Nano Super will host the always-on Buzz collaboration infrastructure. A Mac will serve as the human operator cockpit and will host lightweight cloud-backed crew members that do not need persistent Spark execution. Two Raspberry Pi 5 systems remain available for their originally intended Bitcoin and Ethereum node roles and are outside the Nostromo runtime.
+The crew will collaborate through **Buzz**, execute persistent development sessions through **Herdr** on a DGX Spark, use a mix of local and cloud model providers, and maintain its own version-controlled crew definition in a private GitHub repository. A Jetson Orin Nano Super will host the always-on Buzz collaboration infrastructure. A Mac will serve as the human operator cockpit and will host lightweight cloud-backed crew members that do not need persistent Spark execution. Two Raspberry Pi 5 systems remain available for their originally intended Bitcoin and Ethereum node roles and are outside the Nostromo runtime.
 
 The design deliberately separates five concerns:
 
@@ -55,7 +55,7 @@ The development environment therefore needs an independent crew that can:
 
 Nostromo is therefore both a development crew and an architectural learning environment.
 
-Its purpose is **not** to prematurely recreate SquadOps outside SquadOps. Its purpose is to use existing tools — Buzz, Herdr, ACP-compatible harnesses, GitHub, Ollama, and model-provider controls — to form a dependable development team while exposing useful lessons for SquadOps's future design.
+Its purpose is **not** to prematurely recreate SquadOps outside SquadOps. Its purpose is to use existing tools — Buzz, Herdr, ACP-compatible harnesses, GitHub, Ollama, and model-provider controls — to form a dependable development crew while exposing useful lessons for SquadOps's future design.
 
 ---
 
@@ -132,7 +132,7 @@ The owner must be able to inspect the crew's collaboration in Buzz, reconnect to
 
 ### G-9 — Reconstructability
 
-A fresh machine with the Nostromo repository plus separately provisioned secrets should contain enough declarative information to reconstruct the intended team.
+A fresh machine with the Nostromo repository plus separately provisioned secrets should contain enough declarative information to reconstruct the intended crew.
 
 ### G-10 — Minimal custom infrastructure
 
@@ -193,7 +193,7 @@ Agent identity is a durable configuration composed of:
 - a stable logical name;
 - a Buzz/Nostr identity;
 - a persona;
-- team membership;
+- crew membership;
 - capabilities;
 - role constraints;
 - and durable external work state.
@@ -227,7 +227,7 @@ Herdr MUST NOT be treated as the source of:
 - ACP configuration;
 - provider identity;
 - persona;
-- team membership;
+- crew membership;
 - or canonical workflow state.
 
 A Herdr workspace/pane starts a Nostromo agent launcher. That launcher starts `buzz-acp`, and `buzz-acp` connects the agent to Buzz and spawns the configured ACP-speaking agent runtime.
@@ -432,7 +432,7 @@ Mother owns:
 - budget-awareness;
 - surfacing blocked work;
 - owner escalation when policy requires judgment;
-- and synthesis of team status.
+- and synthesis of crew status.
 
 Mother does **not** own:
 
@@ -446,7 +446,7 @@ Mother does **not** own:
 
 Mother MUST prefer delegation over doing specialist work herself.
 
-Mother MUST use the team manifest to resolve responsibilities rather than embedding an unstructured set of hard-coded assumptions in the prompt.
+Mother MUST use the crew manifest to resolve responsibilities rather than embedding an unstructured set of hard-coded assumptions in the prompt.
 
 Mother SHOULD be able to continue orchestration after its underlying model process restarts because durable work state is externalized.
 
@@ -604,7 +604,7 @@ Loss of Gemini/NotebookLM availability MUST NOT block SquadOps development.
 
 # Part III — Collaboration Model
 
-## 12. Shared Team Instructions
+## 12. Shared Crew Instructions
 
 Nostromo MUST maintain one shared `instructions.md` that functions as the crew's constitution.
 
@@ -623,7 +623,7 @@ It SHOULD define:
 - escalation policy;
 - and lifecycle semantics.
 
-Role-independent rules MUST be placed in team instructions rather than duplicated across seven persona prompts.
+Role-independent rules MUST be placed in crew instructions rather than duplicated across seven persona prompts.
 
 Persona prompts SHOULD focus on:
 
@@ -867,7 +867,7 @@ Exact Compose files, environment values, hostnames, certificates, and installati
 
 Each Nostromo agent MUST receive a unique, stable Buzz/Nostr keypair.
 
-The stable public identity SHOULD be recorded in the Nostromo team manifest.
+The stable public identity SHOULD be recorded in the Nostromo crew manifest.
 
 The private key MUST NOT be committed to GitHub.
 
@@ -908,7 +908,7 @@ Brett -> Parker
 
 while rejecting untrusted relay participants.
 
-The team manifest SHOULD be capable of generating or validating these allowlists.
+The crew manifest SHOULD be capable of generating or validating these allowlists.
 
 ---
 
@@ -939,7 +939,7 @@ model/provider
 - Buzz/Nostr agent identity;
 - inbound event filtering;
 - channel/thread context delivery;
-- team/persona context delivery;
+- crew/persona context delivery;
 - agent lifecycle around ACP turns;
 - and collaboration back to Buzz.
 
@@ -975,7 +975,7 @@ However, the v1 design MUST recognize current Buzz limitations:
 
 Therefore:
 
-> **Nostromo will author team definitions like a Buzz Persona Pack, but v1 runtime launch is explicitly controlled by Nostromo launch configuration.**
+> **Nostromo will author crew definitions like a Buzz Persona Pack, but v1 runtime launch is explicitly controlled by Nostromo launch configuration.**
 
 This avoids coupling the crew to immature team-deployment mechanics while preserving compatibility with Buzz's intended direction.
 
@@ -1381,7 +1381,7 @@ nostromo/
 │
 ├── .mcp.json
 │
-├── team/
+├── crew/
 │   ├── manifest.yaml
 │   ├── lifecycle.yaml
 │   ├── permissions.yaml
@@ -1431,9 +1431,9 @@ The execution plan may simplify the initial scaffold while preserving the separa
 
 ---
 
-## 38. Team Manifest
+## 38. Crew Manifest
 
-`team/manifest.yaml` SHOULD be the canonical machine-readable crew registry.
+`crew/manifest.yaml` SHOULD be the canonical machine-readable crew registry.
 
 It SHOULD represent fields such as:
 
@@ -1457,7 +1457,7 @@ Example semantics:
 capability: adversarial_review
         │
         ▼
-team manifest
+crew manifest
         │
         ▼
 agent: Dallas
@@ -1605,7 +1605,7 @@ The launcher resolves:
 ```text
 version-controlled runtime manifest
         +
-team manifest
+crew manifest
         +
 persona
         +
@@ -1632,7 +1632,7 @@ The launcher MUST:
 6. select the correct ACP child harness;
 7. select the correct provider/model environment;
 8. establish the correct working directory;
-9. inject shared team instructions;
+9. inject shared crew instructions;
 10. inject the role persona;
 11. configure the Buzz MCP/tool bridge required by the child;
 12. fail closed when required configuration is missing;
@@ -1657,7 +1657,7 @@ The launcher must account for Buzz runtime settings equivalent to:
 - agent arguments;
 - optional Buzz MCP command;
 - system/persona content;
-- team instructions;
+- crew instructions;
 - inbound author policy;
 - author allowlist;
 - owner identity;
@@ -1894,7 +1894,7 @@ Durable state must be reconstructable from:
 
 - GitHub;
 - Buzz event/thread history;
-- team/runtime manifests;
+- crew/runtime manifests;
 - work-item metadata;
 - and persisted collaboration artifacts.
 
@@ -2185,10 +2185,10 @@ A private GitHub repository MUST serve as the source of truth for Nostromo confi
 Nostromo MUST remain separable from the SquadOps repository and governance.
 
 ### NSTR-PROJ-003
-The repository MUST contain a machine-readable team manifest.
+The repository MUST contain a machine-readable crew manifest.
 
 ### NSTR-PROJ-004
-The repository MUST contain version-controlled persona definitions and shared team instructions.
+The repository MUST contain version-controlled persona definitions and shared crew instructions.
 
 ### NSTR-PROJ-005
 The repository MUST not contain runtime secrets.
@@ -2207,7 +2207,7 @@ Private Buzz keys MUST remain outside git.
 Agent identity MUST survive replacement of its model or harness.
 
 ### NSTR-ID-004
-Agent public identities SHOULD be represented in the team manifest.
+Agent public identities SHOULD be represented in the crew manifest.
 
 ### NSTR-ID-005
 Agent-to-agent inbound communication MUST be restricted to authorized identities.
@@ -2320,7 +2320,7 @@ Mother and Brett MUST default to local inference with no unapproved metered fall
 ## 68. Collaboration Requirements
 
 ### NSTR-COL-001
-Shared team instructions MUST define role and handoff conventions.
+Shared crew instructions MUST define role and handoff conventions.
 
 ### NSTR-COL-002
 Each persona MUST define both responsibilities and non-responsibilities.
@@ -2381,7 +2381,7 @@ Known design-relevant constraints include:
 - Persona Packs are git-friendly and portable but not equivalent to Desktop team snapshots.
 - Desktop currently requires separate handling to instantiate personas/teams from hand-authored pack source.
 - Persona hooks are not a suitable v1 dependency for critical orchestration.
-- Persona/team instructions are currently injected through the Buzz ACP prompt path; identity reinforcement should be explicit.
+- Persona/crew instructions are currently injected through the Buzz ACP prompt path; identity reinforcement should be explicit.
 - Per-persona/pack MCP configuration exists, but secret interpolation behavior must be validated rather than assumed.
 - `buzz-acp` provides the real runtime boundary for identity, relay connectivity, respond-to policy, and ACP child launch.
 - Allowlist behavior must be explicitly configured.
@@ -2411,7 +2411,7 @@ Nostromo v1 is considered architecturally realized when the following are true.
 
 ### AC-01 — Repository
 
-A private Nostromo GitHub repository exists and contains the team specification, personas, shared instructions, machine-readable crew/runtime configuration, and no secrets.
+A private Nostromo GitHub repository exists and contains the crew specification, personas, shared instructions, machine-readable crew/runtime configuration, and no secrets.
 
 ### AC-02 — Buzz server
 
@@ -2435,7 +2435,7 @@ Each of the five Spark agents is demonstrably backed by its intended ACP harness
 
 ### AC-07 — Correct model/provider binding
 
-Each agent's effective model/provider matches the team manifest.
+Each agent's effective model/provider matches the crew manifest.
 
 ### AC-08 — Local model operation
 
@@ -2499,7 +2499,7 @@ Accepted design, implementation, and verification results are recoverable from G
 **Mitigation:**
 
 - explicit role/non-role boundaries;
-- shared team instructions;
+- shared crew instructions;
 - role-specific tool permissions;
 - independent workspaces;
 - repeated Buzz persona context;
@@ -2627,7 +2627,7 @@ Relevant observed concepts:
 - `buzz-acp` as the live agent collaboration harness;
 - configurable ACP child commands;
 - owner/allowlist author gates;
-- persona + team-instruction layering;
+- persona + crew-instruction layering;
 - channel-scoped context;
 - Persona Pack portable source structure;
 - production relay stack with Postgres/Redis/MinIO;

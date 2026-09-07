@@ -1,4 +1,4 @@
-"""Validation of Nostromo's declarative team configuration.
+"""Validation of Nostromo's declarative crew configuration.
 
 Implements the automated checks in NOSTROMO-PLAN-0001 §7.10 and §24 against the
 requirements in NOSTROMO-0001. Every test names the requirement it enforces.
@@ -15,7 +15,7 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-TEAM = ROOT / "team"
+CREW = ROOT / "crew"
 ENV = ROOT / "runtime" / "env"
 
 EXPECTED_AGENTS = {"mother", "ash", "ripley", "dallas", "parker", "brett", "lambert"}
@@ -70,7 +70,7 @@ SECRET_PATTERNS = {
 
 @pytest.fixture(scope="session")
 def manifest() -> dict:
-    return yaml.safe_load((TEAM / "manifest.yaml").read_text())
+    return yaml.safe_load((CREW / "manifest.yaml").read_text())
 
 
 @pytest.fixture(scope="session")
@@ -80,17 +80,17 @@ def agents(manifest) -> dict:
 
 @pytest.fixture(scope="session")
 def budgets() -> dict:
-    return yaml.safe_load((TEAM / "budgets.yaml").read_text())
+    return yaml.safe_load((CREW / "budgets.yaml").read_text())
 
 
 @pytest.fixture(scope="session")
 def capabilities() -> dict:
-    return yaml.safe_load((TEAM / "capabilities.yaml").read_text())["capabilities"]
+    return yaml.safe_load((CREW / "capabilities.yaml").read_text())["capabilities"]
 
 
 @pytest.fixture(scope="session")
 def lifecycle() -> dict:
-    return yaml.safe_load((TEAM / "lifecycle.yaml").read_text())
+    return yaml.safe_load((CREW / "lifecycle.yaml").read_text())
 
 
 @pytest.fixture(scope="session")

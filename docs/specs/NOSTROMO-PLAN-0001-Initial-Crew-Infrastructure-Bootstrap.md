@@ -91,7 +91,7 @@ Each commissioning step should prove that:
 ```text
 logical agent
     + stable Buzz/Nostr identity
-    + persona/team configuration
+    + persona/crew configuration
     + runtime binding
     = current embodiment
 ```
@@ -185,7 +185,7 @@ All seven logical agents communicate through the same Buzz relay.
 | **WP-6** | Spark | Mother and Brett local-agent runtime | WP-1, WP-4, WP-5 |
 | **WP-7** | Spark | Ripley, Dallas, Parker cloud-agent runtime | WP-1, WP-4, WP-5 |
 | **WP-8** | Mac | Ash and Lambert runtime | WP-3, WP-5 |
-| **WP-9** | Buzz + repo | Channels, allowlists, personas, team instructions, workflow conventions | WP-5–8 |
+| **WP-9** | Buzz + repo | Channels, allowlists, personas, crew instructions, workflow conventions | WP-5–8 |
 | **WP-10** | All | End-to-end SquadOps commissioning roll | WP-9 |
 | **WP-11** | All | Stabilization, recovery tests, documentation, baseline tag | WP-10 |
 
@@ -365,7 +365,7 @@ nostromo/
 │
 ├── instructions.md
 ├── agents/
-├── team/
+├── crew/
 ├── runtime/
 │   ├── manifests/
 │   ├── launchers/
@@ -406,7 +406,7 @@ Be careful not to ignore committed `.example` environment templates.
 
 ---
 
-## 7.6 Create the first team manifest
+## 7.6 Create the first crew manifest
 
 Create a machine-readable manifest containing the baseline roster and non-secret configuration.
 
@@ -1496,10 +1496,10 @@ Do not put private keys in the Nostromo repository.
 Commit public keys to:
 
 ```text
-team/manifest.yaml
+crew/manifest.yaml
 ```
 
-This transforms the team manifest from conceptual roster to addressable crew registry.
+This transforms the crew manifest from conceptual roster to addressable crew registry.
 
 ---
 
@@ -1537,7 +1537,7 @@ Public keys remain authoritative.
 
 # 12.6 Create allowlist source
 
-Generate a non-secret allowlist configuration from `team/manifest.yaml`.
+Generate a non-secret allowlist configuration from `crew/manifest.yaml`.
 
 Each agent should accept:
 
@@ -1546,7 +1546,7 @@ Each agent should accept:
 
 Whether every agent needs all six peers or only allowed collaboration edges can be refined later.
 
-For v1, a team-wide allowlist is simpler and still closed to outsiders.
+For v1, a crew-wide allowlist is simpler and still closed to outsiders.
 
 ---
 
@@ -1617,7 +1617,7 @@ Mother is the best first full-stack agent because it tests:
 - OpenCode;
 - Ollama;
 - Qwen;
-- team/persona context;
+- crew/persona context;
 - tool permissions;
 - agent-to-owner communication;
 
@@ -1632,7 +1632,7 @@ Before building the generic launcher, implement an explicit Mother launch adapte
 It should:
 
 1. resolve Mother persona;
-2. resolve team instructions;
+2. resolve crew instructions;
 3. source Mother's local secret file;
 4. load the stable Mother Buzz key;
 5. configure the Jetson relay URL;
@@ -1821,7 +1821,7 @@ process tree
 
 # 13.13 WP-6 gate
 
-Do not automate team workflow yet.
+Do not automate crew workflow yet.
 
 First prove the local agents can communicate and respect role boundaries.
 
@@ -2018,7 +2018,7 @@ credential removal / fail-closed probe
 
 # 14.11 WP-7 gate
 
-All three cloud agents must prove isolated billing attribution before team collaboration testing.
+All three cloud agents must prove isolated billing attribution before crew collaboration testing.
 
 ---
 
@@ -2176,7 +2176,7 @@ Lambert limitations do not block the engineering crew, but Ash must work before 
 
 ---
 
-# 16. WP-9 — Team Persona, Instructions, Channels, and Collaboration Wiring
+# 16. WP-9 — Crew Persona, Instructions, Channels, and Collaboration Wiring
 
 **Execution surface:** Nostromo repo + Buzz  
 **Goal:** transform seven individually functioning agents into one role-bounded crew.
@@ -2366,7 +2366,7 @@ Do not create the entire roadmap structure before the operating pattern is prove
 
 ---
 
-# 16.7 Team allowlist verification
+# 16.7 Crew allowlist verification
 
 From each agent:
 
@@ -2411,7 +2411,7 @@ Verify agents do not require Jason to copy/paste handoffs.
 
 During commissioning, explicitly verify:
 
-- persona/team instructions are actually reaching the agent;
+- persona/crew instructions are actually reaching the agent;
 - Buzz MCP is available where required;
 - channel context behaves as expected;
 - process restart behavior does not unexpectedly create unrelated cloud conversations;
@@ -2427,7 +2427,7 @@ Evidence:
 
 ```text
 persona files
-team instructions
+crew instructions
 capability map
 lifecycle file
 role-integrity test results
@@ -2979,7 +2979,7 @@ Turn the Mac into Jason's control cockpit and host the two lightweight subscript
 ## Required outputs
 
 - Buzz Desktop connected to Jetson;
-- owner can control team;
+- owner can control crew;
 - Herdr remote attach to Spark;
 - Ash works via subscription-backed Codex path with no API fallback;
 - Lambert works through validated Gemini path;
@@ -3049,7 +3049,7 @@ Make Nostromo reconstructable from versioned source without storing secrets.
 ```text
 spec
 plan
-team manifest
+crew manifest
 budget manifest
 runtime manifests
 persona files
@@ -3093,11 +3093,11 @@ The launcher is one of the most important artifacts in the implementation becaus
 
 ```text
 agent logical name
-team manifest
+crew manifest
 runtime manifest
 budget profile
 persona
-team instructions
+crew instructions
 public identity registry
 host-local private key
 host-local provider auth
@@ -3160,7 +3160,7 @@ The effective context should preserve the layering:
 
 ```text
 Buzz base agent instructions
-Nostromo shared team instructions
+Nostromo shared crew instructions
 role persona
 channel/work-item context
 conversation context
@@ -3202,7 +3202,7 @@ Workspace: ~/worktrees/squadops/parker
 Buzz relay: wss://...
 Respond-to: allowlist
 Persona: agents/parker.persona.md
-Team instructions: instructions.md
+Crew instructions: instructions.md
 ```
 
 ---
@@ -3579,7 +3579,7 @@ The condensed order is:
    Commission Ash.
    Commission Lambert.
 
-10. Team configuration
+10. Crew configuration
     Finalize personas, instructions, capability map,
     lifecycle, allowlists and work-item channel model.
 
@@ -3615,10 +3615,10 @@ The condensed order is:
 15. prove Parker/Ripley/Dallas are bounded by their dedicated provider limits;
 16. prove Ash is not consuming metered OpenAI API budget;
 17. recover canonical design/code/test state from GitHub even if all transient LLM sessions disappear;
-18. reboot the Jetson or Spark according to documented procedures without losing the team definition;
+18. reboot the Jetson or Spark according to documented procedures without losing the crew definition;
 19. see a complete evidence trail from idea through implementation and verification;
 20. use the resulting system as the persistent external development crew for the SquadOps roadmap.
 
-At that point Nostromo has crossed the threshold from a collection of agent terminals into an operational development team.
+At that point Nostromo has crossed the threshold from a collection of agent terminals into an operational development crew.
 
 The next work after this plan should be driven by observed operation rather than additional pre-emptive infrastructure design.

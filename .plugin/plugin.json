@@ -6,7 +6,7 @@
   "description": "Seven-agent development crew that builds SquadOps: Mother orchestrates, Ash researches, Ripley architects, Dallas challenges, Parker implements, Brett verifies, Lambert maintains the Google knowledge surface.",
   "author": "Backspring Labs",
   "homepage": "https://github.com/backspring-labs/nostromo",
-  "keywords": ["team", "development", "squadops", "buzz"],
+  "keywords": ["crew", "development", "squadops", "buzz"],
   "personas": [
     "agents/mother.persona.md",
     "agents/ash.persona.md",

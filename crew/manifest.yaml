@@ -1,4 +1,4 @@
-# Nostromo team manifest: the canonical machine-readable crew registry.
+# Nostromo crew manifest: the canonical machine-readable crew registry.
 # Non-secret. Public Buzz keys are recorded in WP-5; private keys never live here.
 # Exact model tags are pinned in docs/source-baseline.md as each runtime is commissioned.
 version: 1

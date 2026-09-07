@@ -2,7 +2,7 @@
 
 Nostromo is a persistent, multi-agent software development crew whose first mission is to design, build, review, test, and evolve [SquadOps](https://github.com/backspring-labs/squad-ops).
 
-It is deliberately external to SquadOps. It composes existing tools into a role-bounded team rather than building a new agent framework:
+It is deliberately external to SquadOps. It composes existing tools into a role-bounded crew rather than building a new agent framework:
 
 | Concern | Owned by |
 |---|---|
@@ -38,15 +38,17 @@ Configured envelope $139 against a $150 ceiling. Caps are enforced provider-side
 ```text
 .plugin/plugin.json     Buzz Persona Pack manifest (roster is authoritative; personas land in WP-9)
 instructions.md         Crew constitution, appended to every persona prompt
-team/manifest.yaml      Canonical machine-readable crew registry (non-secret)
-team/budgets.yaml       Budget profiles and the monthly envelope
-team/capabilities.yaml  Capability-to-agent routing table Mother consumes
-team/lifecycle.yaml     Work-item lifecycle states
+crew/manifest.yaml      Canonical machine-readable crew registry (non-secret)
+crew/budgets.yaml       Budget profiles and the monthly envelope
+crew/capabilities.yaml  Capability-to-agent routing table Mother consumes
+crew/lifecycle.yaml     Work-item lifecycle states
 runtime/env/*.example   Shape of each agent's host-local secret file; placeholders only
 docs/source-baseline.md Dependency ledger: pinned versions and provenance
 docs/deviations.md      Implementation deviation log
 tests/                  Configuration and policy validation
 ```
+
+Vocabulary: Nostromo's roster is the **crew**, the crew of the Nostromo. Buzz uses "team" for its own deployment grouping and labels the injected instructions block "Team Instructions"; those are Buzz's words and are left as is wherever the specs describe Buzz.
 
 Secrets never live in this repository. Each host keeps its own agent secrets under `~/.config/nostromo/secrets/` with owner-only permissions.
 
