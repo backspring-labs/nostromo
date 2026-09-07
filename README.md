@@ -33,7 +33,7 @@ The plan governs execution. The specification governs architecture. Contradictio
 
 Configured envelope $139 against a $150 ceiling. Caps are enforced provider-side, never by prompt alone.
 
-Each crew member carries a NIP-05 handle, `<name>@buzz.backspring.xyz`, served and verified by the relay. Handles are for display and verification; public keys remain authoritative for routing and security.
+Each crew member carries a NIP-05 handle, `<name>@nano.tailc69e7d.ts.net`, the relay's Tailscale name, served and verified by the relay. Handles are for display and verification; public keys remain authoritative for routing and security.
 
 ## Layout
 

@@ -1037,9 +1037,9 @@ If HTTPS/WSS with Caddy is simple within the private environment, use it.
 
 Otherwise an initial private `ws://` endpoint over Tailscale may be accepted for bootstrap, with TLS hardening before broader exposure.
 
-The relay hostname is `buzz.backspring.xyz`. A public DNS record may point it at the Jetson's Tailscale address; a Tailscale address is unroutable from the public Internet, so the name resolves everywhere and connects only from the tailnet. Obtain the TLS certificate with a DNS-01 challenge, since HTTP-01 needs public reachability. Do not enable Tailscale Funnel; that is the one setting that would make the relay public.
+The relay hostname is the Jetson's Tailscale MagicDNS name, `nano.tailc69e7d.ts.net`, recorded in `crew/manifest.yaml` under `relay.hostname`. No public DNS is involved. Tailscale issues a Let's Encrypt certificate for that name (`tailscale cert`, with HTTPS certificates enabled for the tailnet), and Tailscale Serve terminates TLS in front of the relay's application port, so clients connect over `wss://` from the tailnet only. Do not enable Tailscale Funnel; that is the one setting that would make the relay public.
 
-The hostname also fixes the NIP-05 domain for every crew handle (§12.5), because Buzz binds a handle's domain to the relay host. Choose it once.
+The hostname also fixes the NIP-05 domain for every crew handle (§12.5), because Buzz binds a handle's domain to the relay host. A vanity name such as `buzz.backspring.xyz` is deferred. It would need a public DNS TXT record for a DNS-01 certificate challenge and a DNS provider with an API for renewals. Switching is a URL change before WP-5 and a re-set of every handle and launcher relay URL after, so decide before WP-5 mints identities.
 
 Document the decision.
 
@@ -1611,7 +1611,7 @@ Brett
 Lambert
 ```
 
-Set each identity's NIP-05 handle with the pinned Buzz CLI profile command, `<agent>@buzz.backspring.xyz`, matching `crew/manifest.yaml`. The relay serves the NIP-05 lookup itself and requires the handle domain to equal the relay hostname chosen in §9.6.
+Set each identity's NIP-05 handle with the pinned Buzz CLI profile command, `<agent>@<relay hostname>`, exactly as recorded in `crew/manifest.yaml`. The relay serves the NIP-05 lookup itself and requires the handle domain to equal the relay hostname chosen in §9.6.
 
 Do not rely solely on display names or NIP-05 handles for security or routing.
 
