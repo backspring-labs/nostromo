@@ -1039,7 +1039,9 @@ Otherwise an initial private `ws://` endpoint over Tailscale may be accepted for
 
 The relay hostname is the Jetson's Tailscale MagicDNS name, `nano.tailc69e7d.ts.net`, recorded in `crew/manifest.yaml` under `relay.hostname`. No public DNS is involved. Tailscale issues a Let's Encrypt certificate for that name (`tailscale cert`, with HTTPS certificates enabled for the tailnet), and Tailscale Serve terminates TLS in front of the relay's application port, so clients connect over `wss://` from the tailnet only. Do not enable Tailscale Funnel; that is the one setting that would make the relay public.
 
-The hostname also fixes the NIP-05 domain for every crew handle (§12.5), because Buzz binds a handle's domain to the relay host. A vanity name such as `buzz.backspring.xyz` is deferred. It would need a public DNS TXT record for a DNS-01 certificate challenge and a DNS provider with an API for renewals. Switching is a URL change before WP-5 and a re-set of every handle and launcher relay URL after, so decide before WP-5 mints identities.
+The hostname also fixes the NIP-05 domain for every crew handle (§12.5), because Buzz binds a handle's domain to the relay host.
+
+**The Tailscale name is the bootstrap value only. The relay hostname WILL change to `buzz.backspring.xyz` after the relay is proven and before WP-5 mints identities.** That switch needs a public DNS TXT record for a DNS-01 certificate challenge and a DNS provider with an API for renewals; delegating `backspring.xyz` DNS from Namecheap to Cloudflare is the smoothest path. The A record may point at the Jetson's Tailscale address, which keeps the relay unreachable from the public Internet. Before WP-5 the switch is a relay URL change and a certificate; after WP-5 it would mean re-setting every handle and every launcher's relay URL, which is why it is sequenced first. Update `relay.hostname` in `crew/manifest.yaml` and rewrite the handles to the final domain in the same commit.
 
 Document the decision.
 
@@ -1677,6 +1679,8 @@ Never commit private keys.
 ---
 
 # 12.10 WP-5 gate
+
+Do not set any NIP-05 handle until the relay hostname is its final value, `buzz.backspring.xyz`, and `crew/manifest.yaml` says so (§9.6). Handles bind to the hostname, and re-setting eight profiles later is avoidable work.
 
 Do not create a runtime that generates a new Nostr identity automatically.
 
@@ -3363,6 +3367,7 @@ Crew instructions: instructions.md
 - [ ] auth required
 - [ ] relay private key backed up
 - [ ] persistent volume backup baseline
+- [ ] relay hostname switched from the Tailscale name to buzz.backspring.xyz before WP-5
 
 ## Mac
 
