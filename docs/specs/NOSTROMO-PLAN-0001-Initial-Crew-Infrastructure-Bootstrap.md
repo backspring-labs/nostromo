@@ -177,7 +177,7 @@ All seven logical agents communicate through the same Buzz relay.
 | Work Package | Primary Surface | Outcome | Depends On |
 |---|---|---|---|
 | **WP-0** | GitHub / Mac | Nostromo repo and bootstrap control structure | none |
-| **WP-1** | Provider consoles | Hard spend and credential isolation | WP-0 |
+| **WP-1** | Provider consoles + GitHub | Hard spend, credential, and GitHub identity isolation | WP-0 |
 | **WP-2** | Jetson | Production Buzz server online | WP-0 |
 | **WP-3** | Mac + Jetson | Owner identity, Buzz Desktop, relay membership/control | WP-2 |
 | **WP-4** | Spark | Herdr, worktrees, Ollama/Qwen baseline | WP-0 |
@@ -632,10 +632,10 @@ Do not begin generating real agent credentials until the repo structure can repr
 
 ---
 
-# 8. WP-1 — Provider Projects, Workspaces, Authentication, and Hard Limits
+# 8. WP-1 — Provider Projects, Workspaces, GitHub Identities, Authentication, and Hard Limits
 
-**Execution surface:** Provider consoles + Mac  
-**Goal:** make cost isolation exist before cloud-backed agents are launched.
+**Execution surface:** Provider consoles + GitHub organization settings + Mac  
+**Goal:** make cost isolation and crew GitHub identity exist before cloud-backed agents are launched.
 
 ---
 
@@ -754,15 +754,78 @@ If ACP is not reliable enough:
 
 ---
 
-# 8.7 Provider secret placement
+# 8.7 GitHub — Crew Identities as GitHub Apps
+
+Ripley and Parker push branches and open pull requests against `squad-ops`. Those writes MUST attribute to the crew member, never to the owner's personal account (NSTR-ID-006).
+
+GitHub's Terms of Service allow one free machine account per person, so crew members are **GitHub Apps** owned by `backspring-labs`, not user accounts. An App has its own bot identity, private key, fine-grained permissions, and repository-scoped installation. It needs no email, seat, or two-factor enrollment, and it can be revoked without touching the owner's account.
+
+Create, in the organization's developer settings:
+
+```text
+nostromo-parker
+nostromo-ripley
+```
+
+Per App:
+
+- permissions: Contents read/write, Pull requests read/write, Metadata read; nothing at organization level;
+- no webhook;
+- installed on `squad-ops` only;
+- one private key, generated once and stored only in that agent's host-local secret file on Spark.
+
+After installation, look up the bot user via `GET /users/<slug>[bot]` and record the App slug, App ID, installation ID, and bot login in non-secret form in `crew/manifest.yaml`.
+
+Dallas, Brett, and Mother receive Apps only when their GitHub write flows are commissioned: review comments and evidence comments in WP-9 and WP-10, and lifecycle state if it lands on Issues. Ash and Lambert read a public repository and need no identity.
+
+App registration is a browser flow and is an owner step, like the provider consoles.
+
+---
+
+# 8.8 GitHub — Token Minting and Git Attribution
+
+Installation tokens expire after one hour. The launcher MUST NOT bake a token into the agent's environment. Instead:
+
+1. the agent's secret file holds `GITHUB_APP_ID`, `GITHUB_APP_INSTALLATION_ID`, and `GITHUB_APP_PRIVATE_KEY_FILE`;
+2. the launcher installs a git credential helper that mints an installation token on demand: a JWT signed with the App key, exchanged at `POST /app/installations/{id}/access_tokens`;
+3. the same helper supplies `GH_TOKEN` for `gh`, so pull-request creation attributes to the bot;
+4. the launcher sets `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME`, and `GIT_COMMITTER_EMAIL` to the bot identity, using the `<bot-user-id>+<slug>[bot]@users.noreply.github.com` form;
+5. the owner's personal GitHub credentials MUST NOT be present in any crew agent's environment.
+
+Probe: from Parker's worktree, commit and push to a disposable `nostromo/parker/probe` branch and open a draft pull request. GitHub must show `nostromo-parker[bot]` as commit author and pull-request creator, and the push must attribute to the App installation rather than to the owner.
+
+---
+
+# 8.9 GitHub — Rulesets for Branch and Path Boundaries
+
+Codex sandboxing is directory-scoped, so "Ripley writes SIPs, not source" cannot be enforced inside the harness. `squad-ops` is public, so repository rulesets are available on the free organization plan and enforce it server-side.
+
+Bypass applies to a whole ruleset, so identity and path live in separate rulesets over the same branch namespace:
+
+| Ruleset | Target | Rule | Bypass |
+|---|---|---|---|
+| `nostromo-ripley-branches` | `refs/heads/nostromo/ripley/**` | restrict creations, updates, deletions | `nostromo-ripley` App |
+| `nostromo-ripley-paths` | `refs/heads/nostromo/ripley/**` | restrict file paths `src/**`, `tests/**` | none |
+| `nostromo-parker-branches` | `refs/heads/nostromo/parker/**` | restrict creations, updates, deletions | `nostromo-parker` App |
+| `nostromo-parker-paths` | `refs/heads/nostromo/parker/**` | restrict file paths `sips/**` | none |
+
+The exact path lists are fixed together with the branch conventions in §11.6. The intent is that Ripley's namespace cannot carry implementation changes and Parker's namespace cannot carry SIP changes. Protections on `main` are unchanged: crew work still enters `main` through pull requests under SquadOps governance.
+
+Export each ruleset as JSON through the API into `infrastructure/github/rulesets/` so the boundary is reconstructable (NSTR-PROJ-001).
+
+Probe: a push from Ripley's identity touching `src/` into `nostromo/ripley/probe` is rejected; a push from the owner's identity into `nostromo/parker/probe` is rejected; the same pushes from the correct App succeed.
+
+---
+
+# 8.10 Provider secret placement
 
 Place only each role's own credential on its execution host.
 
 Spark:
 
 ```text
-ripley.env -> Ripley OpenAI project key only
-parker.env -> Parker OpenAI project key only
+ripley.env -> Ripley OpenAI project key + Ripley GitHub App key only
+parker.env -> Parker OpenAI project key + Parker GitHub App key only
 dallas.env -> Dallas Anthropic workspace key only
 ```
 
@@ -777,7 +840,7 @@ for the crew.
 
 ---
 
-# 8.8 Hard-limit test strategy
+# 8.11 Hard-limit test strategy
 
 A real $65 burn test is not required.
 
@@ -792,7 +855,7 @@ Optionally create a temporary tiny isolated test project/workspace to prove hard
 
 ---
 
-# 8.9 WP-1 evidence
+# 8.12 WP-1 evidence
 
 Record in a protected owner/operator record, not in git secrets:
 
@@ -819,15 +882,29 @@ subscription auth verified: yes/no
 Lambert Gemini auth:
 authenticated: yes
 ACP capability verified: yes/no
+
+GitHub App: nostromo-parker
+installed on: squad-ops only
+app id / installation id: ...
+probe commit attributed to bot: yes
+ruleset rejection probe: yes
+
+GitHub App: nostromo-ripley
+installed on: squad-ops only
+app id / installation id: ...
+probe commit attributed to bot: yes
+ruleset rejection probe: yes
+
+Rulesets exported to infrastructure/github/rulesets/: yes
 ```
 
 Non-secret logical names and cap amounts belong in git.
 
 ---
 
-# 8.10 WP-1 gate
+# 8.13 WP-1 gate
 
-**No Parker, Ripley, or Dallas `buzz-acp` runtime may be launched until its provider boundary is proven.**
+**No Parker, Ripley, or Dallas `buzz-acp` runtime may be launched until its provider boundary is proven. No Parker or Ripley runtime may be launched until its GitHub identity and rulesets are proven.**
 
 ---
 
@@ -1887,7 +1964,9 @@ Verify:
 - reads current SquadOps repo state;
 - can identify current branch/worktree;
 - can produce/update a test architecture artifact;
-- does not implement unrelated production code.
+- does not implement unrelated production code;
+- commits and pull requests attribute to `nostromo-ripley[bot]`;
+- a push touching `src/` into Ripley's branch namespace is rejected by ruleset.
 
 ---
 
@@ -1964,7 +2043,9 @@ Verify Parker can:
 - create commits if desired by policy;
 - prepare a PR;
 - identify the correct worktree;
-- not mutate Dallas/Brett worktrees.
+- not mutate Dallas/Brett worktrees;
+- commit and open pull requests as `nostromo-parker[bot]`;
+- have a push touching `sips/` into Parker's branch namespace rejected by ruleset.
 
 Verify provider usage appears under Parker project only.
 
@@ -2009,7 +2090,9 @@ agent -> public key
 agent -> worktree
 agent -> ACP child
 agent -> provider boundary
+agent -> GitHub identity
 test request attribution
+git attribution / ruleset probe
 permission probe
 credential removal / fail-closed probe
 ```
@@ -2926,6 +3009,7 @@ Turn the DGX Spark into the persistent Nostromo development ship.
 - SquadOps repo
 - agent private keys for five Spark agents
 - Parker/Ripley/Dallas provider keys
+- Parker/Ripley GitHub App keys
 - Buzz relay endpoint
 - provider boundary already configured
 - selected Qwen/Ollama baseline
@@ -2950,6 +3034,7 @@ Turn the DGX Spark into the persistent Nostromo development ship.
 
 - mint replacement Buzz identities;
 - use shared provider keys;
+- use the owner's GitHub credentials;
 - introduce vLLM;
 - merge role worktrees;
 - allow Brett to repair production code;
@@ -2988,7 +3073,7 @@ Turn the Mac into Jason's control cockpit and host the two lightweight subscript
 
 ## Must not do
 
-- copy Parker/Ripley/Dallas provider keys to Mac without reason;
+- copy Parker/Ripley/Dallas provider keys or GitHub App keys to Mac without reason;
 - silently give Ash an OpenAI API key;
 - host core Spark development worktrees;
 - become the Buzz server.
@@ -3030,11 +3115,19 @@ ChatGPT
 Gemini
   Lambert
     existing subscription
+
+GitHub (backspring-labs)
+  nostromo-parker App
+    Contents + Pull requests write, installed on squad-ops only
+  nostromo-ripley App
+    Contents + Pull requests write, installed on squad-ops only
+  squad-ops rulesets
+    per-identity branch namespace and path boundaries
 ```
 
 ## Completion probe
 
-Test requests attribute to the correct provider boundary, keys are isolated, and enforced limit behavior is documented.
+Test requests attribute to the correct provider boundary, keys are isolated, and enforced limit behavior is documented. Crew commits attribute to crew GitHub Apps, and ruleset rejections behave as designed.
 
 ---
 
@@ -3079,7 +3172,8 @@ tests
 - Mother/Brett reference Ollama;
 - Parker/Ripley use distinct budget profiles;
 - Dallas uses Anthropic;
-- no `respond_to: anyone`.
+- no `respond_to: anyone`;
+- repo-writing roles declare a GitHub identity; identities are unique and never the owner's login.
 
 ---
 
@@ -3101,6 +3195,7 @@ crew instructions
 public identity registry
 host-local private key
 host-local provider auth
+host-local GitHub App key (repo-writing roles)
 relay config
 working directory
 installed harness
@@ -3123,6 +3218,10 @@ Parker worktree exists
 codex-acp executable exists
 Parker API key exists
 Ripley API key is not being sourced
+Parker GitHub App key exists
+installation token mint succeeds
+git author/committer resolve to nostromo-parker[bot]
+owner GitHub credentials absent
 model config resolves
 respond_to=allowlist
 allowlist nonempty
@@ -3148,7 +3247,15 @@ BUZZ_ACP_RESPOND_TO=allowlist
 BUZZ_ACP_RESPOND_TO_ALLOWLIST=<derived public identities>
 ```
 
-plus provider-specific environment.
+plus provider-specific environment, and for repo-writing roles:
+
+```text
+GITHUB_APP_ID=<from secret file>
+GITHUB_APP_INSTALLATION_ID=<from secret file>
+GITHUB_APP_PRIVATE_KEY_FILE=<host-local path>
+GIT_AUTHOR_NAME / GIT_AUTHOR_EMAIL / GIT_COMMITTER_NAME / GIT_COMMITTER_EMAIL = bot identity
+GH_TOKEN and git credentials minted on demand by the launcher's credential helper
+```
 
 The implementation must verify exact current Buzz variable names against the pinned Buzz version.
 
@@ -3198,6 +3305,7 @@ Harness: codex-acp
 Provider: openai
 Model: gpt-5.6-sol
 Budget: parker ($65 hard limit expected)
+GitHub identity: nostromo-parker[bot]
 Workspace: ~/worktrees/squadops/parker
 Buzz relay: wss://...
 Respond-to: allowlist
@@ -3296,6 +3404,16 @@ Crew instructions: instructions.md
 - [ ] Ash API key absent
 - [ ] configured total = $139
 
+## GitHub identities
+
+- [ ] nostromo-parker App created and installed on squad-ops only
+- [ ] nostromo-ripley App created and installed on squad-ops only
+- [ ] App keys stored host-local on Spark only
+- [ ] probe commits attribute to the bots
+- [ ] rulesets exported to infrastructure/github/rulesets/
+- [ ] ruleset rejection probes pass
+- [ ] owner GitHub credentials absent from crew environments
+
 ## Agents
 
 - [ ] Mother round trip
@@ -3366,6 +3484,7 @@ The setup agent MUST stop and report rather than improvise if:
 13. provider usage is attributed to the wrong project/workspace.
 14. secrets appear in git or logs.
 15. a current tool version invalidates a critical architectural assumption in NOSTROMO-0001.
+16. a crew commit or pull request attributes to the owner's personal account rather than the crew's GitHub App, or the required rulesets cannot be created on `squad-ops`.
 
 A stop condition should produce:
 
@@ -3503,6 +3622,21 @@ Reference:
 
 - https://github.com/google-gemini/gemini-cli/blob/main/docs/reference/configuration.md
 
+## GitHub Apps and Rulesets
+
+Current GitHub documentation establishes:
+
+- one free machine account per person under the Terms of Service, which rules out per-agent user accounts;
+- GitHub Apps as organization-owned identities with fine-grained, repository-scoped permissions and hourly installation tokens;
+- rulesets with restrict-creation/update/deletion rules, file-path restrictions using fnmatch with allowed exceptions, and GitHub Apps as bypass actors, with bypass applying per ruleset.
+
+References:
+
+- https://docs.github.com/en/site-policy/github-terms/github-terms-of-service
+- https://docs.github.com/en/apps/creating-github-apps/about-creating-github-apps/about-creating-github-apps
+- https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app
+- https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets
+
 ## OpenAI Spend Limits
 
 Current OpenAI support material identifies enforced organization/project spend limits and errors including:
@@ -3543,8 +3677,9 @@ The condensed order is:
 1. GitHub
    Create Nostromo repo and commit spec/plan/manifest.
 
-2. Providers
+2. Providers and GitHub
    Create bounded Parker/Ripley/Dallas billing identities.
+   Create Parker/Ripley GitHub Apps and squad-ops rulesets.
    Validate Ash subscription auth and Gemini baseline.
 
 3. Jetson
@@ -3612,7 +3747,7 @@ The condensed order is:
 12. disconnect the Mac without stopping the Spark crew or Buzz server;
 13. restart an agent without changing its Buzz identity;
 14. identify the exact harness/model/provider/worktree backing any agent;
-15. prove Parker/Ripley/Dallas are bounded by their dedicated provider limits;
+15. prove Parker/Ripley/Dallas are bounded by their dedicated provider limits, and that crew commits attribute to crew GitHub identities rather than the owner;
 16. prove Ash is not consuming metered OpenAI API budget;
 17. recover canonical design/code/test state from GitHub even if all transient LLM sessions disappear;
 18. reboot the Jetson or Spark according to documented procedures without losing the crew definition;

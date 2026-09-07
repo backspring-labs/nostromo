@@ -22,6 +22,7 @@ EXPECTED_AGENTS = {"mother", "ash", "ripley", "dallas", "parker", "brett", "lamb
 SPARK_AGENTS = {"mother", "ripley", "dallas", "parker", "brett"}  # NSTR-RUN-001
 MAC_AGENTS = {"ash", "lambert"}  # D-008
 LOCAL_AGENTS = {"mother", "brett"}  # NSTR-MOD-001, NSTR-MOD-002
+REPO_WRITING_AGENTS = {"ripley", "parker"}  # NSTR-ID-006, plan §8.7
 
 REQUIRED_AGENT_FIELDS = {
     "display_name",
@@ -135,6 +136,35 @@ def test_public_keys_are_hex64_when_set(agents, manifest):
     for name, key in candidates.items():
         if key is not None:
             assert hex64.match(key), f"{name} buzz_pubkey is not a 64-char hex pubkey"
+
+
+# --- GitHub identity (NSTR-ID-006, plan §8.7) ----------------------------------------
+
+
+def test_repo_writing_roles_declare_a_github_identity(agents):
+    for name in REPO_WRITING_AGENTS:
+        assert agents[name].get("github_identity"), f"{name} needs a GitHub App identity"
+        assert agents[name].get("branch_namespace") == f"nostromo/{name}", name
+
+
+def test_github_identities_are_unique_and_never_the_owner(agents, manifest):
+    owner_login = manifest["owner"]["github_login"]
+    identities = [a["github_identity"] for a in agents.values() if a.get("github_identity")]
+    assert len(identities) == len(set(identities)), "duplicate GitHub identities"
+    assert owner_login not in identities, "a crew member must not reuse the owner's GitHub login"
+
+
+def test_read_only_roles_have_no_github_identity(agents):
+    for name in MAC_AGENTS:
+        assert not agents[name].get("github_identity"), f"{name} reads a public repo and needs no identity"
+
+
+def test_repo_writing_templates_carry_github_app_fields():
+    wanted = {"GITHUB_APP_ID", "GITHUB_APP_INSTALLATION_ID", "GITHUB_APP_PRIVATE_KEY_FILE"}
+    for name in REPO_WRITING_AGENTS:
+        keys = set(_assignments((ENV / f"{name}.env.example").read_text()))
+        assert wanted <= keys, f"{name}: missing {wanted - keys}"
+        assert not any(k in keys for k in ("GH_TOKEN", "GITHUB_TOKEN")), f"{name}: tokens are minted, never stored"
 
 
 # --- Host and supervisor (NSTR-RUN-001, NSTR-RUN-002, D-007, D-008) -----------------

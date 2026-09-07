@@ -1407,6 +1407,8 @@ nostromo/
 ├── infrastructure/
 │   ├── buzz/
 │   │   └── declarative configuration/templates
+│   ├── github/
+│   │   └── exported rulesets
 │   ├── herdr/
 │   │   └── workspace/session definitions
 │   └── mac/
@@ -1508,6 +1510,7 @@ Version control includes:
 - harness/model assignments;
 - permission policies;
 - provider project/workspace logical names;
+- GitHub App logical names and exported rulesets;
 - host affinity;
 - worktree conventions;
 - startup interface;
@@ -1530,7 +1533,7 @@ The Nostromo repository MUST NOT contain:
 - Anthropic API keys;
 - Google tokens;
 - ChatGPT auth tokens;
-- GitHub PATs;
+- GitHub PATs or GitHub App private keys;
 - Buzz server auth tokens;
 - database passwords;
 - MinIO secrets;
@@ -1568,6 +1571,8 @@ Cloud agents SHOULD have dedicated provider credentials.
 Parker's credentials must not be Ripley's credentials.
 
 Dallas uses its own Anthropic boundary.
+
+Agents that write to GitHub, Ripley and Parker in v1, SHOULD likewise have dedicated GitHub identities, implemented as organization-owned GitHub Apps rather than user accounts, so that commits, pull requests, and review comments attribute to the crew member and can be revoked independently of the owner's account. Server-side rulesets, not harness sandboxing, enforce which paths each identity may change.
 
 This allows:
 
@@ -2212,6 +2217,9 @@ Agent public identities SHOULD be represented in the crew manifest.
 ### NSTR-ID-005
 Agent-to-agent inbound communication MUST be restricted to authorized identities.
 
+### NSTR-ID-006
+Agents that write to GitHub MUST do so under a dedicated, role-specific GitHub identity rather than the owner's personal credentials.
+
 ---
 
 ## 64. Runtime Requirements
@@ -2445,9 +2453,9 @@ Mother and Brett successfully use the local Ollama Qwen3.6 35B-A3B path without 
 
 Ash can receive/respond in Buzz using subscription-backed authentication with no OpenAI API key fallback.
 
-### AC-10 — Budget isolation
+### AC-10 — Budget and identity isolation
 
-Parker, Ripley, and Dallas use independent provider billing/credential boundaries with the defined hard caps.
+Parker, Ripley, and Dallas use independent provider billing/credential boundaries with the defined hard caps. Parker and Ripley write to GitHub under their own crew identities, and rulesets reject out-of-scope paths.
 
 ### AC-11 — Author isolation
 

@@ -5,6 +5,7 @@ version: 1
 
 owner:
   display_name: Jason
+  github_login: jasonLadd
   buzz_pubkey: null   # WP-3
 
 agents:
@@ -43,6 +44,8 @@ agents:
     provider: openai
     model: gpt-5.6-sol
     provider_boundary: nostromo-ripley
+    github_identity: nostromo-ripley   # GitHub App, WP-1 §8.7
+    branch_namespace: nostromo/ripley
     budget_profile: ripley
     workspace_profile: architecture
     respond_to: allowlist
@@ -71,6 +74,8 @@ agents:
     provider: openai
     model: gpt-5.6-sol
     provider_boundary: nostromo-parker
+    github_identity: nostromo-parker   # GitHub App, WP-1 §8.7
+    branch_namespace: nostromo/parker
     budget_profile: parker
     workspace_profile: implementation
     respond_to: allowlist

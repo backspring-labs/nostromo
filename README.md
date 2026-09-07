@@ -78,7 +78,7 @@ The suite validates the manifests parse, the roster is exactly the seven canonic
 
 Recorded here until resolved; each will move into the specification, the plan, or `docs/deviations.md`.
 
+Resolved 2026-09-07: per-agent GitHub identities and path-scoped write boundaries. Ripley and Parker are organization-owned GitHub Apps, and `squad-ops` rulesets enforce branch namespaces and path limits server-side. See the plan, WP-1 sections 8.7 to 8.9, and NSTR-ID-006.
+
 - **Lifecycle state store.** The specification defers where durable work-item state lives. Candidate: GitHub Issues on squad-ops with lifecycle labels.
-- **Per-agent GitHub identities.** Ripley and Parker push branches and open pull requests. The plan does not yet provision GitHub credentials per role.
-- **Path-scoped write boundaries.** Codex sandboxing is directory-scoped. Enforcing "Ripley writes SIPs, not source" needs a GitHub-side check.
 - **Reviewer checkout convention.** Git allows a branch in one worktree at a time. Dallas and Brett will review at a detached commit.
