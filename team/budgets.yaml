@@ -1,0 +1,37 @@
+# Nostromo budget profiles (NOSTROMO-0001 Part VII; NOSTROMO-PLAN-0001 §7.7).
+# Provider hard limits are enforced in the provider console (WP-1), never by prompt alone.
+version: 1
+
+monthly_incremental_ceiling_usd: 150
+
+profiles:
+  chatgpt-plus:
+    type: fixed
+    provider: chatgpt
+    amount_usd: 20
+
+  parker:
+    type: provider_hard_limit
+    provider: openai
+    boundary: nostromo-parker
+    amount_usd: 65
+
+  ripley:
+    type: provider_hard_limit
+    provider: openai
+    boundary: nostromo-ripley
+    amount_usd: 27
+
+  dallas:
+    type: provider_hard_limit
+    provider: anthropic
+    boundary: nostromo-dallas
+    amount_usd: 27
+
+  local:
+    type: local_inference
+    metered_api_usd: 0
+
+  existing-subscription:
+    type: excluded_existing_subscription
+    incremental_usd: 0

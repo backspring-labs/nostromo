@@ -1,0 +1,103 @@
+# Nostromo team manifest: the canonical machine-readable crew registry.
+# Non-secret. Public Buzz keys are recorded in WP-5; private keys never live here.
+# Exact model tags are pinned in docs/source-baseline.md as each runtime is commissioned.
+version: 1
+
+owner:
+  display_name: Jason
+  buzz_pubkey: null   # WP-3
+
+agents:
+  mother:
+    display_name: Mother
+    capability: orchestration
+    host: spark
+    supervisor: herdr
+    harness: opencode-acp
+    provider: ollama
+    model: qwen3.6-35b-a3b
+    budget_profile: local
+    workspace_profile: control
+    respond_to: allowlist
+    buzz_pubkey: null
+
+  ash:
+    display_name: Ash
+    capability: ideation_research
+    host: mac
+    supervisor: launchd
+    harness: codex-acp
+    provider: chatgpt
+    model: subscription-backed
+    budget_profile: chatgpt-plus
+    workspace_profile: research
+    respond_to: allowlist
+    buzz_pubkey: null
+
+  ripley:
+    display_name: Ripley
+    capability: architecture
+    host: spark
+    supervisor: herdr
+    harness: codex-acp
+    provider: openai
+    model: gpt-5.6-sol
+    provider_boundary: nostromo-ripley
+    budget_profile: ripley
+    workspace_profile: architecture
+    respond_to: allowlist
+    buzz_pubkey: null
+
+  dallas:
+    display_name: Dallas
+    capability: adversarial_review
+    host: spark
+    supervisor: herdr
+    harness: claude-agent-acp
+    provider: anthropic
+    model_family: opus
+    provider_boundary: nostromo-dallas
+    budget_profile: dallas
+    workspace_profile: review
+    respond_to: allowlist
+    buzz_pubkey: null
+
+  parker:
+    display_name: Parker
+    capability: implementation
+    host: spark
+    supervisor: herdr
+    harness: codex-acp
+    provider: openai
+    model: gpt-5.6-sol
+    provider_boundary: nostromo-parker
+    budget_profile: parker
+    workspace_profile: implementation
+    respond_to: allowlist
+    buzz_pubkey: null
+
+  brett:
+    display_name: Brett
+    capability: verification
+    host: spark
+    supervisor: herdr
+    harness: opencode-acp
+    provider: ollama
+    model: qwen3.6-35b-a3b
+    budget_profile: local
+    workspace_profile: verification
+    respond_to: allowlist
+    buzz_pubkey: null
+
+  lambert:
+    display_name: Lambert
+    capability: google_knowledge
+    host: mac
+    supervisor: launchd
+    harness: gemini-acp
+    provider: gemini
+    model: subscription-backed
+    budget_profile: existing-subscription
+    workspace_profile: knowledge
+    respond_to: allowlist
+    buzz_pubkey: null

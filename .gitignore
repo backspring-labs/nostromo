@@ -1,0 +1,28 @@
+# Secrets and credentials are never committed (NOSTROMO-0001 §41).
+.env
+.env.*
+!.env.example
+*.env
+!*.env.example
+*.secret
+secrets/
+auth.json
+credentials*
+*.key
+*.pem
+.nostr*
+
+# Runtime state and logs live outside the repo (NOSTROMO-PLAN-0001 §6.3).
+.local/
+state/
+logs/
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# OS
+.DS_Store

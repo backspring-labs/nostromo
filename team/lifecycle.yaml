@@ -1,0 +1,27 @@
+# Work-item lifecycle states (NOSTROMO-0001 §14).
+# Allowed transitions and the durable state store are defined in WP-9.
+# State must never exist only in an agent's conversation memory.
+version: 1
+
+states:
+  - IDEA_CREATED
+  - EXPLORING
+  - CONVERGING
+  - SIP_DRAFTING
+  - ARCHITECTURE_REVIEW
+  - REVISION
+  - PROPOSED
+  - ACCEPTANCE_REVIEW
+  - ACCEPTED
+  - PLANNING
+  - IMPLEMENTING
+  - VERIFYING
+  - READY_TO_MERGE
+  - MERGED
+  - OBSERVING
+  - CLOSED
+  - BLOCKED
+
+initial: IDEA_CREATED
+terminal:
+  - CLOSED
