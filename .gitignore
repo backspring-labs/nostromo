@@ -26,3 +26,7 @@ __pycache__/
 
 # OS
 .DS_Store
+
+# Non-secret by construction and tracked on purpose: relay configuration synced verbatim to the Jetson.
+# tests/test_jetson_infra.py fails if any secret key ever appears in it.
+!infrastructure/jetson/buzz/buzz.env

@@ -47,6 +47,7 @@ crew/lifecycle.yaml     Work-item lifecycle states
 runtime/env/*.example   Shape of each agent's host-local secret file; placeholders only
 docs/source-baseline.md Dependency ledger: pinned versions and provenance
 docs/deviations.md      Implementation deviation log
+infrastructure/jetson/  Buzz relay appliance: pinned overlay, installer, backup, probes, evidence
 tests/                  Configuration and policy validation
 ```
 
@@ -72,7 +73,7 @@ The suite validates the manifests parse, the roster is exactly the seven canonic
 |---|---|
 | WP-0 Repository scaffold | Done |
 | WP-1 Provider boundaries | Next |
-| WP-2 Jetson Buzz server | Next, parallel with WP-1 |
+| WP-2 Jetson Buzz server | Relay live 2026-09-08 at `ws://nano.tailc69e7d.ts.net:3000`, closed, pinned by digest. Open: Tailscale HTTPS (owner), first reboot probe, real owner pubkey at WP-3. Runbook: `infrastructure/jetson/README.md` |
 | WP-4 Spark base: Herdr, worktrees, Ollama/Qwen | Next, parallel with WP-1 |
 | WP-3, WP-5 onward | Gated on the above |
 

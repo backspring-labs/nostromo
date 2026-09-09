@@ -3355,18 +3355,18 @@ Crew instructions: instructions.md
 
 ## Jetson
 
-- [ ] NVMe healthy
-- [ ] Tailscale/private network healthy
-- [ ] Docker/Compose pinned
-- [ ] Buzz production Compose pinned
-- [ ] Postgres healthy
-- [ ] Redis healthy
-- [ ] MinIO healthy
-- [ ] relay healthy
-- [ ] membership required
-- [ ] auth required
-- [ ] relay private key backed up
-- [ ] persistent volume backup baseline
+- [x] NVMe healthy
+- [x] Tailscale/private network healthy
+- [x] Docker/Compose pinned
+- [x] Buzz production Compose pinned
+- [x] Postgres healthy
+- [x] Redis healthy
+- [x] MinIO healthy
+- [x] relay healthy
+- [x] membership required
+- [x] auth required
+- [x] relay private key backed up
+- [x] persistent volume backup baseline
 - [ ] relay hostname switched from the Tailscale name to buzz.backspring.xyz before WP-5
 
 ## Mac

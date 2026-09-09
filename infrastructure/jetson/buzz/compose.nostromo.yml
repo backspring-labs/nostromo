@@ -1,0 +1,26 @@
+# Nostromo overlay for the upstream Buzz production Compose bundle
+# (block/buzz deploy/compose/compose.yml at the commit in upstream.lock). Applied by buzzctl as:
+#   docker compose --env-file buzz.env --env-file secrets.env -f compose.yml -f compose.nostromo.yml
+# NOSTROMO-PLAN-0001 §9.3: only this overlay lives in the repo; the upstream file is fetched at the pin.
+# Every image is pinned by registry digest so a re-install reproduces exactly what was validated.
+services:
+  relay:
+    image: ${BUZZ_IMAGE:?set BUZZ_IMAGE in buzz.env}
+    # Container env comes from the repo-managed file plus the host-generated secrets file, never a single .env.
+    env_file: !override
+      - buzz.env
+      - secrets.env
+    # Publish only on the Jetson's tailnet address, plus loopback for Tailscale Serve and host probes.
+    # Never 0.0.0.0: the relay must not answer on the LAN or the public Internet (spec §20, plan §9.6).
+    ports: !override
+      - "${BUZZ_BIND_IP:?set BUZZ_BIND_IP in buzz.env}:${BUZZ_HTTP_PORT:-3000}:3000"
+      - "127.0.0.1:${BUZZ_HTTP_PORT:-3000}:3000"
+      - "127.0.0.1:8080:8080"
+  postgres:
+    image: postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
+  redis:
+    image: redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
+  minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+  minio-init:
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727

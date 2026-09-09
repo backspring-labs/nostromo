@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Nostromo wrapper around the pinned Buzz production Compose stack on the Jetson (runs ON the Jetson).
+# Replaces upstream run.sh, which hard-codes "-f compose.yml" and therefore cannot load compose.nostromo.yml.
+set -euo pipefail
+DEPLOY=/mnt/ssd/buzz/deploy
+cd "$DEPLOY"
+compose() {
+  docker compose --env-file buzz.env --env-file secrets.env -f compose.yml -f compose.nostromo.yml "$@"
+}
+case "${1:-help}" in
+  start|up)   compose up -d --wait ;;
+  stop|down)  compose down ;;
+  restart)    compose up -d --wait --force-recreate relay ;;
+  pull)       compose pull ;;
+  status|ps)  shift || true; compose ps "$@" ;;
+  logs)       shift || true; compose logs "${@:-relay}" ;;
+  config)     compose config ;;
+  admin)      shift || true; compose exec relay /usr/local/bin/buzz-admin "$@" ;;
+  backup)     exec ./backup.sh ;;
+  *)
+    cat <<'MSG'
+Usage: buzzctl <command>
+  start            docker compose up -d --wait
+  stop             stop containers, keep volumes
+  restart          recreate the relay after buzz.env or image changes
+  pull             pull the pinned images
+  status [args]    compose ps
+  logs [svc] [-f]  compose logs (default service: relay)
+  config           render the merged Compose config
+  admin <args>     run buzz-admin inside the relay container (add-member, list-members, migrate, ...)
+  backup           run backup.sh
+MSG
+    [[ "${1:-help}" == "help" ]] || exit 1
+    ;;
+esac

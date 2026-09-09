@@ -1,0 +1,8 @@
+# Upstream block/buzz assets this deployment is pinned to. install.sh fetches deploy/compose/compose.yml at
+# BUZZ_COMMIT and refuses to install if its sha256 differs from the value here. Update every line together,
+# and mirror the change in buzz.env (BUZZ_IMAGE) and docs/source-baseline.md.
+BUZZ_COMMIT=c045321a7fb3ca8939f28519ce7a555a6f597728
+BUZZ_COMMIT_DATE=2026-09-08
+BUZZ_IMAGE_INDEX_DIGEST=sha256:496c38cc235db7cbbbe9706e67e5dfe9b14ba987d9fd309a8fe6b81d967151ce
+BUZZ_IMAGE_ARM64_DIGEST=sha256:b47bf3ec968a2c68031b69dc7cbcf4499b3811c87969650a7fecae1689cce1b2
+SHA256_COMPOSE_YML=01ea2d7754a9ea7bf4eac42006af32c85a465fc53e41ef1a8ef371e01a0a0489
