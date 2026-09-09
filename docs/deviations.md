@@ -100,4 +100,7 @@ Security/cost impact:  None.
 Temporary or permanent: Temporary.
 Owner approval:        Recorded for review.
 Revisit trigger:       First owner-initiated reboot of the Jetson.
+Resolved:              2026-09-08. Owner rebooted the nano; tailscaled started before Docker, all four
+                       containers returned under the restart policy with no restarts of their own, Serve
+                       persisted, relay identity and the single community row unchanged, probe.sh 14 PASS.
 ```

@@ -97,5 +97,5 @@ The commit that performs the switch changes the four `buzz.env` URL lines and `B
 ## Known constraints on the Jetson
 
 - `sudo` prompts for a password, so anything needing root (a reboot, changing the Tailscale operator) is an owner action typed at the prompt with the `!` prefix. Serve itself no longer needs root because `jladd` is the Tailscale operator.
-- The reboot-persistence probe is therefore still open. Docker's restart policy will bring the stack back; confirm with `probe.sh` after the first reboot.
+- Reboot recovery is proven (2026-09-08): tailscaled starts before Docker, the stack returns under its restart policy, Serve persists. Give the relay its start period, about 30 s after the container appears, before trusting `probe.sh`.
 - A native Ollama listens on loopback port 11434 on the nano. It is unrelated to Buzz and was left alone.

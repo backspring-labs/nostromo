@@ -73,7 +73,7 @@ The suite validates the manifests parse, the roster is exactly the seven canonic
 |---|---|
 | WP-0 Repository scaffold | Done |
 | WP-1 Provider boundaries | Next |
-| WP-2 Jetson Buzz server | Relay live 2026-09-08 at `wss://nano.tailc69e7d.ts.net` (Tailscale Serve TLS, tailnet only), closed, pinned by digest. Open: first reboot probe, real owner pubkey at WP-3. Runbook: `infrastructure/jetson/README.md` |
+| WP-2 Jetson Buzz server | Done 2026-09-08. Relay at `wss://nano.tailc69e7d.ts.net` (Tailscale Serve TLS, tailnet only), closed, pinned by digest, reboot-proven. Carried to WP-3: real owner pubkey replaces the placeholder. Runbook: `infrastructure/jetson/README.md` |
 | WP-4 Spark base: Herdr, worktrees, Ollama/Qwen | Next, parallel with WP-1 |
 | WP-3, WP-5 onward | Gated on the above |
 
