@@ -5,7 +5,6 @@ tailnet, configured from a repo-managed file that can never carry a secret, and 
 crew manifest and the source baseline.
 """
 
-import ipaddress
 import re
 from pathlib import Path
 
@@ -24,7 +23,6 @@ SECRET_KEYS = {
     "BUZZ_S3_ACCESS_KEY",
     "BUZZ_S3_SECRET_KEY",
 }
-TAILNET = ipaddress.ip_network("100.64.0.0/10")
 DIGEST = re.compile(r"@sha256:[0-9a-f]{64}$")
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 
@@ -122,14 +120,21 @@ def test_owner_pubkey_is_valid_hex_when_set(buzz_env):
     assert HEX64.match(buzz_env.get("RELAY_OWNER_PUBKEY", "")), "RELAY_OWNER_PUBKEY must be 64 hex chars"
 
 
-def test_relay_binds_only_tailnet_and_loopback(buzz_env, overlay):
-    bind_ip = ipaddress.ip_address(buzz_env["BUZZ_BIND_IP"])
-    assert bind_ip in TAILNET, "BUZZ_BIND_IP must be the Jetson's Tailscale address"
+def test_relay_binds_loopback_only(buzz_env, overlay):
+    # Tailscale Serve is the only tailnet entry point; the plaintext port never leaves the host.
+    assert "BUZZ_BIND_IP" not in buzz_env, "the tailnet binding was retired when Serve went live"
     ports = overlay["services"]["relay"]["ports"]
     assert ports, "overlay must take over the relay port list"
     for entry in ports:
-        assert entry.startswith("${BUZZ_BIND_IP") or entry.startswith("127.0.0.1:"), entry
-        assert not entry.startswith("0.0.0.0")
+        assert entry.startswith("127.0.0.1:"), entry
+
+
+def test_relay_urls_use_tls_through_serve(buzz_env):
+    assert buzz_env["RELAY_URL"].startswith("wss://")
+    assert buzz_env["BUZZ_MEDIA_BASE_URL"].startswith("https://")
+    assert buzz_env["BUZZ_CORS_ORIGINS"].startswith("https://")
+    for key in ("RELAY_URL", "BUZZ_MEDIA_BASE_URL", "BUZZ_CORS_ORIGINS"):
+        assert ":3000" not in buzz_env[key], f"{key} must go through Serve on 443, not the relay port"
 
 
 def test_overlay_splits_env_into_repo_and_host_files(overlay):

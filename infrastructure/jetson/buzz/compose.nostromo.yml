@@ -10,10 +10,10 @@ services:
     env_file: !override
       - buzz.env
       - secrets.env
-    # Publish only on the Jetson's tailnet address, plus loopback for Tailscale Serve and host probes.
-    # Never 0.0.0.0: the relay must not answer on the LAN or the public Internet (spec §20, plan §9.6).
+    # Publish on loopback only. Tailscale Serve (443, tailnet only) proxies to 3000 and host probes use 8080.
+    # Never 0.0.0.0, and no longer the tailnet address: the relay is reached over wss:// through Serve
+    # (spec §20, plan §9.6). Tailscale Funnel must never be enabled.
     ports: !override
-      - "${BUZZ_BIND_IP:?set BUZZ_BIND_IP in buzz.env}:${BUZZ_HTTP_PORT:-3000}:3000"
       - "127.0.0.1:${BUZZ_HTTP_PORT:-3000}:3000"
       - "127.0.0.1:8080:8080"
   postgres:

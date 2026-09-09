@@ -47,31 +47,21 @@ On the Jetson, `buzzctl` gives `start`, `stop`, `restart`, `status`, `logs`, `co
 
 ## Network boundary
 
-The relay publishes on `100.98.252.95:3000` (tailnet) and `127.0.0.1:3000` and `127.0.0.1:8080` (loopback). It never binds `0.0.0.0`, so the LAN address refuses connections and nothing is reachable from the public Internet. Tailscale Funnel must never be enabled.
+The relay publishes on loopback only: `127.0.0.1:3000` (app, WebSocket, REST) and `127.0.0.1:8080` (liveness and readiness). Tailscale Serve listens on 443 on the tailnet address and proxies to 3000, so the only way in is `wss://nano.tailc69e7d.ts.net` from a tailnet device. The plaintext port is closed to the tailnet, the LAN address refuses on both 3000 and 443, and nothing is reachable from the public Internet. Tailscale Funnel must never be enabled.
 
-## TLS (pending two owner actions)
+Connect by hostname, never by IP. The relay is multi-tenant: at startup it ensures a community row for the host in `RELAY_URL`, and every WebSocket is bound to a community by the request `Host` header. Any other host, including `100.98.252.95`, gets a generic 404 (`relay: no community is configured for this host`). NIP-11 at `/` is served regardless, so a passing NIP-11 probe does not prove the WebSocket path; `probe.sh` checks the `101` upgrade separately.
 
-The relay currently answers `ws://nano.tailc69e7d.ts.net:3000` in the clear over the tailnet, which the plan allows for bootstrap (§9.6). Moving to `wss://` needs:
+## TLS
 
-1. In the Tailscale admin console, DNS page, enable **HTTPS Certificates** for the tailnet. Until then `tailscale status --json` reports `CertDomains: null` on the nano.
-2. On the nano, once: `sudo tailscale set --operator=jladd` so Serve can be configured without root.
-
-Then, from the Mac:
+Tailscale Serve terminates TLS with a Let's Encrypt certificate for `nano.tailc69e7d.ts.net`. Prerequisites done on 2026-09-08 by the owner: HTTPS Certificates enabled for the tailnet in the admin console, and `sudo tailscale set --operator=jladd` on the nano. The Serve configuration was then applied from the Mac:
 
 ```bash
-ssh nano 'tailscale serve --bg --https=443 http://127.0.0.1:3000 && tailscale serve status'
+ssh nano 'tailscale serve --bg --https=443 http://127.0.0.1:3000'
 ```
 
-and change these five lines in `buzz/buzz.env`, then run `install.sh`:
+It persists in tailscaled state across reboots; `ssh nano tailscale serve status` must always show `(tailnet only)`. Tailscale renews the certificate itself. To take Serve down: `tailscale serve --https=443 off`. Never `tailscale funnel`.
 
-```text
-RELAY_URL=wss://nano.tailc69e7d.ts.net
-BUZZ_MEDIA_BASE_URL=https://nano.tailc69e7d.ts.net/media
-BUZZ_MEDIA_SERVER_DOMAIN=nano.tailc69e7d.ts.net
-BUZZ_CORS_ORIGINS=https://nano.tailc69e7d.ts.net
-```
-
-Never `tailscale funnel`. The same steps apply, with the new name, at the hostname switch below.
+Serve only serves the MagicDNS name, so it does not carry over to the hostname switch below. `buzz.backspring.xyz` needs its own terminator with a DNS-01 certificate: the upstream-supported path is `compose.caddy.yml` with a Caddy build that has the DNS provider plugin, proxying to the relay on loopback exactly as Serve does now.
 
 ## Owner identity
 
@@ -97,10 +87,15 @@ Restore on a fresh host: install, stop the stack, restore `secrets.env`, start P
 
 ## Hostname switch before WP-5
 
-The Tailscale name is the bootstrap value. Before WP-5 mints identities the relay moves to `buzz.backspring.xyz` (plan §9.6, `crew/manifest.yaml`). That is a certificate (DNS-01) plus the same five `buzz.env` lines and `relay.hostname` in the manifest, in one commit.
+The Tailscale name is the bootstrap value. Before WP-5 mints identities the relay moves to `buzz.backspring.xyz` (plan §9.6, `crew/manifest.yaml`). Two facts shape the procedure:
+
+- **A new host is a new community.** The `communities` table is keyed by host with create-if-missing semantics (`ensure_configured_community_for_bootstrap`, buzz-db). Changing `RELAY_URL` does not rename the existing community; it creates another one and bootstraps the owner there. There is no rename in `buzz-admin`. So the switch must happen while nothing worth keeping exists, and it should be done with a data reset so no stale community lingers: `buzzctl stop`, remove the four `buzz-prod_buzz-*-data` volumes, `buzzctl start`. The relay identity lives in `secrets.env` and survives the reset.
+- **Serve does not carry over.** Tailscale Serve only serves the MagicDNS name, so `buzz.backspring.xyz` needs its own TLS terminator with a DNS-01 certificate. The upstream-supported path is `compose.caddy.yml` with a Caddy build that includes the DNS provider plugin, proxying to the relay on loopback exactly as Serve does now. Serve is then switched off.
+
+The commit that performs the switch changes the four `buzz.env` URL lines and `BUZZ_DOMAIN`, `relay.hostname` in `crew/manifest.yaml`, and the handles in the manifest, together. The natural moment is WP-3, when the real owner pubkey replaces the placeholder, since that also wants a reset.
 
 ## Known constraints on the Jetson
 
-- `sudo` prompts for a password, so anything needing root (Tailscale Serve setup, reboot) is an owner action typed at the prompt with the `!` prefix.
+- `sudo` prompts for a password, so anything needing root (a reboot, changing the Tailscale operator) is an owner action typed at the prompt with the `!` prefix. Serve itself no longer needs root because `jladd` is the Tailscale operator.
 - The reboot-persistence probe is therefore still open. Docker's restart policy will bring the stack back; confirm with `probe.sh` after the first reboot.
 - A native Ollama listens on loopback port 11434 on the nano. It is unrelated to Buzz and was left alone.

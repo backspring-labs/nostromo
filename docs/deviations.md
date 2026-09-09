@@ -34,6 +34,9 @@ Security/cost impact:  Traffic between tailnet nodes is already WireGuard-encryp
 Temporary or permanent: Temporary.
 Owner approval:        Recorded for review; the two owner actions are listed in infrastructure/jetson/README.md, "TLS".
 Revisit trigger:       HTTPS certificates enabled and operator set; then Serve plus the five buzz.env lines.
+Resolved:              2026-09-08, same day. Owner enabled HTTPS certificates and set the operator; Serve
+                       terminates TLS on 443 (tailnet only), buzz.env advertises wss://, and the plaintext
+                       tailnet binding was removed. Kept for the record.
 ```
 
 ```text

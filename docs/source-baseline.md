@@ -25,7 +25,7 @@ Dependency ledger for Nostromo (NOSTROMO-PLAN-0001 §7.9, §18.4). Buzz, Herdr, 
 | Node runtime on Spark | TBD (WP-4) | — | — | — |
 | Docker / Compose on Jetson | Docker `29.8.0` (build `88096ef`), Compose `v5.5.1`, data root `/mnt/ssd/docker` | preinstalled on the Jetson | https://docs.docker.com/engine/ | 2026-09-08 on nano |
 | Jetson OS | Ubuntu `22.04.5 LTS` (JetPack), aarch64, root on microSD, NVMe at `/mnt/ssd` | — | — | 2026-09-08 |
-| Tailscale on Jetson | `1.102.3`, MagicDNS `nano.tailc69e7d.ts.net`, HTTPS certificates not yet enabled for the tailnet | — | https://tailscale.com | 2026-09-08 |
+| Tailscale on Jetson | `1.102.3`, MagicDNS `nano.tailc69e7d.ts.net`, HTTPS certificates enabled, Serve `https://nano.tailc69e7d.ts.net` (tailnet only) proxying to `127.0.0.1:3000`, Funnel off | — | https://tailscale.com | 2026-09-08 |
 
 ## Refresh procedure
 

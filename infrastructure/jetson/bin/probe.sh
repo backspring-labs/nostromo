@@ -5,8 +5,8 @@ set -uo pipefail
 HOST="${1:-nano}"
 SPARK="${SPARK_HOST:-spark}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-eval "$(grep -E '^(BUZZ_DOMAIN|BUZZ_HTTP_PORT|BUZZ_BIND_IP)=' "$HERE/buzz/buzz.env")"
-URL="http://${BUZZ_DOMAIN}:${BUZZ_HTTP_PORT}"
+eval "$(grep -E '^(BUZZ_DOMAIN|BUZZ_HTTP_PORT)=' "$HERE/buzz/buzz.env")"
+URL="https://${BUZZ_DOMAIN}"
 fail=0
 check() {
   local name="$1"; shift
@@ -22,18 +22,25 @@ check "volumes on NVMe" ssh "$HOST" 'for v in $(docker volume ls -q --filter lab
 check "migrations"      ssh "$HOST" 'c=$(docker ps -q --filter label=com.docker.compose.service=relay); docker logs "$c" 2>&1 | grep -i -m1 migrat'
 check "secrets mode"    ssh "$HOST" 'stat -c "%a %U" /mnt/ssd/buzz/deploy/secrets.env | grep -q "^600 " && echo 600'
 
-echo "== from the Mac over the tailnet"
+check "serve tailnet-only" ssh "$HOST" 'tailscale serve status 2>&1 | grep -q "(tailnet only)" && ! tailscale serve status 2>&1 | grep -qi funnel && echo "serve on, funnel off"'
+
+echo "== from the Mac over the tailnet, TLS via Tailscale Serve"
+check "certificate"           bash -c "echo | openssl s_client -connect ${BUZZ_DOMAIN}:443 -servername ${BUZZ_DOMAIN} 2>/dev/null | openssl x509 -noout -issuer -enddate | tr '\n' ' '"
 check "NIP-11 relay info"     curl -fsS -H 'Accept: application/nostr+json' "${URL}/"
 check "well-known nostr.json" curl -fsS "${URL}/.well-known/nostr.json?name=probe"
+check "wss upgrade 101"       bash -c "curl -sS -i -m 5 --http1.1 -H 'Connection: Upgrade' -H 'Upgrade: websocket' -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' '${URL}/' 2>/dev/null | head -1 | grep ' 101 '"
 
 echo "== from ${SPARK} over the tailnet"
 check "spark NIP-11" ssh "$SPARK" "curl -fsS -H 'Accept: application/nostr+json' '${URL}/'"
 
-echo "== boundary: LAN address must refuse"
+echo "== boundary: plaintext port closed to the tailnet, LAN address refuses"
+TSIP=$(ssh "$HOST" "tailscale ip -4")
 LAN=$(ssh "$HOST" "ip -4 -o addr show scope global | awk '!/tailscale/{print \$4}' | cut -d/ -f1 | head -1")
-if curl -sS -m 4 -o /dev/null "http://${LAN}:${BUZZ_HTTP_PORT}/" 2>/dev/null; then
-  echo "FAIL  LAN ${LAN}:${BUZZ_HTTP_PORT} answered"; fail=1
-else
-  echo "PASS  LAN ${LAN}:${BUZZ_HTTP_PORT} refused"
-fi
+refuse() {
+  local name="$1" url="$2"
+  if curl -sS -k -m 4 -o /dev/null "$url" 2>/dev/null; then echo "FAIL  ${name} answered: ${url}"; fail=1; else echo "PASS  ${name} refused: ${url}"; fi
+}
+refuse "tailnet plaintext" "http://${TSIP}:${BUZZ_HTTP_PORT}/"
+refuse "LAN plaintext"     "http://${LAN}:${BUZZ_HTTP_PORT}/"
+refuse "LAN https"         "https://${LAN}/"
 exit "$fail"
