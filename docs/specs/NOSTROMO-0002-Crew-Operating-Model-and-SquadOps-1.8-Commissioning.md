@@ -240,7 +240,7 @@ A corollary the record states twice, and which this design treats as inviolable:
 
 # Part I — The Crew
 
-## 4. Ripley — Project Lead
+## 4. Ripley — Expedition Lead
 
 **The question Ripley answers.** How should this fit into SquadOps, what has to land before what, and is the
 rule we are about to establish the right one?
@@ -252,6 +252,11 @@ spent here on removing ambiguity before it becomes an expensive edit.
 tracks state and checks that artifacts are present. Ripley decides what the work should be, what order it
 has to happen in, and what "done" means. Neither substitutes for the other, and the owner sets the
 objective both of them serve.
+
+**Expedition, not project.** The title is deliberate. Ripley leads the crew's expedition *into* SquadOps.
+Ripley does not lead SquadOps, whose roadmap, governance and acceptance belong to the owner and to SquadOps'
+own improvement-proposal process. A crew member who begins making SquadOps product decisions has crossed the
+boundary this document's first section exists to hold.
 
 **Owns.**
 
@@ -2420,7 +2425,7 @@ Held with Ripley, Parker and Dallas:
 | **4. Typed-check and gate introduction** | the seam table and the blocking decision are the expensive parts |
 | **8. Architecture rules and standards** | the rule's boundary and its exceptions |
 | **11. Roll readings and supersession** | §37 |
-| **12. Plan authoring, sequencing, re-placement** | Ripley, as Project Lead; every revision in the record was on the owner's review or ruling |
+| **12. Plan authoring, sequencing, re-placement** | Ripley, as Expedition Lead; every revision in the record was on the owner's review or ruling |
 | **13, 15. Issue triage and SIP work** | a wrong mechanism claim in an issue propagates into a wrong fix |
 | **17, 18. Host and compose operations** | one flag from data loss; owner-gated |
 
@@ -2752,7 +2757,7 @@ change.
 |---|---|---|---|---|---|---|---|---|
 | **Mother** | Coordination and control plane | Qwen3.6 35B-A3B, local | OpenCode ACP | Spark | routes, records state, checks artifact presence, runs measurement mechanics, enforces the interlock; **no technical judgment** | GitHub and Buzz events, tracking issues, capability table | routed handoffs, state transitions, collected artifacts, surfaced escalations | owner |
 | **Ash** | Science Officer: proof, evidence and evaluation | ChatGPT Plus subscription, $20 fixed | Codex ACP | **Spark** | owns proof infrastructure and the crew's benchmark; path-scoped to `tests/**`; **no review of work in flight** | rules about to land, findings needing precedent, benchmark cases | guards that fire on their motivating commit, replays and fixtures, corpus counts, blinded scores, research artifacts | Dallas for guards, Parker for fixtures |
-| **Ripley** | Project Lead | GPT-5.6 Sol, `nostromo-ripley`, $27 | Codex ACP | Spark | technical direction, design artifacts, the line's plan and its sequencing, measurement interpretation; terminal technical authority in the crew | objectives, SIPs, plans, standards, records | acceptance sources, plans, dispositions, roll readings | Dallas challenges; escalates to owner |
+| **Ripley** | Expedition Lead | GPT-5.6 Sol, `nostromo-ripley`, $27 | Codex ACP | Spark | technical direction, design artifacts, the line's plan and its sequencing, measurement interpretation; terminal technical authority in the crew | objectives, SIPs, plans, standards, records | acceptance sources, plans, dispositions, roll readings | Dallas challenges; escalates to owner |
 | **Dallas** | Independent adversarial assurance | Claude Opus, `nostromo-dallas`, $27 | Claude ACP | Spark | blocking objections that must be dispositioned; default independent approver for significant Parker work | designs, PRs, repository state | the §19.3 return; review outcomes | owner, on unresolved disagreement |
 | **Parker** | Primary engineer | GPT-5.6 Sol, `nostromo-parker`, $65 | Codex ACP | Spark | implements, traces, decomposes, writes cards, reviews Brett, reclaims work | accepted designs, Finding Records | implementations, Bounded Task Cards, change evidence | Dallas reviews; escalates to Ripley or owner |
 | **Brett** | Supporting engineer | Qwen local, coding-capable *(experiment, §35.1)* | OpenCode ACP *(comparison pending)* | Spark | bounded implementation inside the card; **concludes nothing** | one Bounded Task Card | a PR with raw evidence, or an escalation naming the condition | Parker |
