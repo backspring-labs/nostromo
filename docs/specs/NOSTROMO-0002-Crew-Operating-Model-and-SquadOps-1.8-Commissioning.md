@@ -639,8 +639,13 @@ permanent role to justify a persona.
 
 Lambert keeps the character NOSTROMO-0001 §11.7 defines: the Google knowledge projection, $0 incremental,
 off the critical engineering path, and explicitly unable to block SquadOps development by being unavailable.
-With Ash moved to the Spark (§9), Lambert is the crew's only Mac-resident agent, which suits a role whose
-unavailability is designed to cost nothing.
+
+**Lambert moves to the Spark, under Herdr, with the rest of the crew.** Curating a source manifest means
+reading across a large corpus and deciding what is canonical, which is a long-running task. On the Mac under
+`launchd` that work dies when the lid closes, and the plan already accepts that Mac shutdown ends Mac-agent
+sessions. On the Spark under Herdr it survives, and Lambert's model runs in Google's cloud, so the local
+process is a thin client costing almost nothing on the box. The same reasoning that moved Ash applies here,
+for a different reason: Ash moved for access, Lambert moves for **persistence**.
 
 What this section adds is scope and a mechanism, because "maintain the instructional surface" is not
 implementable as written and the naive implementation is actively harmful.
@@ -720,9 +725,15 @@ exactly one moment to remember and it is attached to a procedure that already ha
 
 ### 10A.6 Access, and the boundary
 
-Lambert needs a **read-only** SquadOps checkout to curate manifests, and write access to the Nostromo
-repository for `education/`. Lambert gets **no SquadOps write access of any kind**, because the role is a
-projection and a projection does not modify its source.
+Lambert runs on the Spark under Herdr, with a **read-only** SquadOps checkout for curating manifests and
+write access to the Nostromo repository for `education/`. Lambert gets **no SquadOps write access of any
+kind**, because the role is a projection and a projection does not modify its source. Lambert needs no
+browser: the manifest is the deliverable, and uploading sources into a notebook is a separate act the owner
+takes, or a future Enterprise API takes.
+
+**Lambert is the one agent that can work during a measured window.** Lambert runs no tests, mutates nothing
+in SquadOps, and reads a checkout rather than a worktree, so `COUNTED_SQUADOPS` (§36) does not stop it.
+When Mother and Brett are down and Ash cannot run its suites, curation is the natural work for that window.
 
 **Lambert's artifacts are never a source.** If a decision ever rests on what a guide or a notebook said,
 there is a stale unguarded surface competing with GitHub. The division against Ash (§9) is clean and
@@ -1814,7 +1825,7 @@ the change is proven or an experiment. Nothing here is presented as settled that
 | **Brett** | `opencode-acp`, Ollama `qwen3.6-35b-a3b`, general variant, read-only permissions | **coding-capable local model**, write permissions inside his own worktree, a GitHub App identity, a branch namespace | **material** | **experiment** — see §35.1 |
 | **Mother** | `opencode-acp`, Ollama `qwen3.6-35b-a3b`, control workspace | unchanged model and harness; move coordination logic from prompt into scripts | none to model | **settled**, with the caveat in §35.2 |
 | **Ash** | `codex-acp`, ChatGPT Plus subscription, **Mac**, no repository access | **Spark**, worktree, GitHub identity path-scoped to `tests/**`; same harness and model | **material — host and access** | **settled on reasoning, unproven in practice** — the arithmetic in §2.7 is not in doubt; what is unmeasured is whether subscription rate limits leave Ash enough throughput to be depended on |
-| **Lambert** | `gemini-acp`, Gemini subscription, Mac | unchanged host, harness and model; gains a read-only checkout and `education/` write in the Nostromo repo | **scope only** | **settled**, with the caveat that Gemini's ACP mode is the least proven runtime in the crew — tolerable because nothing depends on it |
+| **Lambert** | `gemini-acp`, Gemini subscription, **Mac**, `launchd` | **Spark** under Herdr; read-only SquadOps checkout; `education/` write in the Nostromo repo | **material — host; plus scope** | **settled** — persistence across Mac shutdown, at near-zero cost on the box. Gemini's ACP mode remains the least proven runtime in the crew, which is tolerable because nothing depends on it |
 | **Kane** | not configured | not added; an experiment slot only (§10) | none | **not a role** |
 
 ### 35.1 Brett's model and harness are two open experiments, not decisions
@@ -1892,6 +1903,25 @@ cap intact. The measure of success is **paid tokens per passing change, at equal
 count**. A reduction in paid tokens bought with one additional silent failure is a worse result, not a
 cheaper one.
 
+### 35.4 The Mac becomes a pure cockpit
+
+With Ash (§9) and Lambert (§10A) both resident on the Spark, **no crew agent runs on the Mac.** That is a
+simplification worth taking deliberately rather than noticing later:
+
+- one agent host, one supervisor, one launcher path, one permission model;
+- no `launchd` agent management, no Mac-local agent secrets, no second auth surface;
+- the Mac closes, sleeps or reboots with zero crew impact, which the plan previously accepted only for the
+  lightweight roles;
+- NOSTROMO-0001 §27 (Mac agent process affinity) and the plan's WP-8 largely dissolve into WP-7.
+
+The Mac keeps what it was always best at: Buzz Desktop, the owner identity, the control channel, `gh`, and
+SSH to the Spark and the Jetson.
+
+**One practical consequence.** Both the Codex and Gemini sign-ins are interactive browser flows, and they now
+happen on the Spark. The Spark boots to `graphical.target` with Chromium available, so a console or
+forwarded session handles it; a device-code flow is the fallback. Node is not yet installed on the Spark and
+both harnesses need it, which is already a WP-4 item in the source baseline.
+
 ---
 
 # Part VIII — The Spark Interlock
@@ -1917,7 +1947,9 @@ CREW_DEVELOPMENT
 COUNTED_SQUADOPS
     crew local inference stopped and models unloaded
     no crew repository mutation on squad-ops
+    no crew test execution on the box (Ash's suites, Brett's gates)
     cloud-backed crew roles may read and may work on the Nostromo repo
+    Lambert works normally: no tests, no mutation, a read-only checkout
     Mother remains alive to collect, and runs no local inference
 ```
 
@@ -2439,7 +2471,7 @@ Every row names the actual current file. `R` = required before commissioning. `F
 | `crew/manifest.yaml` | Ash: `host: mac` → `spark`, `supervisor: launchd` → `herdr`, `workspace_profile: research` → `proof`; add `github_identity: nostromo-ash`, `branch_namespace: nostromo/ash`, `path_scope: tests/**` | §2.7, §9 | `tests/test_crew_config.py` extended: Ash is on Spark, carries a path scope, and holds no `*_API_KEY` | **R** |
 | `crew/manifest.yaml` | add `reasoning_profile` per agent | it is a first-class setting, not a default | test asserts presence | **R** |
 | `crew/capabilities.yaml` | replace `verification: brett` with `bounded_implementation: brett`, `evidence_collection: brett`; add `measurement_mechanics: mother`, `measurement_interpretation: ripley`; replace `ideation_research: ash` with `proof_infrastructure: ash`, `corpus_measurement: ash`, `evaluation: ash`, `precedent_research: ash`, `external_research: ash`; replace `google_knowledge: lambert` with `knowledge_projection: lambert`, `source_curation: lambert` | the verification capability splits at the `L`/`F` line; Ash gains the Verifier cluster; Lambert's scope is named | test asserts every capability resolves to a manifest agent | **R** |
-| `crew/manifest.yaml` | Lambert: add `workspace_profile: projection`, a read-only SquadOps checkout path, and `github_identity: nostromo-lambert` scoped to the `nostromo` repo | §10A.6 | test asserts Lambert holds no `squad-ops` write identity | F |
+| `crew/manifest.yaml` | Lambert: `host: mac` → `spark`, `supervisor: launchd` → `herdr`, `workspace_profile: knowledge` → `projection`; add a read-only SquadOps checkout path and `github_identity: nostromo-lambert` scoped to the `nostromo` repo | §10A.6, §35.4 | test asserts Lambert is on Spark and holds no `squad-ops` write identity | F |
 | `crew/lifecycle.yaml` | restructure into two lanes with their states, the legal loops, and the Lane B → Lane A crossing conditions | §23, §24 | test asserts both lanes parse, initial and terminal states exist, and every loop target is a declared state | **R** |
 | `crew/budgets.yaml` | unchanged; add a comment recording that Dallas's cap is scoped to risk-triggered review | §35.3 | none | F |
 | `.plugin/plugin.json` | unchanged roster; add `skills/` if the Persona Pack supports it at the pinned version | procedural knowledge is not prompt context | verify against the pinned spec | F |
@@ -2477,7 +2509,8 @@ Every row names the actual current file. `R` = required before commissioning. `F
 | GitHub App `nostromo-ash` | register; install on **both** repos — `squad-ops` with Contents + PR + Issues write, `nostromo` for `bench/` | Ash authors guards, fixtures and benchmark cases | **R** |
 | Ash's Spark worktree | create `~/worktrees/squadops/ash`; validate the repository bootstrap and the unit suite in it | §9, plan §11.6–11.7 | **R** |
 | GitHub App `nostromo-lambert` | register, install on **`nostromo` only**, Contents write for `education/` | Lambert curates manifests and never writes to SquadOps | F |
-| Lambert's SquadOps checkout | read-only clone on the Mac; no worktree, no branch, no push remote | §10A.6 | F |
+| Lambert's SquadOps checkout | read-only clone **on the Spark**; no worktree, no branch, no push remote | §10A.6 | F |
+| Lambert's Gemini auth on the Spark | interactive sign-in completed on the Spark rather than the Mac, via console, forwarded session, or device code | §35.4 | F |
 | Ash's Codex auth on the Spark | ChatGPT login flow completed on the Spark rather than the Mac; confirm the adapter reports ChatGPT-authenticated and that no `OPENAI_API_KEY` or `CODEX_API_KEY` is present | §2.7 host move; plan §8.5 | **R** |
 | Apps `nostromo-parker`, `nostromo-ripley` | **add Issues read/write** — WP-1 §8.7 currently grants only Contents, Pull requests and Metadata | they must file Finding Records and Bounded Task Cards | **R** |
 | `squad-ops` rulesets | add `nostromo-brett-branches` and `nostromo-brett-paths`; add `nostromo-ash-branches` and `nostromo-ash-paths` restricting Ash to `tests/**`; add a require-review-from-non-author rule to each identity ruleset | §12.1, §14; **the author of a proof must not be able to modify the thing proved** | **R** |
@@ -2501,7 +2534,7 @@ Every row names the actual current file. `R` = required before commissioning. `F
 | File | Change | When |
 |---|---|---|
 | `docs/specs/NOSTROMO-0001-*.md` | the four amendments in §1.3, each as a dated amendment section rather than a silent edit | **R** |
-| `docs/specs/NOSTROMO-PLAN-0001-*.md` | WP-1 §8.7 App permissions; WP-4 §11.11 Brett's permission profile; WP-9 persona content; WP-10 commissioning replaced by §40–§42 | **R** |
+| `docs/specs/NOSTROMO-PLAN-0001-*.md` | WP-1 §8.7 App permissions; WP-4 §11.11 Brett's permission profile and the Node runtime both harnesses need; WP-8 folds into WP-7 now that no agent runs on the Mac (§35.4); WP-9 persona content; WP-10 commissioning replaced by §40–§42 | **R** |
 | `README.md` | resolve both open decisions: lifecycle store (§25) and reviewer checkout (§38.1) | **R** |
 | `docs/source-baseline.md` | pin Brett's model and harness once §35.1 resolves | F |
 
@@ -2531,7 +2564,7 @@ WP-4  Spark base: Herdr, worktrees, Ollama          amended by §45.4 (Brett's p
 WP-5  mint seven Buzz identities                    gated on the relay hostname switch
 WP-6  Spark local agents: Mother and Brett          amended: Brett writes now
 WP-7  Spark cloud agents                            unchanged
-WP-8  Mac agents                                    unchanged
+WP-8  Mac agents                                    folds into WP-7 (§35.4): no agent runs on the Mac
 WP-9  personas, instructions, channels              ← Phase 0 and 2 land here
 WP-10 commissioning roll                            ← replaced by §40 and §41
 WP-11 stabilization and baseline freeze             unchanged
@@ -2706,7 +2739,7 @@ change.
 | **Dallas** | Independent adversarial assurance | Claude Opus, `nostromo-dallas`, $27 | Claude ACP | Spark | blocking objections that must be dispositioned; default independent approver for significant Parker work | designs, PRs, repository state | the §19.3 return; review outcomes | owner, on unresolved disagreement |
 | **Parker** | Primary engineer | GPT-5.6 Sol, `nostromo-parker`, $65 | Codex ACP | Spark | implements, traces, decomposes, writes cards, reviews Brett, reclaims work | accepted designs, Finding Records | implementations, Bounded Task Cards, change evidence | Dallas reviews; escalates to Ripley or owner |
 | **Brett** | Supporting engineer | Qwen local, coding-capable *(experiment, §35.1)* | OpenCode ACP *(comparison pending)* | Spark | bounded implementation inside the card; **concludes nothing** | one Bounded Task Card | a PR with raw evidence, or an escalation naming the condition | Parker |
-| **Lambert** | Knowledge projection and source curation | Gemini subscription, $0 incremental | Gemini ACP | Mac | curates source manifests; **read-only on SquadOps**, writes only `education/` in the Nostromo repo; artifacts are never a source | closed release lines, the lessons corpus, landed standards | pinned source manifests and the formats generated from them | Mother; blocks nothing |
+| **Lambert** | Knowledge projection and source curation | Gemini subscription, $0 incremental | Gemini ACP | **Spark** | curates source manifests; **read-only on SquadOps**, writes only `education/` in the Nostromo repo; artifacts are never a source | closed release lines, the lessons corpus, landed standards | pinned source manifests and the formats generated from them | Mother; blocks nothing |
 | *(Kane)* | *harness experiment slot, not a crew member* | Brett's model, held constant | the harness under test | Spark | none | benchmark cases | outcome-class distributions | — |
 
 ## 49. Feature sequence, end to end
