@@ -25,6 +25,13 @@ SquadOps record:
 
 This document turns that evidence into an operating model and a commissioning plan.
 
+### 1.0 A note on the roster's names
+
+The crew's names are call signs, not a cast list. Each role's authority is defined in Part I and Part II and
+nowhere else. Do not infer what an agent may decide from the film the names come from — the assignments
+deliberately diverge from it, and the divergences are the interesting part. Ripley holds the rank the
+character held and the authority the character earned rather than the one the hierarchy gave her.
+
 ### 1.1 The boundary, restated
 
 > SquadOps' internal agent collaboration architecture is the system being maintained. It is not the template
@@ -240,7 +247,7 @@ A corollary the record states twice, and which this design treats as inviolable:
 
 # Part I — The Crew
 
-## 4. Ripley — Expedition Lead
+## 4. Ripley — Warrant Officer
 
 **The question Ripley answers.** How should this fit into SquadOps, what has to land before what, and is the
 rule we are about to establish the right one?
@@ -248,15 +255,20 @@ rule we are about to establish the right one?
 Ripley owns high-cost technical judgment and the technical direction of the line. Frontier reasoning is
 spent here on removing ambiguity before it becomes an expensive edit.
 
-**Lead, not manager.** Ripley leads *technically*; Mother coordinates *mechanically*. Mother routes work,
+**Technical lead, not manager.** Ripley leads *technically*; Mother coordinates *mechanically*. Mother routes work,
 tracks state and checks that artifacts are present. Ripley decides what the work should be, what order it
 has to happen in, and what "done" means. Neither substitutes for the other, and the owner sets the
 objective both of them serve.
 
-**Expedition, not project.** The title is deliberate. Ripley leads the crew's expedition *into* SquadOps.
-Ripley does not lead SquadOps, whose roadmap, governance and acceptance belong to the owner and to SquadOps'
-own improvement-proposal process. A crew member who begins making SquadOps product decisions has crossed the
-boundary this document's first section exists to hold.
+**Why the rank, and not a management title.** A warrant officer's authority comes from expertise rather
+than from position. It runs as deep as the domain and stops sharply at its edge. That is precisely the shape
+of Ripley's authority here: terminal on technical questions inside the crew, and granting nothing over
+SquadOps itself, whose roadmap, governance and acceptance belong to the owner and to SquadOps' own
+improvement-proposal process. A crew member who begins making SquadOps product decisions has crossed the
+boundary §1.1 exists to hold.
+
+On this crew the warrant officer leads, and that is the point rather than an accident of naming. Authority
+here is held by whoever holds the evidence and the domain, not conferred by a slot above other slots.
 
 **Owns.**
 
@@ -2425,7 +2437,7 @@ Held with Ripley, Parker and Dallas:
 | **4. Typed-check and gate introduction** | the seam table and the blocking decision are the expensive parts |
 | **8. Architecture rules and standards** | the rule's boundary and its exceptions |
 | **11. Roll readings and supersession** | §37 |
-| **12. Plan authoring, sequencing, re-placement** | Ripley, as Expedition Lead; every revision in the record was on the owner's review or ruling |
+| **12. Plan authoring, sequencing, re-placement** | Ripley, as Warrant Officer; every revision in the record was on the owner's review or ruling |
 | **13, 15. Issue triage and SIP work** | a wrong mechanism claim in an issue propagates into a wrong fix |
 | **17, 18. Host and compose operations** | one flag from data loss; owner-gated |
 
@@ -2757,7 +2769,7 @@ change.
 |---|---|---|---|---|---|---|---|---|
 | **Mother** | Coordination and control plane | Qwen3.6 35B-A3B, local | OpenCode ACP | Spark | routes, records state, checks artifact presence, runs measurement mechanics, enforces the interlock; **no technical judgment** | GitHub and Buzz events, tracking issues, capability table | routed handoffs, state transitions, collected artifacts, surfaced escalations | owner |
 | **Ash** | Science Officer: proof, evidence and evaluation | ChatGPT Plus subscription, $20 fixed | Codex ACP | **Spark** | owns proof infrastructure and the crew's benchmark; path-scoped to `tests/**`; **no review of work in flight** | rules about to land, findings needing precedent, benchmark cases | guards that fire on their motivating commit, replays and fixtures, corpus counts, blinded scores, research artifacts | Dallas for guards, Parker for fixtures |
-| **Ripley** | Expedition Lead | GPT-5.6 Sol, `nostromo-ripley`, $27 | Codex ACP | Spark | technical direction, design artifacts, the line's plan and its sequencing, measurement interpretation; terminal technical authority in the crew | objectives, SIPs, plans, standards, records | acceptance sources, plans, dispositions, roll readings | Dallas challenges; escalates to owner |
+| **Ripley** | Warrant Officer | GPT-5.6 Sol, `nostromo-ripley`, $27 | Codex ACP | Spark | technical direction, design artifacts, the line's plan and its sequencing, measurement interpretation; terminal technical authority in the crew | objectives, SIPs, plans, standards, records | acceptance sources, plans, dispositions, roll readings | Dallas challenges; escalates to owner |
 | **Dallas** | Independent adversarial assurance | Claude Opus, `nostromo-dallas`, $27 | Claude ACP | Spark | blocking objections that must be dispositioned; default independent approver for significant Parker work | designs, PRs, repository state | the §19.3 return; review outcomes | owner, on unresolved disagreement |
 | **Parker** | Primary engineer | GPT-5.6 Sol, `nostromo-parker`, $65 | Codex ACP | Spark | implements, traces, decomposes, writes cards, reviews Brett, reclaims work | accepted designs, Finding Records | implementations, Bounded Task Cards, change evidence | Dallas reviews; escalates to Ripley or owner |
 | **Brett** | Supporting engineer | Qwen local, coding-capable *(experiment, §35.1)* | OpenCode ACP *(comparison pending)* | Spark | bounded implementation inside the card; **concludes nothing** | one Bounded Task Card | a PR with raw evidence, or an escalation naming the condition | Parker |
