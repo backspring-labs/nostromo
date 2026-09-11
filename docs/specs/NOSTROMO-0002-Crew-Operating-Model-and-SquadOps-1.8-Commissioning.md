@@ -48,13 +48,14 @@ form, and none of which alter what SquadOps does.
 
 ### 1.3 Amendments to NOSTROMO-0001
 
-Five changes. Each is argued in §2 and listed here so the spec's readers can find them.
+Six changes. The first five are argued in §2; the sixth is scope definition rather than reversal and is argued in §10A.
 
 | Spec section | Current text | Amendment | Reason |
 |---|---|---|---|
 | §11.6 Brett | Brett owns "failure classification" and "QA conclusions" | Brett owns bounded implementation, deterministic execution and evidence **collection**; Brett never concludes | every conclusion verb in §11.6 is tiered `F` by the capabilities document, and the record's four delegation failures were all frontier delegates concluding in the confirming direction |
 | §11.3 Ripley | "Ripley MUST NOT be the primary implementation engineer for work Ripley designed" | unchanged for Lane A (design work); does not apply in Lane B (findings), where the investigator implements | cross-layer tracing is the archetype where the trace *is* the fix's specification, and where every rework in the record clusters |
 | §11.2 Ash | Ash owns "exploratory discussion, idea expansion, external precedent research"; hosted on the Mac; "does not own production code"; no repository access | Ash is the **Science Officer**: owns proof infrastructure, corpus measurement and evaluation; hosted on the **Spark** with a worktree and a repository identity scoped to `tests/**` | Ash's marginal cost is zero and Parker's is scarce, so the free frontier-capable agent held the least work; and the capabilities document's Verifier cluster, "owns whether a check can fail", had no owner |
+| §11.7 Lambert | Lambert "maintains sources used by NotebookLM" and instructional summaries, with no stated mechanism or access | scope defined: the source-manifest system (§10A.3), a read-only SquadOps checkout, write access to `education/` in the Nostromo repo, and a closed-over-living rule for what gets built | "maintain the instructional surface" is not implementable as written, and the naive implementation multiplies unguarded derived content, which drifts invisibly |
 | §14 Lifecycle | one sixteen-state ladder | two lanes: Lane A (design) keeps the ladder; Lane B (finding) gets its own nine states | `fix` is 381 of 935 merged PRs against `feat` 173; 263 of 535 issue bodies cite a live cycle id |
 | §10 Roster | seven agents, Brett capability `verification` | seven agents unchanged; Brett's capability becomes `bounded_implementation` plus `evidence_collection`; three new capabilities are routed | the verification capability splits at the `L`/`F` line and cannot be held by one role |
 
@@ -634,16 +635,112 @@ permanent role to justify a persona.
 
 ---
 
-## 10A. Lambert — unchanged, and off the 1.8 path
+## 10A. Lambert — Knowledge projection, and the source-manifest system
 
-Lambert is retained exactly as NOSTROMO-0001 §11.7 defines: the Google knowledge projection, not on the
-critical engineering path, $0 incremental, and explicitly unable to block SquadOps development by being
-unavailable. With Ash moved to the Spark (§9), Lambert is the crew's only Mac-resident agent, which suits a
-role whose unavailability is designed to cost nothing.
+Lambert keeps the character NOSTROMO-0001 §11.7 defines: the Google knowledge projection, $0 incremental,
+off the critical engineering path, and explicitly unable to block SquadOps development by being unavailable.
+With Ash moved to the Spark (§9), Lambert is the crew's only Mac-resident agent, which suits a role whose
+unavailability is designed to cost nothing.
 
-Lambert has no role in the 1.8 operating model and no place in either lifecycle lane. Lambert's work begins
-after a work item closes, projecting canonical material into the instructional surface. Nothing in this
-document changes Lambert, and Lambert is not part of the commissioning gate.
+What this section adds is scope and a mechanism, because "maintain the instructional surface" is not
+implementable as written and the naive implementation is actively harmful.
+
+### 10A.1 The problem with educational material
+
+Derived material is unguarded content. A guide is never run, so when it drifts nothing fails — it simply
+becomes a confident description of a system that no longer exists. The record names this failure three ways:
+version and documentation drift recurred three separate times despite a written rule; falsified premises
+survived only in a plan that was superseded at a cut; and the governing lesson, *what a test enforces stays
+true, what discipline enforces drifts.*
+
+Producing many forms of material multiplies that surface. Ten guides is ten things that rot invisibly.
+
+### 10A.2 The rule that makes it safe
+
+**Prefer material about things that are closed.** A closed release line's plan, record, cut record and
+changelog entry are final. Material built from them cannot go stale, needs no refresh, and needs no
+automation. This matters practically as well as theoretically: the programmatic notebook API is a Google
+Cloud Enterprise product, not the consumer surface the existing subscription carries, so any design that
+depends on continuous sync depends on a recurring manual step — and the record's natural experiment on
+recurring manual steps is that the one unguarded step was missed twice by someone holding the checklist.
+
+Where material must cover something living, it carries its pin and its date visibly, so staleness is legible
+rather than invisible. That is the three-state readout lesson applied to documentation: a reader can tell
+current from stale from unknown.
+
+### 10A.3 The source-manifest system
+
+One manifest per topic, in the **Nostromo** repository under `education/manifests/`. It lists the canonical
+sources and the commit they were taken at. Everything generated from it carries the manifest's id and date.
+Generated formats are **regenerated, never hand-edited**, which turns drift from a discipline problem into a
+build problem.
+
+```yaml
+id: maintainer-lessons
+title: What this repository learned by failing
+audience: owner
+status: living            # living | frozen
+source_repo: squad-ops
+source_commit: <40-hex>   # the pin; the whole point of the manifest
+captured: 2026-09-11
+sources:
+  - path: docs/...        # canonical, in-repo
+  - url: https://...      # external, with the date read
+    read: 2026-09-11
+formats: [audio-overview, study-guide, timeline, briefing]
+regenerate_when: the source commit moves, or a listed source is amended
+```
+
+- **`frozen`** means the sources are final and the manifest is never refreshed. A closed release line.
+- **`living`** means it tracks a moving corpus and is refreshed on a schedule (§10A.5).
+
+This obeys the rule the record paid for twice: **derive, do not author.** A guide that restates a fact the
+system already holds is a second copy that will eventually disagree with the first. The manifest points at
+the fact; it does not repeat it.
+
+### 10A.4 What gets made, and what does not
+
+| Build | Why it is safe |
+|---|---|
+| The maintainer lessons corpus | twenty-seven lessons already structured as rule, what happened, how it failed, where it is encoded; it is about principles, so it barely drifts. The highest-value first artifact |
+| One frozen manifest per closed release line | final by the time it is built; zero maintenance forever |
+| Architecture standards, each paired with its motivating failure | standards carry their audit commit already, so the manifest is nearly free |
+| The roadmap's ordering and what gates what | slow-moving and genuinely hard to reconstruct |
+
+**Never:** current code structure, open issues, in-flight pull requests, operational procedure a reader
+might act on. Those live in the repository where they are guarded, and a stale copy of them is worse than
+no copy.
+
+### 10A.5 Lifecycle and the refresh step
+
+A release cut is already a guarded procedure. Nostromo hangs one step off it, on the Nostromo side rather
+than in SquadOps' own checklist: when a line cuts, **freeze that line's manifest** and **re-pin every
+`living` manifest, then regenerate its formats.** Living manifests are refreshed nowhere else, so there is
+exactly one moment to remember and it is attached to a procedure that already has a checklist.
+
+### 10A.6 Access, and the boundary
+
+Lambert needs a **read-only** SquadOps checkout to curate manifests, and write access to the Nostromo
+repository for `education/`. Lambert gets **no SquadOps write access of any kind**, because the role is a
+projection and a projection does not modify its source.
+
+**Lambert's artifacts are never a source.** If a decision ever rests on what a guide or a notebook said,
+there is a stale unguarded surface competing with GitHub. The division against Ash (§9) is clean and
+deliberate: Ash answers questions about open work and live precedent, grounded in the current tree with
+citations; Lambert projects closed work into a durable reading surface. Two oracles answering the same
+question with different freshness is exactly the shape to avoid.
+
+### 10A.7 Not on the 1.8 path
+
+Lambert has no place in either lifecycle lane, is not part of the commissioning gate (§43), and is not a
+dependency of any 1.8 work. Gemini's ACP mode is also the least proven runtime in the crew, which is
+tolerable precisely because nothing depends on it. This work is worth doing and must not consume
+commissioning attention.
+
+**Scope note.** Start with SquadOps material only. SquadOps is public, so its corpus carries no exposure
+question. The Nostromo repository is private and holds the operating model and the maintainer analysis;
+putting those into a third-party product is a decision to take deliberately rather than by default, and
+little is lost by deferring it, because the corpus that is genuinely hard to hold is SquadOps'.
 
 ---
 
@@ -1717,7 +1814,7 @@ the change is proven or an experiment. Nothing here is presented as settled that
 | **Brett** | `opencode-acp`, Ollama `qwen3.6-35b-a3b`, general variant, read-only permissions | **coding-capable local model**, write permissions inside his own worktree, a GitHub App identity, a branch namespace | **material** | **experiment** — see §35.1 |
 | **Mother** | `opencode-acp`, Ollama `qwen3.6-35b-a3b`, control workspace | unchanged model and harness; move coordination logic from prompt into scripts | none to model | **settled**, with the caveat in §35.2 |
 | **Ash** | `codex-acp`, ChatGPT Plus subscription, **Mac**, no repository access | **Spark**, worktree, GitHub identity path-scoped to `tests/**`; same harness and model | **material — host and access** | **settled on reasoning, unproven in practice** — the arithmetic in §2.7 is not in doubt; what is unmeasured is whether subscription rate limits leave Ash enough throughput to be depended on |
-| **Lambert** | `gemini-acp`, Gemini subscription, Mac | unchanged, off the 1.8 path | none | **settled** |
+| **Lambert** | `gemini-acp`, Gemini subscription, Mac | unchanged host, harness and model; gains a read-only checkout and `education/` write in the Nostromo repo | **scope only** | **settled**, with the caveat that Gemini's ACP mode is the least proven runtime in the crew — tolerable because nothing depends on it |
 | **Kane** | not configured | not added; an experiment slot only (§10) | none | **not a role** |
 
 ### 35.1 Brett's model and harness are two open experiments, not decisions
@@ -2236,7 +2333,7 @@ delegation-era failures were all of this kind, and there is no threshold at whic
 - A dedicated Measurement Steward (§37.3).
 - A GitHub Project as the lifecycle board.
 - Machine-readable contract schemas.
-- Lambert's instructional projection of 1.8 work.
+- Lambert's instructional projection of 1.8 work. The source-manifest system (§10A.3) may be built at any time, because it is off the critical path and depends on nothing in the gate.
 
 ---
 
@@ -2341,7 +2438,8 @@ Every row names the actual current file. `R` = required before commissioning. `F
 | `crew/manifest.yaml` | Mother: add `github_identity: nostromo-mother` scoped to the `nostromo` repo | Mother owns the tracking issues | test | **R** |
 | `crew/manifest.yaml` | Ash: `host: mac` → `spark`, `supervisor: launchd` → `herdr`, `workspace_profile: research` → `proof`; add `github_identity: nostromo-ash`, `branch_namespace: nostromo/ash`, `path_scope: tests/**` | §2.7, §9 | `tests/test_crew_config.py` extended: Ash is on Spark, carries a path scope, and holds no `*_API_KEY` | **R** |
 | `crew/manifest.yaml` | add `reasoning_profile` per agent | it is a first-class setting, not a default | test asserts presence | **R** |
-| `crew/capabilities.yaml` | replace `verification: brett` with `bounded_implementation: brett`, `evidence_collection: brett`; add `measurement_mechanics: mother`, `measurement_interpretation: ripley`; replace `ideation_research: ash` with `proof_infrastructure: ash`, `corpus_measurement: ash`, `evaluation: ash`, `precedent_research: ash`, `external_research: ash` | the verification capability splits at the `L`/`F` line; Ash gains the Verifier cluster | test asserts every capability resolves to a manifest agent | **R** |
+| `crew/capabilities.yaml` | replace `verification: brett` with `bounded_implementation: brett`, `evidence_collection: brett`; add `measurement_mechanics: mother`, `measurement_interpretation: ripley`; replace `ideation_research: ash` with `proof_infrastructure: ash`, `corpus_measurement: ash`, `evaluation: ash`, `precedent_research: ash`, `external_research: ash`; replace `google_knowledge: lambert` with `knowledge_projection: lambert`, `source_curation: lambert` | the verification capability splits at the `L`/`F` line; Ash gains the Verifier cluster; Lambert's scope is named | test asserts every capability resolves to a manifest agent | **R** |
+| `crew/manifest.yaml` | Lambert: add `workspace_profile: projection`, a read-only SquadOps checkout path, and `github_identity: nostromo-lambert` scoped to the `nostromo` repo | §10A.6 | test asserts Lambert holds no `squad-ops` write identity | F |
 | `crew/lifecycle.yaml` | restructure into two lanes with their states, the legal loops, and the Lane B → Lane A crossing conditions | §23, §24 | test asserts both lanes parse, initial and terminal states exist, and every loop target is a declared state | **R** |
 | `crew/budgets.yaml` | unchanged; add a comment recording that Dallas's cap is scoped to risk-triggered review | §35.3 | none | F |
 | `.plugin/plugin.json` | unchanged roster; add `skills/` if the Persona Pack supports it at the pinned version | procedural knowledge is not prompt context | verify against the pinned spec | F |
@@ -2366,6 +2464,7 @@ Every row names the actual current file. `R` = required before commissioning. `F
 | `skills/` | `squadops-repo`, `bounded-task-card`, `finding-record`, `verification-mechanics`, `release-cadence` | F, except the first two |
 | `bench/` | cases, packets, oracles, the runner, records | **R** for the delegation experiment |
 | `commissioning/` | the two work-package definitions and their evidence | **R** |
+| `education/manifests/` | one source manifest per topic (§10A.3), plus an index recording where each manifest's generated formats live | F |
 | `infrastructure/github/rulesets/` | exported ruleset JSON | **R** |
 | `infrastructure/spark/` | the mode file, the guard, the launcher hook | **R** |
 
@@ -2377,6 +2476,8 @@ Every row names the actual current file. `R` = required before commissioning. `F
 | GitHub App `nostromo-mother` | register, install on **`nostromo` only**, Issues write | the tracking board | **R** |
 | GitHub App `nostromo-ash` | register; install on **both** repos — `squad-ops` with Contents + PR + Issues write, `nostromo` for `bench/` | Ash authors guards, fixtures and benchmark cases | **R** |
 | Ash's Spark worktree | create `~/worktrees/squadops/ash`; validate the repository bootstrap and the unit suite in it | §9, plan §11.6–11.7 | **R** |
+| GitHub App `nostromo-lambert` | register, install on **`nostromo` only**, Contents write for `education/` | Lambert curates manifests and never writes to SquadOps | F |
+| Lambert's SquadOps checkout | read-only clone on the Mac; no worktree, no branch, no push remote | §10A.6 | F |
 | Ash's Codex auth on the Spark | ChatGPT login flow completed on the Spark rather than the Mac; confirm the adapter reports ChatGPT-authenticated and that no `OPENAI_API_KEY` or `CODEX_API_KEY` is present | §2.7 host move; plan §8.5 | **R** |
 | Apps `nostromo-parker`, `nostromo-ripley` | **add Issues read/write** — WP-1 §8.7 currently grants only Contents, Pull requests and Metadata | they must file Finding Records and Bounded Task Cards | **R** |
 | `squad-ops` rulesets | add `nostromo-brett-branches` and `nostromo-brett-paths`; add `nostromo-ash-branches` and `nostromo-ash-paths` restricting Ash to `tests/**`; add a require-review-from-non-author rule to each identity ruleset | §12.1, §14; **the author of a proof must not be able to modify the thing proved** | **R** |
@@ -2393,6 +2494,7 @@ Every row names the actual current file. `R` = required before commissioning. `F
 | `tests/test_crew_config.py` | extend for the new capabilities, the two-lane lifecycle, Brett's identity and namespace, reasoning profiles, and Mother's absence from `squad-ops` write | **R** |
 | `tests/test_contracts.py` (new) | every contract template exists and carries its mandatory field headings; the card template's five always-fields are present | **R** |
 | `tests/test_spark_interlock.py` (new) | the guard's modes and exit codes | **R** |
+| `tests/test_education_manifests.py` (new) | every manifest parses and carries `id`, `status`, `source_commit` (40 hex) and `captured`; `status` is `living` or `frozen`; a frozen manifest names its release tag; no manifest lists a source under `src/`, `adapters/`, or an issue or pull-request URL | F |
 
 ### 45.6 Specification and plan amendments
 
@@ -2604,7 +2706,7 @@ change.
 | **Dallas** | Independent adversarial assurance | Claude Opus, `nostromo-dallas`, $27 | Claude ACP | Spark | blocking objections that must be dispositioned; default independent approver for significant Parker work | designs, PRs, repository state | the §19.3 return; review outcomes | owner, on unresolved disagreement |
 | **Parker** | Primary engineer | GPT-5.6 Sol, `nostromo-parker`, $65 | Codex ACP | Spark | implements, traces, decomposes, writes cards, reviews Brett, reclaims work | accepted designs, Finding Records | implementations, Bounded Task Cards, change evidence | Dallas reviews; escalates to Ripley or owner |
 | **Brett** | Supporting engineer | Qwen local, coding-capable *(experiment, §35.1)* | OpenCode ACP *(comparison pending)* | Spark | bounded implementation inside the card; **concludes nothing** | one Bounded Task Card | a PR with raw evidence, or an escalation naming the condition | Parker |
-| **Lambert** | Knowledge and Google surface | Gemini subscription | Gemini ACP | Mac | none over engineering | closed work items | instructional projections | Mother; blocks nothing |
+| **Lambert** | Knowledge projection and source curation | Gemini subscription, $0 incremental | Gemini ACP | Mac | curates source manifests; **read-only on SquadOps**, writes only `education/` in the Nostromo repo; artifacts are never a source | closed release lines, the lessons corpus, landed standards | pinned source manifests and the formats generated from them | Mother; blocks nothing |
 | *(Kane)* | *harness experiment slot, not a crew member* | Brett's model, held constant | the harness under test | Spark | none | benchmark cases | outcome-class distributions | — |
 
 ## 49. Feature sequence, end to end
