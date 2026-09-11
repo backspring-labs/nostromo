@@ -48,12 +48,13 @@ form, and none of which alter what SquadOps does.
 
 ### 1.3 Amendments to NOSTROMO-0001
 
-Four changes. Each is argued in §2 and listed here so the spec's readers can find them.
+Five changes. Each is argued in §2 and listed here so the spec's readers can find them.
 
 | Spec section | Current text | Amendment | Reason |
 |---|---|---|---|
 | §11.6 Brett | Brett owns "failure classification" and "QA conclusions" | Brett owns bounded implementation, deterministic execution and evidence **collection**; Brett never concludes | every conclusion verb in §11.6 is tiered `F` by the capabilities document, and the record's four delegation failures were all frontier delegates concluding in the confirming direction |
 | §11.3 Ripley | "Ripley MUST NOT be the primary implementation engineer for work Ripley designed" | unchanged for Lane A (design work); does not apply in Lane B (findings), where the investigator implements | cross-layer tracing is the archetype where the trace *is* the fix's specification, and where every rework in the record clusters |
+| §11.2 Ash | Ash owns "exploratory discussion, idea expansion, external precedent research"; hosted on the Mac; "does not own production code"; no repository access | Ash is the **Science Officer**: owns proof infrastructure, corpus measurement and evaluation; hosted on the **Spark** with a worktree and a repository identity scoped to `tests/**` | Ash's marginal cost is zero and Parker's is scarce, so the free frontier-capable agent held the least work; and the capabilities document's Verifier cluster, "owns whether a check can fail", had no owner |
 | §14 Lifecycle | one sixteen-state ladder | two lanes: Lane A (design) keeps the ladder; Lane B (finding) gets its own nine states | `fix` is 381 of 935 merged PRs against `feat` 173; 263 of 535 issue bodies cite a live cycle id |
 | §10 Roster | seven agents, Brett capability `verification` | seven agents unchanged; Brett's capability becomes `bounded_implementation` plus `evidence_collection`; three new capabilities are routed | the verification capability splits at the `L`/`F` line and cannot be held by one role |
 
@@ -168,6 +169,39 @@ have no counterpart anywhere in the Nostromo documents, and the task card exists
 **Recommendation.** Keep the envelope exactly as it is, as the transport. Add seven payload contracts that
 travel inside it (§15 to §22). The envelope says *who is being asked for what*; the payload says *what they
 need in order to answer without rediscovering architecture*.
+
+### 2.7 Ash was read-only for no derived reason — resolved against the current design
+
+**Current design.** Ash is a research and ideation role on the Mac, with no repository access, no GitHub
+identity, and no place in either lifecycle lane after the exploration phase.
+
+**The arithmetic.** Ash's marginal cost is zero: the $20 subscription is spent whether Ash works or not.
+Parker's $65 is metered, scarce, and already carrying two jobs — implementing what has no table, and
+producing tables for Brett — which §55's OD-3 flags as an open capacity question. The crew gave its one
+free frontier-capable agent the least work and its scarcest agent the most.
+
+**The constraints turned out not to be real.** Ash runs a cloud model, so an Ash process on the Spark is a
+thin client costing tens of megabytes rather than the gigabytes the interlock exists to manage. The required
+regression check runs the unit suite, which does not need the live stack, so a repo-facing Ash can produce
+the evidence a PR body requires. A GitHub App for Ash is the same shape as Parker's. The read-only rule was
+inherited from the specification's framing of Ash as a conversational thinking partner and was never
+re-derived against the work.
+
+**The one real constraint** is that a consumer subscription is rate-limited per window, so Ash is
+interruptible in a way a metered agent is not. That is an argument about *which* work Ash holds, not about
+whether Ash holds any: Ash takes work that tolerates pausing and never sits on the critical path of a merge.
+
+**The function that had no owner.** The capabilities document proposes seven role clusters, one of which is
+a **Verifier** who "owns whether a check can fail". This operating model dissolved it: execution went to
+Brett and authoring was scattered between Parker and Brett. Seven of the nine capabilities in that domain
+are tiered `F` — naming the bug a test catches before writing it, entering at the live caller rather than
+the seam, pairing every assertion with a control, proving a new test fails against the pre-fix tree,
+deriving a guard from the owning module rather than a hand-listed set, tabling every seam before binding a
+check.
+
+**Recommendation.** Ash becomes the Science Officer and owns proof, constructively (§9). Ash moves to the
+Spark with a worktree and an identity path-scoped to `tests/**`, which yields a structural property worth
+having on its own: **the author of a proof cannot modify the thing being proved.**
 
 ---
 
@@ -499,30 +533,84 @@ explained by exactly one absent field.
 
 ---
 
-## 9. Ash — Research and external evidence
+## 9. Ash — Science Officer: proof, evidence and evaluation
 
-Ash is retained unchanged in character and re-scoped in routing. Ash is the crew's access to information that
-is not in the repository.
+**The question Ash answers.** Can this claim be trusted, and what would it take to prove it false?
 
-**Route to Ash when the work needs:**
+Ash owns **proof, constructively**. Where Dallas asks whether a proof can fail, Ash builds the proof that
+can. Where Ripley decides what a rule should be, Ash measures what that rule would do to the code that
+already exists. Where the crew claims a capability, Ash builds the benchmark that tests the claim.
 
-- external technical research: a standard, a protocol, an RFC, a specification;
-- library, framework or vendor investigation: capabilities, versions, breaking changes, deprecations;
-- current ecosystem information that postdates any model's training;
-- comparative technology investigation where SquadOps is choosing between external options;
-- evidence that requires internet access rather than repository modification.
+Ash is resident on the Spark with a worktree, a GitHub identity, and a repository path scope of `tests/**`.
+The scope is the point: **Ash cannot make a test pass by changing the code it tests.** That is the mirror of
+Brett's bounded scope and it makes Ash's proofs structurally independent of the implementation.
 
-**Do not route to Ash:** anything answerable from the SquadOps repository. Repository questions go to Ripley
-or Parker, who can read the tree. Ash's value is that Ash can reach outside; spending it on questions the
-repository answers wastes the one thing the crew has only one of.
+### 9.1 What Ash owns
 
-**Ash returns a durable artifact, not a conversation.** An Ash finding lands as a research note in the work
-item's canonical GitHub artifact or as a Canvas that is then moved to GitHub when it is used. A conclusion
-that exists only in a Buzz thread is not an Ash deliverable. Ash's findings carry their sources as links,
+**Proof infrastructure.** The reusable machinery every change is proven against: architecture guards and
+ratchets under the repository's guard directory; replay harnesses over stored artifacts; fixtures and golden
+corpora; the paired controls a guard needs before it may gate anything. A guard Ash writes carries the commit
+it must fire on, and Ash demonstrates it firing there before it is trusted to pass.
+
+**Corpus measurement before a rule lands.** When Ripley is about to write a rule, Ash measures what it would
+do to the tree as it stands, and reports the count. The record settles the value of this. A check measured
+against nine already-accepted suites first showed that the obvious form would have wrongly flagged seven of
+them, so the rule was written differently and held. Two checks that were not measured first were reverted,
+one of them as an unvalidated rejection gate sitting in the path of a measurement.
+
+This is also what makes Dallas's upstream challenge evidential rather than rhetorical. Dallas asks whether a
+proof can fail; Ash can answer with a number across the existing corpus.
+
+**Evaluation.** The benchmark and everything that makes it honest: case construction; the admission proof
+that every oracle fails on the broken tree and passes on the clean one; blinded scoring of the quality
+dimensions; classification of every non-passing run; and the graduation ladder's arithmetic (§44.3). Ash is
+the independent evaluator the evaluation design requires, because Ripley interprets measurement and holds
+architecture, Parker and Dallas are the subjects being scored, and Mother may not conclude.
+
+**Precedent and decision archaeology.** Reconstructing a prior decision and its reason before anyone
+contradicts it. This is archival work across the proposal corpus, plans and records, and it is a different
+skill from reading current code. Ripley reads the tree as it is; Ash reads how it came to be that way. The
+failure this prevents is on record: three falsified premises and four unbuilt dispositions survived only in
+a plan superseded at a release cut, after which the proposal would have been the sole surviving description
+of a design it no longer matched.
+
+**External evidence.** Standards, protocols, library and vendor investigation, ecosystem facts that postdate
+training, and comparisons where SquadOps is choosing between external options. Findings carry their sources
 with the date read, because external facts expire.
 
-Ash has no repository write access and no GitHub identity. Ash's subscription-backed configuration must never
-fall back to metered API usage, which is enforced by the absence of any API key in Ash's environment.
+### 9.2 What Ash does not own
+
+- **Review of work in flight.** That is Dallas. Ash builds proofs; Ash does not adjudicate pull requests.
+- **The test for someone else's specific fix.** A fix and its proof are coupled, and splitting them would
+  insert a handoff into exactly the chain §24.2 protects. The implementer writes the test for their own
+  change, using the infrastructure Ash builds.
+- **Production code.** Ash's path scope is `tests/**`. A proof that requires a source change goes to Parker.
+- **Anything on the critical path of a merge.** Ash is rate-limited by subscription and must never be the
+  thing a merge waits on.
+- **Deciding whether an oracle was right.** When a benchmark result turns on whether the oracle itself was
+  wrong, that is Ripley's or the owner's call, not the evaluator's.
+
+### 9.3 Why this role and not a second implementer
+
+A second implementer would add another queue for Parker to review and would sit on the merge path, which the
+rate limit makes a poor fit. Proof work compounds instead. **The bounding proof is the single field that
+decides whether work can be delegated to Brett at all**, so an agent that manufactures proofs is
+manufacturing delegability, converting free subscription capacity into local-model throughput.
+
+### 9.4 The dependency this creates, and its release valve
+
+If Parker needs a replay harness that does not exist, Parker now has someone to ask — and something to wait
+for. Ash owns the *standard* for proof infrastructure, not a monopoly on writing it. A blocked implementer
+builds what they need and Ash reviews the shape afterward. Ash being unavailable must never stop work.
+
+### 9.5 What is retained
+
+Ash remains the owner's exploratory thinking partner in conversation. Nothing about the ideation character
+is lost; what changed is what Mother *routes* to Ash. Ash still returns durable artifacts rather than
+conclusions that live only in a Buzz thread.
+
+Ash's subscription-backed configuration must never fall back to metered API usage, which is enforced by the
+absence of any API key in Ash's environment.
 
 ---
 
@@ -550,7 +638,8 @@ permanent role to justify a persona.
 
 Lambert is retained exactly as NOSTROMO-0001 §11.7 defines: the Google knowledge projection, not on the
 critical engineering path, $0 incremental, and explicitly unable to block SquadOps development by being
-unavailable.
+unavailable. With Ash moved to the Spark (§9), Lambert is the crew's only Mac-resident agent, which suits a
+role whose unavailability is designed to cost nothing.
 
 Lambert has no role in the 1.8 operating model and no place in either lifecycle lane. Lambert's work begins
 after a work item closes, projecting canonical material into the instructional surface. Nothing in this
@@ -642,6 +731,8 @@ Finding / defect (Lane B)
 | Parker | Dallas where risk warrants, else owner | Dallas is the default independent approver for significant Parker work | Parker never approves Parker |
 | Ripley (Lane B continuity, §4) | Dallas | Dallas | mandatory, because the usual Ripley/Parker independence is absent |
 | Ripley (design artifact, Lane A) | Dallas, then owner | owner | the artifact is the acceptance source |
+| Ash (guard or rule-bearing proof) | Dallas | Dallas | "can this check fail" is Dallas's question and Ash's product |
+| Ash (fixtures, replays, benchmark) | Parker | Parker | no rule content; routine proof infrastructure |
 
 **Nobody approves their own work.** This is enforced three ways, in descending order of reliability: a
 GitHub ruleset requiring a review from someone other than the author; the launcher refusing to mint a token
@@ -736,7 +827,7 @@ not introduced.
 |---|---|---|---|---|---|---|---|
 | 1 | **Finding Record** | any crew member; Mother from an event | Parker (or Ripley) | `squad-ops` issue | link + summary line | yes, presence | yes, in full |
 | 2 | **Bounded Task Card** | Parker (or Ripley for Lane A slices) | Brett | `squad-ops` issue | link + assignment message | yes, mandatory fields | yes, in full — it is Brett's primary context |
-| 3 | **Change Evidence** | implementer (Brett, Parker, Ripley) | reviewer (Parker, Dallas, owner) | `squad-ops` PR body | link + status events | yes, section presence | yes, for the reviewer |
+| 3 | **Change Evidence** | implementer (Brett, Parker, Ripley, Ash) | reviewer (Parker, Dallas, owner) | `squad-ops` PR body | link + status events | yes, section presence | yes, for the reviewer |
 | 4 | **Ruling Record** | owner | whoever holds the line | where the decision lives: plan, SIP amendment, PR comment, pre-registration, or `instructions.md` | link + the ruling text | yes, presence before work resumes | yes, the applicable rulings |
 | 5 | **Deploy Identity** | Mother (mechanics), owner (the rebuild decision) | Ripley, Parker, the owner | `squad-ops` generated artifact (`shakeout-deploy.json`) + the pre-registration's deploy table | link + the probe summary | yes, that every probe is `observed` | on demand |
 | 6 | **Measurement Pair** | Ripley (pre-registration), Mother (record mechanics) | Ripley (interpretation), owner (rulings) | `squad-ops` `docs/plans/` pre-registration and record | link | yes, that pre-registration precedes roll 1 | on demand |
@@ -1115,6 +1206,7 @@ CONVERGING
 DESIGN_DRAFTING    ── Ripley authors the acceptance source: a standard, a map, or a SIP
    ↓
 DALLAS_CHALLENGE   ── risk-triggered (§11); skipped explicitly, with the "no trigger" line recorded
+                   ── Ash measures the corpus first where the work establishes a rule (§9)
    ↓
 REVISION           ── Ripley dispositions every blocking objection in the artifact
    ↓
@@ -1356,25 +1448,28 @@ seemed to imply it.
     Ripley's worktree — not from the Buzz thread.          [state → DESIGN_DRAFTING]
  5. Ripley authors the acceptance source, commits it, and posts the framing plus the link and
     the risk-trigger line: "T2, T4 fired" or "no trigger".
- 6. If a trigger fired, Mother @Dallas. Dallas reads the artifact and the repository, and
-    returns the §19.3 shape in a thread.                    [state → DALLAS_CHALLENGE]
- 7. Ripley dispositions every blocking objection *in the artifact*, commits, and posts the
+ 6. If the work establishes or changes a rule, Mother @Ash to measure the corpus that rule
+    will apply to. Ash reports the count, not an opinion: what the rule would flag across the
+    tree as it stands. The count goes in the artifact.
+ 7. If a trigger fired, Mother @Dallas. Dallas reads the artifact and the repository, and
+    returns the §19.3 shape in a thread, with Ash's count in hand. [state → DALLAS_CHALLENGE]
+ 8. Ripley dispositions every blocking objection *in the artifact*, commits, and posts the
     disposition summary with the commit link.               [state → REVISION → PROPOSED]
- 8. Mother surfaces the item to the owner for acceptance.   [state → OWNER_ACCEPTANCE]
+ 9. Mother surfaces the item to the owner for acceptance.   [state → OWNER_ACCEPTANCE]
     The owner's ruling is recorded in the artifact, dated.  [state → ACCEPTED]
- 9. Mother @Parker with the envelope and the accepted artifact.  [state → PLANNING]
-10. Parker either implements directly, or writes Bounded Task Cards as squad-ops issues and
+10. Mother @Parker with the envelope and the accepted artifact.  [state → PLANNING]
+11. Parker either implements directly, or writes Bounded Task Cards as squad-ops issues and
     posts each card's link. Mother checks each card's mandatory fields are present.
-11. For each card, Mother @Brett in a thread with the envelope and the card URL. Brett
+12. For each card, Mother @Brett in a thread with the envelope and the card URL. Brett
     acknowledges, works in Brett's own worktree through Brett's harness, and reports through
     Buzz. Brett never modifies the repository through Buzz.  [state → IMPLEMENTING]
-12. PR opened. Mother surfaces it: author, branch, card, checks pending.
-13. Checks complete. Mother posts every job's status, including the non-required ones.
-14. Mother routes the review per §12.1: @Parker for a Brett PR, @Dallas for significant
+13. PR opened. Mother surfaces it: author, branch, card, checks pending.
+14. Checks complete. Mother posts every job's status, including the non-required ones.
+15. Mother routes the review per §12.1: @Parker for a Brett PR, @Dallas for significant
     Parker work.                                            [state → VERIFYING → REVIEW]
-15. Approval recorded. Merge per §12.1.                     [state → MERGED]
-16. Mother opens the observation window and records what will be watched. [state → OBSERVING]
-17. Observation read by Ripley (§37). Item closed; channel archived.      [state → CLOSED]
+16. Approval recorded. Merge per §12.1.                     [state → MERGED]
+17. Mother opens the observation window and records what will be watched. [state → OBSERVING]
+18. Observation read by Ripley (§37). Item closed; channel archived.      [state → CLOSED]
 ```
 
 **Which events become Buzz messages.** Handoffs, escalations, state transitions, PR lifecycle events, check
@@ -1517,14 +1612,14 @@ authored content).
 
 | Element | Ripley | Dallas | Parker | Brett | Mother | Ash |
 |---|---|---|---|---|---|---|
-| SquadOps worktree path | yes | yes, detached | yes | yes | read-only checkout | no |
-| Branch / worktree policy | `nostromo/ripley/**` | detached commit, never a branch | `nostromo/parker/**` | `nostromo/brett/**` | none | none |
-| `CLAUDE.md` and contributor workflow | yes | yes | yes | yes | no | no |
-| Architecture standards under `docs/architecture/` | yes | yes | on demand | on demand | no | no |
-| The ten doctrine rules | yes | yes | yes | yes | abbreviated | abbreviated |
-| Role-specific lessons | design, precedent, amendment | falsely-reassuring proofs, seam tables, controls | continuity, tracing, delegation, budgets | bounded execution, collection, forbidden conclusions | routing, presence checks, interlock | sourcing, durable artifacts |
-| GitHub tooling | `gh`, Issues + PR write | `gh` read | `gh`, Issues + PR write | `gh`, Issues read + PR write | `gh` on `nostromo` only | none |
-| Shell / tool capabilities | read, grep, edit own artifacts, git | read, grep, run tests, git read | full dev loop | edit, test, lint, git, push to own namespace | read, scripts, `gh` | web research |
+| SquadOps worktree path | yes | yes, detached | yes | yes | read-only checkout | yes |
+| Branch / worktree policy | `nostromo/ripley/**` | detached commit, never a branch | `nostromo/parker/**` | `nostromo/brett/**` | none | `nostromo/ash/**`, path-scoped to `tests/**` |
+| `CLAUDE.md` and contributor workflow | yes | yes | yes | yes | no | yes |
+| Architecture standards under `docs/architecture/` | yes | yes | on demand | on demand | no | yes |
+| The ten doctrine rules | yes | yes | yes | yes | abbreviated | yes |
+| Role-specific lessons | design, precedent, amendment | falsely-reassuring proofs, seam tables, controls | continuity, tracing, delegation, budgets | bounded execution, collection, forbidden conclusions | routing, presence checks, interlock | controls, guards that fire, corpus measurement, blinded scoring |
+| GitHub tooling | `gh`, Issues + PR write | `gh` read | `gh`, Issues + PR write | `gh`, Issues read + PR write | `gh` on `nostromo` only | `gh`, Issues + PR write on both repos |
+| Shell / tool capabilities | read, grep, edit own artifacts, git | read, grep, run tests, git read | full dev loop | edit, test, lint, git, push to own namespace | read, scripts, `gh` | edit under `tests/**`, run tests, git, push to own namespace, web research |
 
 **Skills, not context.** Procedural knowledge — how to run the regression gate, how to author a verification
 set config, how to read a roll record, the surface-specific traps — belongs in `skills/*/SKILL.md`, loaded by
@@ -1621,7 +1716,7 @@ the change is proven or an experiment. Nothing here is presented as settled that
 | **Dallas** | `claude-agent-acp`, Anthropic Opus, workspace `nostromo-dallas`, $27 | unchanged; add the requirement that Dallas's worktree is detached and never shares Parker's tree or session | none to model or harness | **settled** — a different provider family is what makes the review independent |
 | **Brett** | `opencode-acp`, Ollama `qwen3.6-35b-a3b`, general variant, read-only permissions | **coding-capable local model**, write permissions inside his own worktree, a GitHub App identity, a branch namespace | **material** | **experiment** — see §35.1 |
 | **Mother** | `opencode-acp`, Ollama `qwen3.6-35b-a3b`, control workspace | unchanged model and harness; move coordination logic from prompt into scripts | none to model | **settled**, with the caveat in §35.2 |
-| **Ash** | `codex-acp`, ChatGPT Plus subscription, Mac | unchanged | none | **settled** |
+| **Ash** | `codex-acp`, ChatGPT Plus subscription, **Mac**, no repository access | **Spark**, worktree, GitHub identity path-scoped to `tests/**`; same harness and model | **material — host and access** | **settled on reasoning, unproven in practice** — the arithmetic in §2.7 is not in doubt; what is unmeasured is whether subscription rate limits leave Ash enough throughput to be depended on |
 | **Lambert** | `gemini-acp`, Gemini subscription, Mac | unchanged, off the 1.8 path | none | **settled** |
 | **Kane** | not configured | not added; an experiment slot only (§10) | none | **not a role** |
 
@@ -1693,10 +1788,12 @@ What changes is where Dallas's $27 goes. Reviewing every PR would exhaust it on 
 Scoped to the risk triggers in §11 — architecture rules, check and gate introduction, recovery semantics,
 evidence instrumentation — it covers the archetypes where the record says rework actually lives.
 
-Brett's work is unmetered, which is the point: the operating model converts frontier tokens into local
-tokens wherever a bounding proof exists. The measure of success is **paid tokens per passing change, at
-equal or better silent-failure count**. A reduction in paid tokens bought with one additional silent failure
-is a worse result, not a cheaper one.
+Brett's work is unmetered and Ash's is fixed, which is the point. The operating model converts frontier
+tokens into local tokens wherever a bounding proof exists, and Ash is where those proofs come from — so the
+one agent whose marginal cost is zero is also the one manufacturing the delegability that keeps Parker's
+cap intact. The measure of success is **paid tokens per passing change, at equal or better silent-failure
+count**. A reduction in paid tokens bought with one additional silent failure is a worse result, not a
+cheaper one.
 
 ---
 
@@ -1795,6 +1892,18 @@ the set.
 | **Preservation of perishable evidence** | Mother executes, Ripley decides what is perishable | a record's texture derives from container logs; a rebuild destroys it permanently |
 | **Instrument correction during an open set** | **owner** | an instrument fix that changes a counted roll's score is a ruling, and both readings are reported |
 
+### 37.0 Two measurements, deliberately kept apart
+
+This section is about **SquadOps measurement**: verification sets, counted rolls, deploy identity,
+supersession. Ripley interprets it and the owner rules on it.
+
+The **crew's own benchmark** — case construction, oracle admission, blinded scoring, failure classification
+— is a different instrument measuring a different subject, and it belongs to Ash (§9, §42.3a). Keeping them
+apart is deliberate: the party whose architecture is being measured should not also score the crew's
+performance, and the party scoring the crew should not rule on what a SquadOps roll means.
+
+Mother runs the mechanics for both, and concludes from neither.
+
 ### 37.1 The line Mother must not cross
 
 ```text
@@ -1854,6 +1963,9 @@ swapped are acceptable for v1 if cleanup is disciplined.
   Parker's mutable tree.
 - A second concurrent item for the same role needs a second worktree, which is permitted and named
   `<role>-2`, with the same rulesets.
+- **Ash has a worktree on the Spark** and adds no meaningful memory pressure, because Ash's model runs
+  remotely and the local process is a thin client. Ash's *test execution* is local CPU, so it stops during
+  `COUNTED_SQUADOPS` along with everything else that could perturb a measured run (§36).
 
 ### 38.2 The independence constraint
 
@@ -2036,6 +2148,21 @@ the symptom, names the violated invariant, or names the invariant and the eviden
 **proportionality** — a review that redesigns rather than requesting the smallest correction that restores
 the invariant scores zero here even when the detection is right.
 
+### 42.3a Who runs and scores the evaluation
+
+**Ash** (§9). Ash constructs the cases, proves each oracle fails on the broken tree and passes on the clean
+one, scores the quality dimensions **blind to which arm produced the run**, and classifies every non-passing
+run. Mother runs the mechanics on the Spark; Ash never executes a benchmark run against work Ash will score.
+
+This assignment is forced rather than chosen. The evaluation design requires a scorer who has not seen the
+arm's identity. Ripley interprets measurement and holds architecture. Parker and Dallas are the subjects
+being scored. Mother may not conclude. Ash is the only frontier-capable role with no stake in the work.
+
+**The conflict this creates, and its limit.** Ash authors cases and then scores runs against them, which is
+the same shape as an instrument whose author's assumptions decided a headline. Two things bound it: the
+oracle is mechanical and its admission is proven, so Ash never decides pass or fail; and whether an oracle
+itself was wrong is classified as a verification failure and goes to Ripley or the owner, never to Ash.
+
 ### 42.4 What the experiment costs
 
 All Brett runs are local and unmetered. Parker's framing and review are the only paid calls: a handful of
@@ -2162,6 +2289,12 @@ Held with Ripley, Parker and Dallas:
 
 None of these touch the 1.8 headline features. All of them are real work the release line needs.
 
+**Ash's first work runs alongside them, not after.** Item 2 needs a guard, and a guard is Ash's product: Ash
+measures what the rule would flag across the existing corpus, reports the count, and builds the guard with
+the commit it must fire on demonstrated. That is the cheapest possible proof that the Science Officer role
+works, because the corpus measurement either changes the rule's shape or confirms it, and both outcomes are
+informative.
+
 ### 44.3 How archetypes graduate to Brett
 
 Evidence only, per archetype, and the tier is a hypothesis about this configuration rather than a permanent
@@ -2206,8 +2339,9 @@ Every row names the actual current file. `R` = required before commissioning. `F
 |---|---|---|---|---|
 | `crew/manifest.yaml` | Brett: `capability: verification` → `bounded_implementation`; add `github_identity: nostromo-brett`, `branch_namespace: nostromo/brett`; change harness/model only after §35.1's experiment | Brett writes to the repository now | `tests/test_crew_config.py` extended | **R** |
 | `crew/manifest.yaml` | Mother: add `github_identity: nostromo-mother` scoped to the `nostromo` repo | Mother owns the tracking issues | test | **R** |
+| `crew/manifest.yaml` | Ash: `host: mac` → `spark`, `supervisor: launchd` → `herdr`, `workspace_profile: research` → `proof`; add `github_identity: nostromo-ash`, `branch_namespace: nostromo/ash`, `path_scope: tests/**` | §2.7, §9 | `tests/test_crew_config.py` extended: Ash is on Spark, carries a path scope, and holds no `*_API_KEY` | **R** |
 | `crew/manifest.yaml` | add `reasoning_profile` per agent | it is a first-class setting, not a default | test asserts presence | **R** |
-| `crew/capabilities.yaml` | replace `verification: brett` with `bounded_implementation: brett`, `evidence_collection: brett`; add `measurement_mechanics: mother`, `measurement_interpretation: ripley`, `external_research: ash` | the verification capability splits at the `L`/`F` line | test asserts every capability resolves | **R** |
+| `crew/capabilities.yaml` | replace `verification: brett` with `bounded_implementation: brett`, `evidence_collection: brett`; add `measurement_mechanics: mother`, `measurement_interpretation: ripley`; replace `ideation_research: ash` with `proof_infrastructure: ash`, `corpus_measurement: ash`, `evaluation: ash`, `precedent_research: ash`, `external_research: ash` | the verification capability splits at the `L`/`F` line; Ash gains the Verifier cluster | test asserts every capability resolves to a manifest agent | **R** |
 | `crew/lifecycle.yaml` | restructure into two lanes with their states, the legal loops, and the Lane B → Lane A crossing conditions | §23, §24 | test asserts both lanes parse, initial and terminal states exist, and every loop target is a declared state | **R** |
 | `crew/budgets.yaml` | unchanged; add a comment recording that Dallas's cap is scoped to risk-triggered review | §35.3 | none | F |
 | `.plugin/plugin.json` | unchanged roster; add `skills/` if the Persona Pack supports it at the pinned version | procedural knowledge is not prompt context | verify against the pinned spec | F |
@@ -2241,8 +2375,11 @@ Every row names the actual current file. `R` = required before commissioning. `F
 |---|---|---|---|
 | GitHub App `nostromo-brett` | register, install on `squad-ops`, Contents + PR + Issues read | Brett opens PRs now | **R** |
 | GitHub App `nostromo-mother` | register, install on **`nostromo` only**, Issues write | the tracking board | **R** |
+| GitHub App `nostromo-ash` | register; install on **both** repos — `squad-ops` with Contents + PR + Issues write, `nostromo` for `bench/` | Ash authors guards, fixtures and benchmark cases | **R** |
+| Ash's Spark worktree | create `~/worktrees/squadops/ash`; validate the repository bootstrap and the unit suite in it | §9, plan §11.6–11.7 | **R** |
+| Ash's Codex auth on the Spark | ChatGPT login flow completed on the Spark rather than the Mac; confirm the adapter reports ChatGPT-authenticated and that no `OPENAI_API_KEY` or `CODEX_API_KEY` is present | §2.7 host move; plan §8.5 | **R** |
 | Apps `nostromo-parker`, `nostromo-ripley` | **add Issues read/write** — WP-1 §8.7 currently grants only Contents, Pull requests and Metadata | they must file Finding Records and Bounded Task Cards | **R** |
-| `squad-ops` rulesets | add `nostromo-brett-branches` and `nostromo-brett-paths`; add a require-review-from-non-author rule to each identity ruleset | §12.1, §14 | **R** |
+| `squad-ops` rulesets | add `nostromo-brett-branches` and `nostromo-brett-paths`; add `nostromo-ash-branches` and `nostromo-ash-paths` restricting Ash to `tests/**`; add a require-review-from-non-author rule to each identity ruleset | §12.1, §14; **the author of a proof must not be able to modify the thing proved** | **R** |
 | `squad-ops` labels | add `nostromo:card`, `nostromo:lane-a`, `nostromo:lane-b` | provenance only | **R** |
 | `nostromo` labels | lane and state labels for tracking issues | §25 | **R** |
 | Brett's OpenCode permission profile | plan §11.11 denies production edit and commit/push; both must be allowed inside Brett's worktree and namespace, with merge still denied | Brett's role changed | **R** |
@@ -2462,7 +2599,7 @@ change.
 | Identity | Role | Model | Harness | Machine | Authority | Primary inputs | Primary outputs | Reviewer / escalates to |
 |---|---|---|---|---|---|---|---|---|
 | **Mother** | Coordination and control plane | Qwen3.6 35B-A3B, local | OpenCode ACP | Spark | routes, records state, checks artifact presence, runs measurement mechanics, enforces the interlock; **no technical judgment** | GitHub and Buzz events, tracking issues, capability table | routed handoffs, state transitions, collected artifacts, surfaced escalations | owner |
-| **Ash** | Research and external evidence | ChatGPT Plus subscription | Codex ACP | Mac | none over the repository; returns findings | research questions | durable research artifacts with dated sources | Mother |
+| **Ash** | Science Officer: proof, evidence and evaluation | ChatGPT Plus subscription, $20 fixed | Codex ACP | **Spark** | owns proof infrastructure and the crew's benchmark; path-scoped to `tests/**`; **no review of work in flight** | rules about to land, findings needing precedent, benchmark cases | guards that fire on their motivating commit, replays and fixtures, corpus counts, blinded scores, research artifacts | Dallas for guards, Parker for fixtures |
 | **Ripley** | Architect and technical lead | GPT-5.6 Sol, `nostromo-ripley`, $27 | Codex ACP | Spark | architecture direction, design artifacts, measurement interpretation, resolves escalations from the crew | objectives, SIPs, plans, standards, records | acceptance sources, dispositions, roll readings | Dallas challenges; escalates to owner |
 | **Dallas** | Independent adversarial assurance | Claude Opus, `nostromo-dallas`, $27 | Claude ACP | Spark | blocking objections that must be dispositioned; default independent approver for significant Parker work | designs, PRs, repository state | the §19.3 return; review outcomes | owner, on unresolved disagreement |
 | **Parker** | Primary engineer | GPT-5.6 Sol, `nostromo-parker`, $65 | Codex ACP | Spark | implements, traces, decomposes, writes cards, reviews Brett, reclaims work | accepted designs, Finding Records | implementations, Bounded Task Cards, change evidence | Dallas reviews; escalates to Ripley or owner |
@@ -2475,7 +2612,7 @@ change.
 ```text
 owner objective ─▶ Mother opens tracking issue (Lane A) + #nostromo-<item>
                           │
-                   @Ash (if external evidence needed) ─▶ research artifact, linked
+                   @Ash (if external evidence or precedent needed) ─▶ artifact, linked
                           │
                    @Ripley ─▶ reads canonical GitHub in Ripley's worktree
                           │     authors the acceptance source; commits; posts the
@@ -2483,9 +2620,13 @@ owner objective ─▶ Mother opens tracking issue (Lane A) + #nostromo-<item>
                           │
               trigger? ───┴── no ──────────────────────────────┐
                    │ yes                                        │
+              @Ash ─▶ measures the corpus the rule will apply  │
+                   │     to; reports the count                  │
+                   ▼                                            │
               @Dallas ─▶ challenges: claim, evidence inspected, │
                    │     blocking, non-blocking, unresolved,    │
                    │     falsification, recommendation          │
+                   │     (armed with Ash's count)               │
                    ▼                                            │
               Ripley dispositions each blocking point IN THE     │
               ARTIFACT, commits, posts the summary              │
@@ -2734,6 +2875,14 @@ two jobs, and the record's recent cadence was produced by frontier sessions with
 one cap covers both at useful throughput is a measurement, not a judgment. *Resolved by:* one month of
 observed spend. *Consequence:* if it does not, the options are reallocating from Ripley, raising the ceiling,
 or reducing concurrency — an owner decision either way.
+
+**OD-5. Whether Ash's subscription throughput supports a depended-on role.** Moving Ash onto the critical
+production path of proof infrastructure assumes the rate limits leave enough capacity. The arithmetic in
+§2.7 is sound; the throughput is not measured, because no local crew has run. *Resolved by:* one release
+line of observed Ash availability. *Interim:* §9.4's release valve — a blocked implementer builds what they
+need and Ash reviews the shape afterward, so Ash being unavailable never stops work.
+*Consequence if wrong:* proof infrastructure moves to Parker, and Ash reverts to evaluation and research
+only, which is still more than the original design gave it.
 
 **OD-4. Whether the Lane B continuity rule survives contact with a real routed system.** The rule is derived
 from a record where the holder was a person, and the claim that Mother's coordination will not fragment it
