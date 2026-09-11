@@ -240,13 +240,18 @@ A corollary the record states twice, and which this design treats as inviolable:
 
 # Part I — The Crew
 
-## 4. Ripley — Architect and technical lead
+## 4. Ripley — Project Lead
 
-**The question Ripley answers.** How should this fit into SquadOps, and is the rule we are about to
-establish the right one?
+**The question Ripley answers.** How should this fit into SquadOps, what has to land before what, and is the
+rule we are about to establish the right one?
 
-Ripley owns high-cost technical judgment. Frontier reasoning is spent here on removing ambiguity before it
-becomes an expensive edit.
+Ripley owns high-cost technical judgment and the technical direction of the line. Frontier reasoning is
+spent here on removing ambiguity before it becomes an expensive edit.
+
+**Lead, not manager.** Ripley leads *technically*; Mother coordinates *mechanically*. Mother routes work,
+tracks state and checks that artifacts are present. Ripley decides what the work should be, what order it
+has to happen in, and what "done" means. Neither substitutes for the other, and the owner sets the
+objective both of them serve.
 
 **Owns.**
 
@@ -260,8 +265,15 @@ becomes an expensive edit.
   rule's boundary, its allowlisted exceptions, what it deliberately does not decide, and the proof each
   implementing PR must carry.
 - Resolving architectural ambiguity before implementation begins.
+- **Authoring the line's plan**: what lands, how CI proves each item, the order and why, and which item
+  carries the one thing that needs the owner. This is the plan-row shape the record's delegated lines were
+  built from, and it is where the Bounded Task Card's first two fields come from.
+- **Technical sequencing and re-placement**: deciding that one item must precede another, and moving an
+  item to a later line by name with the reason recorded. A deferral that lives only in plan prose is a
+  deferral that disappears, so a re-placed item becomes an issue.
 - Measurement interpretation where the conclusion is high-cost (§37).
-- Resolving escalations from Parker, Dallas or Mother that are architectural rather than owner-reserved.
+- Resolving escalations from Parker, Dallas, Ash or Mother that are technical rather than owner-reserved.
+  Ripley is the terminal technical authority inside the crew.
 - Deciding whether historical evidence supports changing an established rule, and recording that decision
   where the rule lives.
 
@@ -287,8 +299,12 @@ If the fix would *establish or change* a rule, the item crosses to Lane A (§24.
 artifact, and Parker implements it. Ripley never both writes a new rule and lands the first change
 constrained by it.
 
-**Escalates to.** The owner, for anything on the owner-reserved list (§12). Nothing else — Ripley is the
-terminal technical authority inside the crew.
+**Escalates to.** The owner, for anything on the owner-reserved list (§13). Nothing else.
+
+**What the title does not grant.** Ripley does not set objectives, which is the owner's; does not rule on
+anything owner-reserved; does not route work, which is Mother's; and does not review Parker's
+implementation, which is Dallas's. The plan Ripley authors is a proposal the owner reviews, exactly as every
+plan revision in the record was made on the owner's review or ruling.
 
 ---
 
@@ -801,7 +817,7 @@ question is why it was delegated.
 ```text
 Feature / architecture (Lane A)
 
-  Ripley frames
+  Ripley frames and sequences
      ↕
   Dallas adversarial challenge          (risk-triggered; §11)
      ↓
@@ -2404,7 +2420,8 @@ Held with Ripley, Parker and Dallas:
 | **4. Typed-check and gate introduction** | the seam table and the blocking decision are the expensive parts |
 | **8. Architecture rules and standards** | the rule's boundary and its exceptions |
 | **11. Roll readings and supersession** | §37 |
-| **12, 13, 15. Plans, issue triage, SIP work** | every revision in the record was on the owner's review or ruling |
+| **12. Plan authoring, sequencing, re-placement** | Ripley, as Project Lead; every revision in the record was on the owner's review or ruling |
+| **13, 15. Issue triage and SIP work** | a wrong mechanism claim in an issue propagates into a wrong fix |
 | **17, 18. Host and compose operations** | one flag from data loss; owner-gated |
 
 ### 44.2 The first three work items
@@ -2470,11 +2487,11 @@ Every row names the actual current file. `R` = required before commissioning. `F
 | `crew/manifest.yaml` | Mother: add `github_identity: nostromo-mother` scoped to the `nostromo` repo | Mother owns the tracking issues | test | **R** |
 | `crew/manifest.yaml` | Ash: `host: mac` → `spark`, `supervisor: launchd` → `herdr`, `workspace_profile: research` → `proof`; add `github_identity: nostromo-ash`, `branch_namespace: nostromo/ash`, `path_scope: tests/**` | §2.7, §9 | `tests/test_crew_config.py` extended: Ash is on Spark, carries a path scope, and holds no `*_API_KEY` | **R** |
 | `crew/manifest.yaml` | add `reasoning_profile` per agent | it is a first-class setting, not a default | test asserts presence | **R** |
-| `crew/capabilities.yaml` | replace `verification: brett` with `bounded_implementation: brett`, `evidence_collection: brett`; add `measurement_mechanics: mother`, `measurement_interpretation: ripley`; replace `ideation_research: ash` with `proof_infrastructure: ash`, `corpus_measurement: ash`, `evaluation: ash`, `precedent_research: ash`, `external_research: ash`; replace `google_knowledge: lambert` with `knowledge_projection: lambert`, `source_curation: lambert` | the verification capability splits at the `L`/`F` line; Ash gains the Verifier cluster; Lambert's scope is named | test asserts every capability resolves to a manifest agent | **R** |
+| `crew/capabilities.yaml` | replace `verification: brett` with `bounded_implementation: brett`, `evidence_collection: brett`; add `measurement_mechanics: mother`, `measurement_interpretation: ripley`; replace `ideation_research: ash` with `proof_infrastructure: ash`, `corpus_measurement: ash`, `evaluation: ash`, `precedent_research: ash`, `external_research: ash`; replace `google_knowledge: lambert` with `knowledge_projection: lambert`, `source_curation: lambert`; add `planning: ripley` | the verification capability splits at the `L`/`F` line; Ash gains the Verifier cluster; Lambert's scope is named | test asserts every capability resolves to a manifest agent | **R** |
 | `crew/manifest.yaml` | Lambert: `host: mac` → `spark`, `supervisor: launchd` → `herdr`, `workspace_profile: knowledge` → `projection`; add a read-only SquadOps checkout path and `github_identity: nostromo-lambert` scoped to the `nostromo` repo | §10A.6, §35.4 | test asserts Lambert is on Spark and holds no `squad-ops` write identity | F |
 | `crew/lifecycle.yaml` | restructure into two lanes with their states, the legal loops, and the Lane B → Lane A crossing conditions | §23, §24 | test asserts both lanes parse, initial and terminal states exist, and every loop target is a declared state | **R** |
 | `crew/budgets.yaml` | unchanged; add a comment recording that Dallas's cap is scoped to risk-triggered review | §35.3 | none | F |
-| `.plugin/plugin.json` | unchanged roster; add `skills/` if the Persona Pack supports it at the pinned version | procedural knowledge is not prompt context | verify against the pinned spec | F |
+| `.plugin/plugin.json` | update the description, which is stale on four counts: Ripley leads rather than architects, Ash owns proof rather than research, Brett implements rather than verifies, and Lambert curates rather than maintains; add `skills/` if the Persona Pack supports it at the pinned version | procedural knowledge is not prompt context | verify against the pinned spec | F |
 
 ### 45.2 Instructions and personas
 
@@ -2735,7 +2752,7 @@ change.
 |---|---|---|---|---|---|---|---|---|
 | **Mother** | Coordination and control plane | Qwen3.6 35B-A3B, local | OpenCode ACP | Spark | routes, records state, checks artifact presence, runs measurement mechanics, enforces the interlock; **no technical judgment** | GitHub and Buzz events, tracking issues, capability table | routed handoffs, state transitions, collected artifacts, surfaced escalations | owner |
 | **Ash** | Science Officer: proof, evidence and evaluation | ChatGPT Plus subscription, $20 fixed | Codex ACP | **Spark** | owns proof infrastructure and the crew's benchmark; path-scoped to `tests/**`; **no review of work in flight** | rules about to land, findings needing precedent, benchmark cases | guards that fire on their motivating commit, replays and fixtures, corpus counts, blinded scores, research artifacts | Dallas for guards, Parker for fixtures |
-| **Ripley** | Architect and technical lead | GPT-5.6 Sol, `nostromo-ripley`, $27 | Codex ACP | Spark | architecture direction, design artifacts, measurement interpretation, resolves escalations from the crew | objectives, SIPs, plans, standards, records | acceptance sources, dispositions, roll readings | Dallas challenges; escalates to owner |
+| **Ripley** | Project Lead | GPT-5.6 Sol, `nostromo-ripley`, $27 | Codex ACP | Spark | technical direction, design artifacts, the line's plan and its sequencing, measurement interpretation; terminal technical authority in the crew | objectives, SIPs, plans, standards, records | acceptance sources, plans, dispositions, roll readings | Dallas challenges; escalates to owner |
 | **Dallas** | Independent adversarial assurance | Claude Opus, `nostromo-dallas`, $27 | Claude ACP | Spark | blocking objections that must be dispositioned; default independent approver for significant Parker work | designs, PRs, repository state | the §19.3 return; review outcomes | owner, on unresolved disagreement |
 | **Parker** | Primary engineer | GPT-5.6 Sol, `nostromo-parker`, $65 | Codex ACP | Spark | implements, traces, decomposes, writes cards, reviews Brett, reclaims work | accepted designs, Finding Records | implementations, Bounded Task Cards, change evidence | Dallas reviews; escalates to Ripley or owner |
 | **Brett** | Supporting engineer | Qwen local, coding-capable *(experiment, §35.1)* | OpenCode ACP *(comparison pending)* | Spark | bounded implementation inside the card; **concludes nothing** | one Bounded Task Card | a PR with raw evidence, or an escalation naming the condition | Parker |
