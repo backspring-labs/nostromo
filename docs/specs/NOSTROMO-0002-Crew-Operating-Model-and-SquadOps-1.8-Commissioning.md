@@ -1637,18 +1637,37 @@ at it. **That reasoning is a hypothesis and is not evidence.** It is tested by h
 commit and oracle constant and varying only the model.
 
 **The harness.** The working direction is a coding-focused harness, with the `pi` agent as the leading
-candidate. Two facts about `pi` must be recorded plainly, because they are the reason this is an experiment
-rather than a decision:
+candidate. What is in its favour, on the merits of Brett's role:
 
-- `pi` has a tool allowlist, an extension hook that can block a tool call, and a system-prompt override, so
-  the bounding of Brett's tools is implementable in it;
-- `pi` has **no built-in permission system** and **no first-party ACP support**. The only ACP adapter is a
-  stale community project. Nostromo's entire process chain depends on ACP, so adopting `pi` for Brett means
-  either owning an adapter or changing the chain.
+- `.pi/SYSTEM.md` **replaces** the system prompt rather than appending to it, which suits a role whose design
+  is that the Bounded Task Card is nearly the whole context;
+- `--tools` / `--exclude-tools` / `--no-builtin-tools` give a bounded tool surface by construction;
+- an extension hook on `tool_call` can **block a call and terminate the turn**, which moves Brett's
+  prohibitions from the constitutional tier of §14 to the deterministic tier — a path boundary enforced in
+  code rather than by instruction.
 
-Therefore: **Brett is commissioned on OpenCode ACP**, which is already configured, already ACP-native, and
-already has a permission profile in the plan. `pi` is evaluated beside it under the Kane slot, on the same
-local model and the same cases, and Brett's harness changes only if the outcome-class distribution says so.
+What must be recorded plainly, because it is why this is still an experiment:
+
+- `pi` has **no built-in permission system**; isolation is expected from a container or sandbox, and the
+  extension hook above is the substitute that Nostromo would have to write.
+- `pi` has **no first-party ACP support**. As of 2026-09-11 there is one actively maintained independent
+  adapter, `regadas/pi-acp` (MIT, TypeScript, a fork of `svkozak/pi-acp`), targeting stable ACP v1 on the
+  current SDK, mapping pi tool execution to ACP tool calls and pi's extension permission UI to ACP
+  permissions. It is **not published to npm** and is built from source, so Nostromo would pin a commit and
+  carry it in the source baseline. Its development is centred on Zed, so compatibility with `buzz-acp` is
+  unverified and is an empirical question, not a documentation question.
+- `pi` has **no MCP support**, and the adapter therefore *rejects* any `session/new` carrying a non-empty
+  `mcpServers` list. This does **not** block Brett: `buzz-acp` sends an empty list when
+  `BUZZ_ACP_MCP_COMMAND` is unset, and Brett's loop is receive-card, work, report, which the base
+  prompt/response path already carries. It does mean Brett can never use the Buzz MCP bridge.
+- `pi` sessions do not coordinate concurrent writers, so Brett must run as a single agent instance, never a
+  `buzz-acp` pool.
+
+**Therefore: the harness is decided by the benchmark, not in advance, and the benchmark does not need ACP.**
+The evaluation runner invokes a harness directly, so `pi` and OpenCode can be compared on the same local
+model, the same cases and the same oracles with zero ACP integration work. Only the winner pays the
+integration cost. Until that comparison runs, `crew/manifest.yaml` keeps OpenCode ACP, which is already
+configured, already ACP-native, and already has a permission profile in the plan.
 
 **The design constraint that makes the comparison mean anything.** The same underlying local model is
 retained across harnesses, so the experiment isolates harness behaviour. A harness effect is one that appears
@@ -2701,8 +2720,9 @@ made deliberately rather than deferred.
 **OD-1. Brett's model and harness.** Whether a coding-tuned local variant outperforms the configured general
 Qwen3.6 35B-A3B on bounded implementation, and whether OpenCode or `pi` is the better harness for it, cannot
 be decided from the record — no local model has run this work. *Resolved by:* the §42 experiment and the
-harness comparison, holding the model constant. *Interim:* Brett is commissioned on the configured model and
-OpenCode ACP. *Consequence if unresolved:* Brett works, possibly below potential, which is acceptable.
+harness comparison, holding the model constant; neither needs ACP, so the comparison can precede any
+integration work. *Interim:* Brett is commissioned on the configured model and OpenCode ACP.
+*Consequence if unresolved:* Brett works, possibly below potential, which is acceptable.
 
 **OD-2. Whether measurement needs its own role.** §37 assigns the function to Ripley and the owner and names
 four conditions that would justify a dedicated Measurement Steward. Which way it goes depends on observed
