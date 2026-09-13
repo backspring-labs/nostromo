@@ -16,7 +16,21 @@ Console: https://platform.openai.com
 ### 1.1 Organization sanity check first
 
 1. Settings → Organization → **Limits** (organization level). Note whether an organization hard limit exists and its amount.
-2. It must leave room for `$70 + $25 = $95` of Nostromo spend on top of any other API workloads billed to this organization. If it is lower, raise it; if none exists, consider setting one at your true monthly ceiling so a project misconfiguration can never exceed it.
+2. It must leave room for `$70 + $25 = $95` of Nostromo spend on top of any other API workloads billed to this organization. If an existing limit is lower than that, raise it.
+
+   **If no organization limit exists, set one at `110`.** The derivation is the sum of the project caps plus
+   about 15%: enough that it can never fire in a legitimate month, tight enough to catch a project created
+   without a limit or one whose limit was removed. Do not set it at `100` — with both projects at their caps
+   and enforcement lag on each, legitimate spend can reach the high nineties, and an organization limit that
+   fires in normal operation stops every project at once.
+
+   **Add any other API work billed to this organization**, because the limit spans every project. Check the
+   usage page grouped by project first. If other usage is substantial and variable, a separate organization
+   for Nostromo is cleaner than a limit that has to accommodate two unrelated things.
+
+   This is the third fence, not the first. With prepaid credits and a `95` monthly reload limit, the card
+   cannot be charged more than `95` in a month regardless of any spend limit. The organization limit exists
+   to produce a clean, diagnosable error instead of silent balance exhaustion.
 3. Settings → Organization → **Billing**: confirm a payment method or prepaid balance exists. Projects bill to the organization.
 
 ### 1.2 Project `nostromo-parker`, cap $70
