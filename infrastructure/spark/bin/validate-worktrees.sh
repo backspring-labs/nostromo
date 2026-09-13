@@ -24,7 +24,14 @@ for role in "${roles[@]}"; do
   [[ -d "$wt" ]] || { echo "  MISSING worktree"; overall=1; continue; }
   cd "$wt" || { overall=1; continue; }
 
-  dirty=$(git status --porcelain | wc -l)
+  # Capture status and its exit code separately. Piping into `wc -l` throws the exit code away,
+  # so a git that FAILS reports zero lines and reads as "clean" — which is how the first version
+  # of this script called a broken worktree healthy.
+  if ! status=$(git status --porcelain 2>&1); then
+    printf '  git status          FAILED — %s\n' "$(echo "$status" | head -1)"
+    overall=1; continue
+  fi
+  dirty=$(printf '%s' "$status" | grep -c . || true)
   printf '  git status          %s\n' \
     "$([[ $dirty -eq 0 ]] && echo 'clean' || echo "$dirty uncommitted path(s) — INVESTIGATE")"
   [[ $dirty -eq 0 ]] || overall=1
@@ -33,11 +40,20 @@ for role in "${roles[@]}"; do
     echo "  creating .venv (python 3.12)"
     uv venv --python 3.12 --quiet .venv || { echo "  venv FAILED"; overall=1; continue; }
   fi
+  # Two separate installs, each checked. `if ! A && B` parses as `(!A) && B`, so B never runs
+  # when A succeeds — which is how the first version of this script skipped the test
+  # requirements entirely and then blamed the gate for not finding ruff.
   echo "  installing (editable package + pinned test requirements)"
-  if ! VIRTUAL_ENV="$wt/.venv" uv pip install --quiet -e . -c ci-constraints.txt \
-       && VIRTUAL_ENV="$wt/.venv" uv pip install --quiet -r tests/requirements.txt -c ci-constraints.txt; then
-    echo "  install FAILED"; overall=1; continue
+  export VIRTUAL_ENV="$wt/.venv"
+  if ! uv pip install --quiet -e . -c ci-constraints.txt; then
+    echo "  install of the package FAILED"; overall=1; continue
   fi
+  if ! uv pip install --quiet -r tests/requirements.txt -c ci-constraints.txt; then
+    echo "  install of the test requirements FAILED"; overall=1; continue
+  fi
+  for tool in ruff pytest; do
+    [[ -x "$wt/.venv/bin/$tool" ]] || { echo "  $tool missing after install — INVESTIGATE"; overall=1; }
+  done
   printf '  python              %s\n' "$(.venv/bin/python --version)"
 
   echo "  running the repository's own gate: scripts/dev/run_regression_tests.sh"
