@@ -121,9 +121,17 @@ using subscription auth as intended.
    Default Workspace exist as soon as the account does. Signing in with the same email or Google identity as
    a Claude subscription is fine — same identity, separate billing.
 1. **Billing → add a payment method, then buy credits.** No API key works until a payment method exists, so
-   this comes first. `$25` at the start of a full month, `$20` when part-way through, with auto-reload adding
-   `$10` below `$5` and a monthly reload limit of `25` — the sum of the enforced limits below it, by the same
-   derivation rule as §1.1.
+   this comes first. Buy `$25` at the start of a full month, `$20` when part-way through.
+
+   **Auto-reload: add `$10` when the balance drops below `$10`** — a higher floor than OpenAI's `$5`, on
+   purpose. Dallas's work is lumpy: a handful of risk-triggered Opus reviews, each a meaningful fraction of
+   `$25`, where Parker's many turns are each small against `$70`. Set the threshold to cover one unit of work
+   comfortably, and keep the reload amount at least as large as the threshold so a top-up clears the
+   low-water mark rather than immediately re-triggering.
+
+   **Monthly reload limit `25`** — the sum of the enforced limits beneath it, by the same derivation rule as
+   §1.1. It sits below the `30` organization limit so that limit stays a backstop, mirroring `95` under `100`
+   on OpenAI.
 2. **Settings → Limits** (organization level) → set an organization spend limit of `30`. This is the backstop
    above the workspace, the role `100` plays on OpenAI. Add any other Anthropic API work you run to it.
 3. **Settings → Workspaces** → add a workspace named `nostromo-dallas`. It must be a new workspace: the
