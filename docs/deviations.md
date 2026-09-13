@@ -139,3 +139,54 @@ Resolved:              2026-09-08. Owner rebooted the nano; tailscaled started b
                        containers returned under the restart policy with no restarts of their own, Serve
                        persisted, relay identity and the single community row unchanged, probe.sh 14 PASS.
 ```
+
+```text
+ID:                    DEV-007
+Date:                  2026-09-13
+Spec/plan reference:   NOSTROMO-PLAN-0001 §11.2 ("Clone the new private nostromo repo onto Spark")
+Expected:              The crew account on the Spark clones backspring-labs/nostromo from GitHub.
+Actual tooling constraint: Deploy keys are disabled organization-wide on backspring-labs. A read-only
+                       deploy key was generated on the Spark and refused at registration:
+                       "Deploy keys are disabled for this repository" (HTTP 422). The organization
+                       setting is a sound posture and was not changed to work around this.
+Chosen workaround:     The Jetson pattern, inverted. The Mac pushes to a bare repository in the crew
+                       account's home and the crew account clones from there
+                       (infrastructure/spark/bin/push-repo.sh). The crew account therefore holds the
+                       manifests, personas and launch configuration it needs and no GitHub credential
+                       whatsoever. The generated deploy key was deleted rather than left unused.
+Security/cost impact:  Positive rather than neutral. The crew account cannot reach GitHub at all for
+                       this repository, which is stronger than a read-only deploy key would have been.
+                       The cost is that the Spark's copy advances only when the Mac pushes, so a stale
+                       manifest is possible; the launcher should assert the commit it is running from.
+Temporary or permanent: Temporary. Superseded when nostromo-mother and nostromo-lambert are registered
+                       (NOSTROMO-0002 §45.4), both of which install on the nostromo repository and can
+                       mint a scoped installation token the way the squad-ops roles already do.
+Owner approval:        Recorded for review.
+Revisit trigger:       Registration of an App installed on the nostromo repository; or the organization
+                       enabling deploy keys.
+```
+
+```text
+ID:                    DEV-008
+Date:                  2026-09-13
+Spec/plan reference:   NOSTROMO-PLAN-0001 §11.10, §11.13 ("opencode acp starts as an ACP-compatible
+                       stdio process"; "OpenCode->Ollama works independently")
+Expected:              Both `opencode run` and `opencode acp` usable against the local Ollama provider.
+Actual tooling constraint: `opencode run` (OpenCode 1.18.30, linux-arm64) succeeded twice and then hung
+                       on every subsequent invocation, stopping after `message=init` and before session
+                       creation, with no error at any log level. Ruled out: the flags (--print-logs,
+                       --log-level, --pure all behave identically), the state directory (a fresh one
+                       hangs the same way), a held SQLite lock (no process holds the database), a
+                       respawn loop (one run id per invocation), Ollama health (HTTP 200, model
+                       resident), and network reachability (models.dev and the npm registry both 200).
+Chosen workaround:     None needed. `opencode run` is a convenience CLI and is not in the crew's path:
+                       buzz-acp drives the harness over ACP. The ACP surface was probed end to end and
+                       works -- initialize, session/new and session/prompt, with a real `read` tool call
+                       and the correct answer, in under two seconds, three times consecutively. The
+                       §11.13 gate is therefore met on the surface the design uses.
+Security/cost impact:  None.
+Temporary or permanent: Temporary, and low priority while ACP works.
+Owner approval:        Recorded for review. Not worth further investigation unless a crew workflow turns
+                       out to need the CLI.
+Revisit trigger:       An OpenCode upgrade; or a crew workflow that needs `opencode run` rather than ACP.
+```
