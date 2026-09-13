@@ -549,7 +549,7 @@ profiles:
 Add a validation test asserting:
 
 ```text
-20 + 65 + 27 + 27 = 139
+20 + 70 + 25 + 25 = 140
 139 < 150
 ```
 
@@ -652,7 +652,7 @@ Configure:
 - Parker-specific API credential/service account;
 - permitted model usage constrained to the intended model family where practical;
 - project rate limits appropriate to a single agent;
-- enforced monthly spend limit: **$65**;
+- enforced monthly spend limit: **$70**;
 - alert(s) below the hard limit if useful.
 
 Current OpenAI support documentation distinguishes enforced project spend limits from mere notifications and exposes `project_spend_limit_exceeded` when an enforced project limit is hit.
@@ -676,7 +676,7 @@ Configure:
 - distinct API credential/service account;
 - intended model;
 - project rate limits;
-- enforced monthly spend limit: **$27**.
+- enforced monthly spend limit: **$25**.
 
 Parker and Ripley MUST NOT share credentials.
 
@@ -710,7 +710,7 @@ Configure:
 
 - intended Claude Opus tier/model access;
 - workspace rate limits if configurable;
-- Workspace Spend Limit: **$27**.
+- Workspace Spend Limit: **$25**.
 
 Anthropic's current documentation states that Workspace API keys are tied to the Workspace and that Workspace Spend Limits are evaluated alongside organization limits.
 
@@ -842,7 +842,7 @@ for the crew.
 
 # 8.11 Hard-limit test strategy
 
-A real $65 burn test is not required.
+A real $70 burn test is not required.
 
 Instead prove configuration through:
 
@@ -861,17 +861,17 @@ Record in a protected owner/operator record, not in git secrets:
 
 ```text
 OpenAI project: nostromo-parker
-hard cap: $65
+hard cap: $70
 key fingerprint / identifier: ...
 test usage attributed: yes
 
 OpenAI project: nostromo-ripley
-hard cap: $27
+hard cap: $25
 key fingerprint / identifier: ...
 test usage attributed: yes
 
 Anthropic workspace: nostromo-dallas
-hard cap: $27
+hard cap: $25
 key identifier: ...
 test usage attributed: yes
 
@@ -1958,7 +1958,7 @@ SquadOps worktree: Ripley worktree
 ACP child: codex-acp
 OpenAI project key: nostromo-ripley only
 model: GPT-5.6 Sol
-budget: $27 hard project boundary
+budget: $25 hard project boundary
 persona: Ripley
 ```
 
@@ -2000,7 +2000,7 @@ SquadOps worktree: Dallas worktree
 ACP child: claude-agent-acp
 Anthropic API key: nostromo-dallas Workspace
 model family: Opus
-budget: $27 workspace spend limit
+budget: $25 workspace spend limit
 persona: Dallas
 ```
 
@@ -2036,7 +2036,7 @@ SquadOps worktree: Parker worktree
 ACP child: codex-acp
 OpenAI project key: nostromo-parker only
 model: GPT-5.6 Sol
-budget: $65 hard project boundary
+budget: $70 hard project boundary
 persona: Parker
 ```
 
@@ -3108,16 +3108,16 @@ Create real cost boundaries before metered agents exist.
 ```text
 OpenAI
   nostromo-parker
-    hard/enforced spend limit $65
+    hard/enforced spend limit $70
     Parker key
 
   nostromo-ripley
-    hard/enforced spend limit $27
+    hard/enforced spend limit $25
     Ripley key
 
 Anthropic
   nostromo-dallas
-    Workspace Spend Limit $27
+    Workspace Spend Limit $25
     Dallas key
 
 ChatGPT
@@ -3317,7 +3317,7 @@ Supervisor: herdr
 Harness: codex-acp
 Provider: openai
 Model: gpt-5.6-sol
-Budget: parker ($65 hard limit expected)
+Budget: parker ($70 hard limit expected)
 GitHub identity: nostromo-parker[bot]
 Workspace: ~/worktrees/squadops/parker
 Buzz relay: wss://...
@@ -3417,7 +3417,7 @@ Crew instructions: instructions.md
 - [ ] Dallas Anthropic Workspace
 - [ ] Dallas $27 spend limit
 - [ ] Ash API key absent
-- [ ] configured total = $139
+- [ ] configured total = $140
 
 ## GitHub identities
 

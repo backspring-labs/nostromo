@@ -162,7 +162,7 @@ than one reader and only one was tested."
 
 **Recommendation.** Confirm Dallas, and make the upstream half primary rather than optional. Dallas's most
 valuable output is a seam table demanded before an implementation exists, not an objection to a finished
-diff. §11 sets risk triggers; §13 sets what Dallas returns. The $27 cap forces this discipline anyway:
+diff. §11 sets risk triggers; §13 sets what Dallas returns. The $25 cap forces this discipline anyway:
 Dallas cannot review every PR, so he must review the ones where the record says rework lives.
 
 ### 2.6 The handoff envelope is right but empty — confirmed, and filled
@@ -184,7 +184,7 @@ need in order to answer without rediscovering architecture*.
 identity, and no place in either lifecycle lane after the exploration phase.
 
 **The arithmetic.** Ash's marginal cost is zero: the $20 subscription is spent whether Ash works or not.
-Parker's $65 is metered, scarce, and already carrying two jobs — implementing what has no table, and
+Parker's $70 is metered, scarce, and already carrying two jobs — implementing what has no table, and
 producing tables for Brett — which §55's OD-3 flags as an open capacity question. The crew gave its one
 free frontier-capable agent the least work and its scarcest agent the most.
 
@@ -300,7 +300,7 @@ here is held by whoever holds the evidence and the domain, not conferred by a sl
   in the record and is kept.
 - Rewriting Dallas's objections into agreement. Dallas is independent input, not a subordinate approval step.
 - Product acceptance. SquadOps governance and the owner accept; Ripley proposes.
-- Routine implementation volume. Ripley's cap is $27 against Parker's $65 for exactly this reason.
+- Routine implementation volume. Ripley's cap is $25 against Parker's $70 for exactly this reason.
 
 **When Ripley may stay through a fix chain.** The Lane A prohibition does not apply in Lane B. Ripley may
 hold a finding from investigation through implementation when **all** of the following hold:
@@ -792,7 +792,7 @@ little is lost by deferring it, because the corpus that is genuinely hard to hol
 
 ## 11. Risk triggers: when Dallas enters before implementation
 
-Dallas does not review every design. Reviewing everything would exhaust a $27 cap on work with no rework
+Dallas does not review every design. Reviewing everything would exhaust a $25 cap on work with no rework
 history and would turn adversarial review into the stamp it is supposed to replace.
 
 Dallas enters **upstream** when the work has any of the following properties. Each trigger is drawn from
@@ -1852,9 +1852,9 @@ the change is proven or an experiment. Nothing here is presented as settled that
 
 | Role | Configured today | Proposed | Change | Status |
 |---|---|---|---|---|
-| **Parker** | `codex-acp`, OpenAI `gpt-5.6-sol`, project `nostromo-parker`, $65 | unchanged; add persistent session affinity and a long-lived worktree | none to model or harness | **settled** — the largest cap belongs to the largest consumer |
-| **Ripley** | `codex-acp`, OpenAI `gpt-5.6-sol`, project `nostromo-ripley`, $27 | unchanged | none | **settled** |
-| **Dallas** | `claude-agent-acp`, Anthropic Opus, workspace `nostromo-dallas`, $27 | unchanged; add the requirement that Dallas's worktree is detached and never shares Parker's tree or session | none to model or harness | **settled** — a different provider family is what makes the review independent |
+| **Parker** | `codex-acp`, OpenAI `gpt-5.6-sol`, project `nostromo-parker`, $70 | unchanged; add persistent session affinity and a long-lived worktree | none to model or harness | **settled** — the largest cap belongs to the largest consumer |
+| **Ripley** | `codex-acp`, OpenAI `gpt-5.6-sol`, project `nostromo-ripley`, $25 | unchanged | none | **settled** |
+| **Dallas** | `claude-agent-acp`, Anthropic Opus, workspace `nostromo-dallas`, $25 | unchanged; add the requirement that Dallas's worktree is detached and never shares Parker's tree or session | none to model or harness | **settled** — a different provider family is what makes the review independent |
 | **Brett** | `opencode-acp`, Ollama `qwen3.6-35b-a3b`, general variant, read-only permissions | **coding-capable local model**, write permissions inside his own worktree, a GitHub App identity, a branch namespace | **material** | **experiment** — see §35.1 |
 | **Mother** | `opencode-acp`, Ollama `qwen3.6-35b-a3b`, control workspace | unchanged model and harness; move coordination logic from prompt into scripts | none to model | **settled**, with the caveat in §35.2 |
 | **Ash** | `codex-acp`, ChatGPT Plus subscription, **Mac**, no repository access | **Spark**, worktree, GitHub identity path-scoped to `tests/**`; same harness and model | **material — host and access** | **settled on reasoning, unproven in practice** — the arithmetic in §2.7 is not in doubt; what is unmeasured is whether subscription rate limits leave Ash enough throughput to be depended on |
@@ -1923,9 +1923,12 @@ growing rules, that is the signal that logic has leaked into inference and shoul
 
 ### 35.3 Budget reconciliation
 
-The envelope is unchanged: $20 + $65 + $27 + $27 = $139 against a $150 ceiling.
+The envelope is $20 + $70 + $25 + $25 = $140 against a $150 ceiling, revised 2026-09-13. Parker gained $5
+because OD-3 flags its two-job load as the open capacity question. Ripley and Dallas are now equal, which
+makes the model-swap experiment in §47.1 budget-neutral: moving a model between those two slots moves no
+money. The derived reload limits are $95 for OpenAI and $25 for Anthropic (§15 of the WP-1 runbook).
 
-What changes is where Dallas's $27 goes. Reviewing every PR would exhaust it on work with no rework history.
+What changes is where Dallas's $25 goes. Reviewing every PR would exhaust it on work with no rework history.
 Scoped to the risk triggers in §11 — architecture rules, check and gate introduction, recovery semantics,
 evidence instrumentation — it covers the archetypes where the record says rework actually lives.
 
@@ -2080,7 +2083,7 @@ roll 3 was counted.
 
 ### 37.2 Whether Ripley can carry this
 
-Ripley's $27 cap is the constraint. Reading a roll boundary is a small number of high-value tokens — the
+Ripley's $25 cap is the constraint. Reading a roll boundary is a small number of high-value tokens — the
 record is rendered, and the judgment is against pre-registered predictions — so the cost is compatible with
 the cap. What is *not* compatible is Ripley also authoring every pre-registration, running every diagnostic
 interpretation, and holding architecture for the 1.8 line simultaneously.
@@ -2138,7 +2141,7 @@ swapped are acceptable for v1 if cleanup is disciplined.
 
 ### 38.3 The budget constraint
 
-Concurrent metered sessions burn caps in parallel and the caps are monthly. At $65, $27 and $27 with hard
+Concurrent metered sessions burn caps in parallel and the caps are monthly. At $70, $25 and $25 with hard
 provider limits, the practical ceiling is roughly two concurrent metered work items, and one is the
 commissioning default. Local roles are unmetered and unconstrained by this.
 
@@ -2665,7 +2668,7 @@ only by passing is a guard that has not been proven.
 ## 47. Recommendations
 
 **1. Should Dallas adversarially review every Ripley design, or only risk-triggered ones?**
-Only risk-triggered. Reviewing everything exhausts a $27 cap on work with no rework history and converts
+Only risk-triggered. Reviewing everything exhausts a $25 cap on work with no rework history and converts
 adversarial review into the stamp it replaces. Ripley or Parker records the trigger line on every item, and
 "no trigger" is an explicit, auditable statement rather than an omission.
 
@@ -2769,9 +2772,9 @@ change.
 |---|---|---|---|---|---|---|---|---|
 | **Mother** | Coordination and control plane | Qwen3.6 35B-A3B, local | OpenCode ACP | Spark | routes, records state, checks artifact presence, runs measurement mechanics, enforces the interlock; **no technical judgment** | GitHub and Buzz events, tracking issues, capability table | routed handoffs, state transitions, collected artifacts, surfaced escalations | owner |
 | **Ash** | Science Officer: proof, evidence and evaluation | ChatGPT Plus subscription, $20 fixed | Codex ACP | **Spark** | owns proof infrastructure and the crew's benchmark; path-scoped to `tests/**`; **no review of work in flight** | rules about to land, findings needing precedent, benchmark cases | guards that fire on their motivating commit, replays and fixtures, corpus counts, blinded scores, research artifacts | Dallas for guards, Parker for fixtures |
-| **Ripley** | Warrant Officer | GPT-5.6 Sol, `nostromo-ripley`, $27 | Codex ACP | Spark | technical direction, design artifacts, the line's plan and its sequencing, measurement interpretation; terminal technical authority in the crew | objectives, SIPs, plans, standards, records | acceptance sources, plans, dispositions, roll readings | Dallas challenges; escalates to owner |
-| **Dallas** | Independent adversarial assurance | Claude Opus, `nostromo-dallas`, $27 | Claude ACP | Spark | blocking objections that must be dispositioned; default independent approver for significant Parker work | designs, PRs, repository state | the §19.3 return; review outcomes | owner, on unresolved disagreement |
-| **Parker** | Primary engineer | GPT-5.6 Sol, `nostromo-parker`, $65 | Codex ACP | Spark | implements, traces, decomposes, writes cards, reviews Brett, reclaims work | accepted designs, Finding Records | implementations, Bounded Task Cards, change evidence | Dallas reviews; escalates to Ripley or owner |
+| **Ripley** | Warrant Officer | GPT-5.6 Sol, `nostromo-ripley`, $25 | Codex ACP | Spark | technical direction, design artifacts, the line's plan and its sequencing, measurement interpretation; terminal technical authority in the crew | objectives, SIPs, plans, standards, records | acceptance sources, plans, dispositions, roll readings | Dallas challenges; escalates to owner |
+| **Dallas** | Independent adversarial assurance | Claude Opus, `nostromo-dallas`, $25 | Claude ACP | Spark | blocking objections that must be dispositioned; default independent approver for significant Parker work | designs, PRs, repository state | the §19.3 return; review outcomes | owner, on unresolved disagreement |
+| **Parker** | Primary engineer | GPT-5.6 Sol, `nostromo-parker`, $70 | Codex ACP | Spark | implements, traces, decomposes, writes cards, reviews Brett, reclaims work | accepted designs, Finding Records | implementations, Bounded Task Cards, change evidence | Dallas reviews; escalates to Ripley or owner |
 | **Brett** | Supporting engineer | Qwen local, coding-capable *(experiment, §35.1)* | OpenCode ACP *(comparison pending)* | Spark | bounded implementation inside the card; **concludes nothing** | one Bounded Task Card | a PR with raw evidence, or an escalation naming the condition | Parker |
 | **Lambert** | Knowledge projection and source curation | Gemini subscription, $0 incremental | Gemini ACP | **Spark** | curates source manifests; **read-only on SquadOps**, writes only `education/` in the Nostromo repo; artifacts are never a source | closed release lines, the lessons corpus, landed standards | pinned source manifests and the formats generated from them | Mother; blocks nothing |
 | *(Kane)* | *harness experiment slot, not a crew member* | Brett's model, held constant | the harness under test | Spark | none | benchmark cases | outcome-class distributions | — |

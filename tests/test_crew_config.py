@@ -281,19 +281,19 @@ def _configured_envelope(budgets) -> int:
     )
 
 
-def test_configured_envelope_is_139_under_150_ceiling(budgets):
+def test_configured_envelope_is_140_under_150_ceiling(budgets):
     envelope = _configured_envelope(budgets)
     ceiling = budgets["monthly_incremental_ceiling_usd"]
-    assert envelope == 139
+    assert envelope == 140
     assert ceiling == 150
     assert envelope < ceiling
 
 
 def test_role_caps_match_specification(budgets):
     profiles = budgets["profiles"]
-    assert profiles["parker"]["amount_usd"] == 65
-    assert profiles["ripley"]["amount_usd"] == 27
-    assert profiles["dallas"]["amount_usd"] == 27
+    assert profiles["parker"]["amount_usd"] == 70
+    assert profiles["ripley"]["amount_usd"] == 25
+    assert profiles["dallas"]["amount_usd"] == 25
     assert profiles["chatgpt-plus"]["amount_usd"] == 20
 
 

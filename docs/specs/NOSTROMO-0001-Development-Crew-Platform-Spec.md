@@ -390,9 +390,9 @@ The v1 crew contains seven agents.
 |---|---|---|---|---|---|---|---:|
 | **Mother** | Orchestrator | Routing, lifecycle coordination, state, escalation | Spark | Yes | OpenCode ACP | Qwen3.6 35B-A3B via Ollama | ~$0 API |
 | **Ash** | Research & Ideation | Exploration, research, IDEA convergence | Mac | No | Codex ACP-compatible path | ChatGPT Plus-backed Codex/ChatGPT auth | $20 fixed |
-| **Ripley** | Architect | Architecture, SIP drafting, implementation planning | Spark | Yes | Codex ACP | GPT-5.6 Sol API | Hard cap $27 |
-| **Dallas** | Adversarial Reviewer | Independent architecture/design challenge; final independent review | Spark | Yes | Claude ACP | Claude Opus API | Hard cap $27 |
-| **Parker** | Implementation Engineer | Coding, debugging, build work, PR implementation | Spark | Yes | Codex ACP | GPT-5.6 Sol API | Hard cap $65 |
+| **Ripley** | Warrant Officer | Technical direction, design artifacts, plan authoring and sequencing | Spark | Yes | Codex ACP | GPT-5.6 Sol API | Hard cap $25 |
+| **Dallas** | Adversarial Reviewer | Independent architecture/design challenge; final independent review | Spark | Yes | Claude ACP | Claude Opus API | Hard cap $25 |
+| **Parker** | Implementation Engineer | Coding, debugging, build work, PR implementation | Spark | Yes | Codex ACP | GPT-5.6 Sol API | Hard cap $70 |
 | **Brett** | QA / Verification | Tests, deterministic verification, evidence, failure diagnosis | Spark | Yes | OpenCode ACP | Qwen3.6 35B-A3B via Ollama | ~$0 API |
 | **Lambert** | Knowledge & Google Specialist | Google ecosystem, instructional corpus, NotebookLM source maintenance | Mac | No | Gemini-compatible ACP/tooling | Existing Gemini subscription | $0 incremental |
 
@@ -400,16 +400,16 @@ Maximum intentionally allocated incremental cloud/subscription envelope:
 
 ```text
 ChatGPT Plus             $20
-Parker OpenAI cap        $65
-Ripley OpenAI cap        $27
-Dallas Anthropic cap     $27
+Parker OpenAI cap        $70
+Ripley OpenAI cap        $25
+Dallas Anthropic cap     $25
                          ---
-Configured envelope     $139
+Configured envelope     $140
 Target ceiling          $150
-Buffer                   $11
+Buffer                   $10
 ```
 
-The $11 difference is deliberate margin for accounting/cutoff lag and incidental variance. Existing Gemini spend and local electricity are not counted as incremental Nostromo API budget.
+The $10 difference is deliberate margin for accounting/cutoff lag and incidental variance. Existing Gemini spend and local electricity are not counted as incremental Nostromo API budget.
 
 ---
 
@@ -1178,7 +1178,7 @@ Ollama remains the single local inference control plane unless measured evidence
 - Model: GPT-5.6 Sol
 - Provider: OpenAI API
 - Credential boundary: dedicated Ripley OpenAI Project/service account/key
-- Monthly hard cap: $27
+- Monthly hard cap: $25
 
 ### Parker
 
@@ -1186,7 +1186,7 @@ Ollama remains the single local inference control plane unless measured evidence
 - Model: GPT-5.6 Sol
 - Provider: OpenAI API
 - Credential boundary: dedicated Parker OpenAI Project/service account/key
-- Monthly hard cap: $65
+- Monthly hard cap: $70
 
 ### Dallas
 
@@ -1194,7 +1194,7 @@ Ollama remains the single local inference control plane unless measured evidence
 - Model family: Claude Opus
 - Provider: Anthropic API
 - Credential boundary: dedicated Dallas Anthropic Workspace/key
-- Monthly hard cap: $27
+- Monthly hard cap: $25
 
 Dallas intentionally uses a different provider/model family from Ripley and Parker to reduce correlated architectural review failure.
 
@@ -1254,7 +1254,7 @@ Material provider/cost changes require owner approval.
 
 Nostromo's intended incremental monthly ceiling is **$150**.
 
-The baseline configured envelope is **$139**.
+The baseline configured envelope is **$140**.
 
 The remaining margin is deliberate.
 
@@ -1262,7 +1262,7 @@ The remaining margin is deliberate.
 
 ## 33. Hard Provider Boundaries
 
-Prompt-level instructions such as "do not spend over $65" are insufficient.
+Prompt-level instructions such as "do not spend over $70" are insufficient.
 
 Metered API agents MUST have provider-enforced spend boundaries where supported.
 
@@ -1273,8 +1273,8 @@ Parker and Ripley MUST use separate OpenAI projects or equivalent isolated provi
 Target hard caps:
 
 ```text
-Parker  $65
-Ripley  $27
+Parker  $70
+Ripley  $25
 ```
 
 They MUST NOT share a key that allows one role to consume the other's entire envelope.
@@ -2148,9 +2148,9 @@ Lambert's incremental Nostromo budget is treated as zero.
 
 Provider-side role-specific spend limits are mandatory for metered API agents.
 
-### D-017 — $139 configured envelope
+### D-017 — $140 configured envelope
 
-Parker $65 + Ripley $27 + Dallas $27 + Plus $20 = $139.
+Parker $70 + Ripley $25 + Dallas $25 + Plus $20 = $140. Revised 2026-09-13 from $65/$27/$27; see NOSTROMO-0002 §35.3.
 
 ### D-018 — Buzz identity is durable
 
@@ -2309,7 +2309,7 @@ Lambert MUST use the existing Gemini ecosystem without becoming a critical-path 
 Incremental intended monthly Nostromo spend MUST remain below $150 absent explicit owner action.
 
 ### NSTR-BUD-002
-The configured baseline envelope MUST not exceed $139.
+The configured baseline envelope MUST not exceed $140.
 
 ### NSTR-BUD-003
 Parker's provider boundary MUST cap metered use at $65/month.

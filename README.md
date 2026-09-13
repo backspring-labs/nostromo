@@ -27,13 +27,13 @@ The plan governs execution. The specification governs architecture. Contradictio
 |---|---|---|---|---|---:|
 | Mother | Orchestrator | Spark | OpenCode ACP | Qwen3.6 35B-A3B via Ollama | local |
 | Ash | Research and ideation | Mac | Codex ACP | ChatGPT Plus subscription | $20 fixed |
-| Ripley | Architect | Spark | Codex ACP | GPT-5.6 Sol, OpenAI project `nostromo-ripley` | $27 hard |
-| Dallas | Adversarial reviewer | Spark | Claude ACP | Claude Opus, Anthropic workspace `nostromo-dallas` | $27 hard |
-| Parker | Implementation engineer | Spark | Codex ACP | GPT-5.6 Sol, OpenAI project `nostromo-parker` | $65 hard |
+| Ripley | Warrant Officer | Spark | Codex ACP | GPT-5.6 Sol, OpenAI project `nostromo-ripley` | $25 hard |
+| Dallas | Adversarial reviewer | Spark | Claude ACP | Claude Opus, Anthropic workspace `nostromo-dallas` | $25 hard |
+| Parker | Implementation engineer | Spark | Codex ACP | GPT-5.6 Sol, OpenAI project `nostromo-parker` | $70 hard |
 | Brett | QA and verification | Spark | OpenCode ACP | Qwen3.6 35B-A3B via Ollama | local |
 | Lambert | Knowledge and Google specialist | Mac | Gemini ACP | Existing Gemini subscription | $0 incremental |
 
-Configured envelope $139 against a $150 ceiling. Caps are enforced provider-side, never by prompt alone.
+Configured envelope $140 against a $150 ceiling. Caps are enforced provider-side, never by prompt alone.
 
 Each crew member carries a NIP-05 handle, `<name>@<relay hostname>`, served and verified by the relay. The relay bootstraps on its Tailscale name and changes to `buzz.backspring.xyz` before WP-5 mints identities, so the final handles are `<name>@buzz.backspring.xyz`. Handles are for display and verification; public keys remain authoritative for routing and security.
 

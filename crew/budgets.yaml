@@ -14,19 +14,19 @@ profiles:
     type: provider_hard_limit
     provider: openai
     boundary: nostromo-parker
-    amount_usd: 65
+    amount_usd: 70
 
   ripley:
     type: provider_hard_limit
     provider: openai
     boundary: nostromo-ripley
-    amount_usd: 27
+    amount_usd: 25
 
   dallas:
     type: provider_hard_limit
     provider: anthropic
     boundary: nostromo-dallas
-    amount_usd: 27
+    amount_usd: 25
 
   local:
     type: local_inference
