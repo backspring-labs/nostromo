@@ -137,3 +137,54 @@ shared bot.
   a commit in the tree.
 - Apps for Brett, Dallas, Mother, Ash and Lambert are not registered; each waits on its write flow being
   commissioned (NOSTROMO-0002 §45.4).
+
+---
+
+# Rulesets on squad-ops, 2026-09-13
+
+## What was created
+
+| Ruleset | Id | Target | Rules | Bypass |
+|---|---|---|---|---|
+| `nostromo-parker-branches` | 23189673 | `refs/heads/nostromo/parker/**` | creation, update, deletion | `nostromo-parker` App only |
+| `nostromo-ripley-branches` | 23189751 | `refs/heads/nostromo/ripley/**` | creation, update, deletion | `nostromo-ripley` App only |
+
+Exported to `infrastructure/github/rulesets/` so the boundary is reconstructable (NSTR-PROJ-001).
+
+## Probe — paired control, all pass
+
+```text
+PASS   parker -> nostromo/parker/probe          HTTP 201   its own namespace
+PASS   parker -> nostromo/ripley/probe          HTTP 422   another role's namespace, refused
+PASS   owner  -> nostromo/parker/owner-probe    HTTP 422   the owner, refused
+```
+
+The second and third are the ones that establish anything. A ruleset that only ever admits the intended
+actor has not been shown to exclude anyone, and the owner being refused is deliberate: an identity boundary
+that the owner can walk through is not a boundary, it is a convention.
+
+The probe branch was deleted afterwards; no `nostromo/**` branches remain.
+
+## What could not be created, and why — see DEV-006
+
+Path restrictions are unavailable on this repository. A branch-target ruleset rejects the rule
+(`Invalid rule 'file_path_restriction'`), and a push-target ruleset, where the rule belongs, is refused with
+**`Source public repos cannot have push rules`**. So the design's second half — Ripley's namespace cannot
+carry implementation, Parker's cannot carry SIPs — has no server-side mechanism available.
+
+What survives is the more important half: attribution is guaranteed and no agent can write into another's
+namespace. What is lost is role-scope containment *within* a namespace, which falls back to Dallas's review
+and the harness permission profile — that is, to discipline, which this record says drifts.
+
+**Recommended remedy, owner's decision because it changes squad-ops CI:** a workflow that fails a pull
+request whose head branch is `nostromo/<role>/**` and whose diff touches that role's forbidden paths,
+promoted to a required status check. It converts the boundary back into a test, explains the violation where
+a ruleset can only reject a push, and passes trivially for every non-crew pull request.
+
+## Not changed, deliberately
+
+`main`'s existing protection is SquadOps governance and was left alone: pull request required, four status
+checks, admins included, force pushes off. Note that `required_approving_review_count` is **0**, so a pull
+request can merge with no approval. The crew's control against self-approval is therefore that merging is
+owner-reserved (NOSTROMO-0002 §13), not the branch protection. Raising that count would change how the owner
+works on every pull request and is the owner's call.

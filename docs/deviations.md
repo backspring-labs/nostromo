@@ -89,6 +89,41 @@ Revisit trigger:       Upstream moves to bind mounts.
 ```
 
 ```text
+ID:                    DEV-006
+Date:                  2026-09-13
+Spec/plan reference:   NOSTROMO-PLAN-0001 §8.9; NOSTROMO-0002 §14, §45.4
+Expected:              Four rulesets on squad-ops — a branch ruleset and a path ruleset per repo-writing
+                       identity — so that "Ripley's namespace cannot carry implementation changes and
+                       Parker's namespace cannot carry SIP changes" is enforced server-side.
+Actual tooling constraint: GitHub refuses path restrictions on this repository, twice over. A branch-target
+                       ruleset rejects the rule outright: `Invalid rule 'file_path_restriction'`. A
+                       push-target ruleset, which is where that rule belongs, is refused with
+                       `Source public repos cannot have push rules`. squad-ops is a public source
+                       repository, so no path boundary of any kind is available to it.
+Chosen workaround:     Branch-namespace rulesets only. `nostromo-parker-branches` and
+                       `nostromo-ripley-branches` restrict creation, update and deletion on
+                       `refs/heads/nostromo/<role>/**`, each bypassed by exactly one App. Probed with a
+                       paired control: the role creates in its own namespace (201), the same role is
+                       refused in the other's (422), and the owner is refused in a crew namespace (422).
+Security/cost impact:  The half that is enforced is the more important half — attribution is guaranteed and
+                       no agent can write into another's namespace or overwrite its work. The half that is
+                       lost is role-scope containment within a namespace: nothing server-side stops Ripley
+                       committing to `src/` on a Ripley branch. That returns to being a discipline, which
+                       the record says drifts, and it is presently caught only by Dallas's review and by
+                       the harness permission profile.
+Temporary or permanent: Permanent while squad-ops is a public source repository.
+Owner approval:        Recorded for review. The recommended remedy needs the owner's decision because it
+                       changes squad-ops CI: a workflow that fails a pull request whose head branch is
+                       `nostromo/<role>/**` and whose diff touches that role's forbidden paths, promoted to
+                       a required status check. That converts the boundary back into a test, which is this
+                       repository's own rule for anything discipline has been shown to miss, and it can
+                       explain the violation where a ruleset can only reject a push. It passes trivially
+                       for every non-crew pull request.
+Revisit trigger:       The CI check landing; or squad-ops ceasing to be a public source repository; or
+                       GitHub permitting push rules on public source repositories.
+```
+
+```text
 ID:                    DEV-005
 Date:                  2026-09-08
 Spec/plan reference:   NOSTROMO-PLAN-0001 §9.8, §20 completion probe ("Jetson reboot preserves state")
