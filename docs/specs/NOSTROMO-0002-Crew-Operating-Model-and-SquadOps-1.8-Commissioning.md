@@ -2541,7 +2541,8 @@ Every row names the actual current file. `R` = required before commissioning. `F
 
 | Item | Change | Reason | When |
 |---|---|---|---|
-| GitHub App `nostromo-brett` | register, install on `squad-ops`, Contents + PR + Issues read | Brett opens PRs now | **R** |
+| GitHub App `nostromo-brett` | register, install on `squad-ops`: Contents **write**, Pull requests **write**, Issues **read** | Brett pushes branches and opens PRs now; Issues read is to fetch the Bounded Task Card, which Brett never edits | **R** |
+| GitHub App `nostromo-dallas` | register, install on `squad-ops`: Pull requests **write**, Contents **read**, Issues **read**. **No branch namespace and no content write** | §12.1 makes Dallas the default independent approver, and §14 enforces that with a ruleset requiring a review from a non-author — which can only see a review actually submitted to GitHub. Without this App the independence model is unenforceable and Dallas degrades to opining in Buzz while somebody else merges on its say-so, the exact stamp-instead-of-review failure the crew exists to end. Withholding content write is deliberate: the reviewer must not be able to fix what it reviews | **R** |
 | GitHub App `nostromo-mother` | register, install on **`nostromo` only**, Issues write | the tracking board | **R** |
 | GitHub App `nostromo-ash` | register; install on **both** repos — `squad-ops` with Contents + PR + Issues write, `nostromo` for `bench/` | Ash authors guards, fixtures and benchmark cases | **R** |
 | Ash's Spark worktree | create `~/worktrees/squadops/ash`; validate the repository bootstrap and the unit suite in it | §9, plan §11.6–11.7 | **R** |
