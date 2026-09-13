@@ -57,7 +57,16 @@ agents:
     provider: openai
     model: gpt-5.6-sol
     provider_boundary: nostromo-ripley
-    github_identity: nostromo-ripley   # GitHub App, WP-1 §8.7
+    github_identity: nostromo-ripley   # GitHub App, registered and installed WP-1 2026-09-13
+    github:
+      app_slug: nostromo-ripley
+      app_id: 4931773
+      installation_id: 161406228
+      bot_login: nostromo-ripley[bot]
+      bot_user_id: 328774520
+      commit_email: 328774520+nostromo-ripley[bot]@users.noreply.github.com
+      installed_on: [backspring-labs/squad-ops]
+      permissions: {contents: write, issues: write, pull_requests: write, metadata: read}
     branch_namespace: nostromo/ripley
     budget_profile: ripley
     workspace_profile: architecture
@@ -89,7 +98,16 @@ agents:
     provider: openai
     model: gpt-5.6-sol
     provider_boundary: nostromo-parker
-    github_identity: nostromo-parker   # GitHub App, WP-1 §8.7
+    github_identity: nostromo-parker   # GitHub App, registered and installed WP-1 2026-09-13
+    github:
+      app_slug: nostromo-parker
+      app_id: 4931663
+      installation_id: 161404312
+      bot_login: nostromo-parker[bot]
+      bot_user_id: 328771233
+      commit_email: 328771233+nostromo-parker[bot]@users.noreply.github.com
+      installed_on: [backspring-labs/squad-ops]
+      permissions: {contents: write, issues: write, pull_requests: write, metadata: read}
     branch_namespace: nostromo/parker
     budget_profile: parker
     workspace_profile: implementation

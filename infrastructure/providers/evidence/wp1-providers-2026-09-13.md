@@ -64,3 +64,55 @@ a harness misconfigured onto a pricier model fails loudly instead of silently dr
 - GitHub Apps `nostromo-parker` and `nostromo-ripley` are not yet registered, so no identity or ruleset
   evidence exists.
 - Actual tax on the credit purchases is unrecorded; the $148.40 envelope figure assumes 6%.
+
+---
+
+# GitHub identities, 2026-09-13
+
+Registered by the owner, verified through the API by `infrastructure/github/mint-token.sh` and `gh`.
+
+| Role | App slug | App id | Installation id | Bot user | Bot user id |
+|---|---|---|---|---|---|
+| Parker | `nostromo-parker` | 4931663 | 161404312 | `nostromo-parker[bot]` | 328771233 |
+| Ripley | `nostromo-ripley` | 4931773 | 161406228 | `nostromo-ripley[bot]` | 328774520 |
+
+Both owned by `backspring-labs`. Commit identity is `<bot user id>+<bot login>@users.noreply.github.com`,
+recorded in `crew/manifest.yaml` and asserted by `tests/test_crew_config.py` so the launcher cannot
+misattribute a commit through a typo.
+
+## Verified
+
+| Check | Result |
+|---|---|
+| Permissions, both Apps | exactly `contents: write`, `issues: write`, `pull_requests: write`, `metadata: read` |
+| Administrative permissions | none — no Administration, Workflows or Actions |
+| Webhook events | none subscribed |
+| Repository selection | `selected`, not all |
+| Installation token mints | both, from the host-local `.pem` via a signed JWT |
+| Repositories a minted token reaches | `backspring-labs/squad-ops` only, for both |
+| Private keys on disk | RSA, mode 600, under `~/.config/nostromo/secrets/<role>/github-app.pem`; nothing left in Downloads |
+
+The token probe is the one that matters. It proves the private key is valid, the App can authenticate as
+itself, and the resulting credential reaches exactly one repository — which is the boundary the design
+claims and could not otherwise be asserted from console settings alone.
+
+## Not granted, deliberately
+
+No client secret was generated for either App. Client secrets exist for OAuth user-authorization flows,
+which the crew does not use: the launcher mints installation tokens from the private key instead. An unused
+secret is an unnecessary credential.
+
+## Also present in the organization
+
+Two unrelated Apps are installed on `backspring-labs`: `claude` (selected repositories) and
+`chatgpt-codex-connector` (**all repositories**). Neither belongs to the crew. The second has organization-wide
+repository access, which is a broader surface than anything Nostromo grants itself, and is worth an owner
+review at some point — noted rather than acted on.
+
+## What remains open
+
+- Rulesets on `squad-ops` are not yet created, so branch namespaces and path boundaries are unenforced.
+- No commit has yet been made under either identity, so attribution is proven for the token but not yet for
+  a commit in the tree.
+- Apps for Brett, Dallas, Mother, Ash and Lambert are not registered; each waits on its write flow being
+  commissioned (NOSTROMO-0002 §45.4).

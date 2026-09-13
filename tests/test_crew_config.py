@@ -407,3 +407,48 @@ def test_no_secret_shaped_values_in_tracked_files():
             for match in pattern.finditer(text):
                 findings.append(f"{path.relative_to(ROOT)}: {label}: {match.group(0)[:12]}...")
     assert not findings, "\n".join(findings)
+
+
+GITHUB_IDENTITY_FIELDS = {
+    "app_slug",
+    "app_id",
+    "installation_id",
+    "bot_login",
+    "bot_user_id",
+    "commit_email",
+    "installed_on",
+    "permissions",
+}
+
+
+def test_repo_writing_roles_carry_a_resolved_github_identity(agents):
+    """WP-1 §8.7: slug, App id, installation id and bot login are recorded non-secret."""
+    for name in REPO_WRITING_AGENTS:
+        gh = agents[name].get("github")
+        assert gh, f"{name}: no resolved github block"
+        assert GITHUB_IDENTITY_FIELDS <= set(gh), f"{name}: missing {GITHUB_IDENTITY_FIELDS - set(gh)}"
+        assert gh["app_slug"] == f"nostromo-{name}"
+        assert gh["bot_login"] == f"nostromo-{name}[bot]"
+        assert isinstance(gh["app_id"], int) and isinstance(gh["installation_id"], int)
+
+
+def test_bot_commit_email_matches_the_bot_user_id(agents):
+    """The launcher sets GIT_AUTHOR_EMAIL from this; a mismatch misattributes every commit."""
+    for name in REPO_WRITING_AGENTS:
+        gh = agents[name]["github"]
+        assert gh["commit_email"] == f"{gh['bot_user_id']}+{gh['bot_login']}@users.noreply.github.com"
+
+
+def test_crew_apps_are_installed_only_on_squad_ops(agents):
+    """An App reaching a second repository is a boundary this design does not grant."""
+    for name in REPO_WRITING_AGENTS:
+        assert agents[name]["github"]["installed_on"] == ["backspring-labs/squad-ops"]
+
+
+def test_crew_apps_hold_no_administrative_permission(agents):
+    """Administration, workflows or actions would let an agent alter the rules that constrain it."""
+    allowed = {"contents", "issues", "pull_requests", "metadata"}
+    for name in REPO_WRITING_AGENTS:
+        perms = agents[name]["github"]["permissions"]
+        assert set(perms) <= allowed, f"{name}: unexpected {set(perms) - allowed}"
+        assert perms["metadata"] == "read"
