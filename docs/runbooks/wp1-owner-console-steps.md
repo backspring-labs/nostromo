@@ -108,15 +108,30 @@ When tracked spend reaches a project hard limit, requests billed to that project
 
 ## 2. Anthropic: one workspace with a spend limit
 
-Console: https://platform.claude.com
+Console: https://platform.claude.com (console.anthropic.com redirects to the same place)
 
-1. **Settings → Workspaces** → **Create workspace** → name `nostromo-dallas`, pick a colour → **Create**. It must be a new workspace: the Default Workspace cannot carry limits.
+**This is a separate account from a Claude subscription.** A Pro or Max plan carries no API credits,
+organization, workspaces or keys. `claude-agent-acp` requires `ANTHROPIC_API_KEY` and does not accept
+subscription OAuth, and Anthropic prohibits routing requests through Free, Pro or Max credentials from
+anything outside Claude Code and claude.ai — so there is no subscription route to Dallas and none should be
+sought. This differs from Ash only because Ash's path, ChatGPT Plus through Codex, is OpenAI's own product
+using subscription auth as intended.
 
-   Starting mid-month, apply §1.3a here too: keep the workspace limit at its full `25` and bound the month with a smaller initial purchase, `$25` at the start of a full month or `$20` when part-way through, with the monthly reload limit also `25` by the same derivation rule.
-2. Open the workspace → **Spend limits** tab → monthly spend limit `25`, plus an alert threshold around `20`. Workspace limits can be set lower than the organization's limits but not higher, and organization limits always apply as well, so confirm the organization limit under Settings leaves room for `$25` on top of your other Anthropic usage.
-3. **Rate limits** tab: confirm the Opus tier is available to the workspace, and **record the exact model identifier** for the same reason as §1.2 step 5 — the manifest says only `model_family: opus`. Leave the values at the organization defaults unless you want single-agent ceilings.
-4. Switch into the workspace using the **Workspaces** selector in the top-left, then **API keys** → **Create Key** → name `dallas`. The key must be scoped to this single workspace, not a multi-workspace key. Save it as `~/.config/nostromo/secrets/dallas/anthropic.key`.
-5. Nothing else is created in this workspace.
+0. **Sign in at platform.claude.com.** There is **no create-organization step**: the organization and its
+   Default Workspace exist as soon as the account does. Signing in with the same email or Google identity as
+   a Claude subscription is fine — same identity, separate billing.
+1. **Billing → add a payment method, then buy credits.** No API key works until a payment method exists, so
+   this comes first. `$25` at the start of a full month, `$20` when part-way through, with auto-reload adding
+   `$10` below `$5` and a monthly reload limit of `25` — the sum of the enforced limits below it, by the same
+   derivation rule as §1.1.
+2. **Settings → Limits** (organization level) → set an organization spend limit of `30`. This is the backstop
+   above the workspace, the role `100` plays on OpenAI. Add any other Anthropic API work you run to it.
+3. **Settings → Workspaces** → add a workspace named `nostromo-dallas`. It must be a new workspace: the
+   Default Workspace cannot carry limits.
+4. Open the workspace → **Spend limits** tab → monthly spend limit `25`, plus an alert threshold around `20`. Workspace limits can be set lower than the organization's limits but not higher, and organization limits always apply as well, so confirm the organization limit under Settings leaves room for `$25` on top of your other Anthropic usage.
+5. **Rate limits** tab: confirm the Opus tier is available to the workspace, and **record the exact model identifier** for the same reason as §1.2 step 5 — the manifest says only `model_family: opus`. Leave the values at the organization defaults unless you want single-agent ceilings.
+6. Switch into the workspace using the **Workspaces** selector in the top-left, then **API keys** → **Create Key** → name `dallas`. The key must be scoped to this single workspace, not a multi-workspace key. Save it as `~/.config/nostromo/secrets/dallas/anthropic.key`.
+7. Nothing else is created in this workspace.
 
 Every API response carries an `anthropic-workspace-id` header, which is how the assistant's test request proves attribution: the header must equal the `wrkspc_…` ID of `nostromo-dallas`, and the request must appear under that workspace's usage.
 
