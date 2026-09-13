@@ -123,11 +123,13 @@ using subscription auth as intended.
 1. **Billing → add a payment method, then buy credits.** No API key works until a payment method exists, so
    this comes first. Buy `$25` at the start of a full month, `$20` when part-way through.
 
-   **Auto-reload: add `$10` when the balance drops below `$10`** — a higher floor than OpenAI's `$5`, on
-   purpose. Dallas's work is lumpy: a handful of risk-triggered Opus reviews, each a meaningful fraction of
-   `$25`, where Parker's many turns are each small against `$70`. Set the threshold to cover one unit of work
-   comfortably, and keep the reload amount at least as large as the threshold so a top-up clears the
-   low-water mark rather than immediately re-triggering.
+   **Auto-reload.** Anthropic phrases this as a top-up to a target, not an amount to add: *when the credit
+   balance reaches X, bring it back up to Y.* Set **X = `10`, Y = `25`**.
+
+   The `$10` floor is higher than OpenAI's `$5` on purpose. Dallas's work is lumpy — a handful of
+   risk-triggered Opus reviews, each a meaningful fraction of `$25`, where Parker's many turns are each small
+   against `$70`. The floor should cover one unit of work comfortably, and the target is one month's full
+   budget so a single top-up carries the rest of the month.
 
    **Monthly reload limit `25`** — the sum of the enforced limits beneath it, by the same derivation rule as
    §1.1. It sits below the `30` organization limit so that limit stays a backstop, mirroring `95` under `100`
