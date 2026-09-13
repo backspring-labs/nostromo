@@ -68,7 +68,7 @@ for role in "${roles[@]}"; do
   start=$(date +%s)
   if PATH="$wt/.venv/bin:$PATH" bash scripts/dev/run_regression_tests.sh >/tmp/reg-$role.log 2>&1; then
     printf '  GATE PASSED         %ss  (%s)\n' "$(( $(date +%s) - start ))" \
-      "$(grep -oE '[0-9]+ passed[^)]*' /tmp/reg-$role.log | tail -1)"
+      "$(sed 's/\x1b\[[0-9;]*m//g' /tmp/reg-$role.log | grep -oE '[0-9]+ passed[^=]*' | tail -1 | sed 's/ *$//')"
   else
     printf '  GATE FAILED         %ss — see /tmp/reg-%s.log\n' "$(( $(date +%s) - start ))" "$role"
     grep -E "^(FAILED|ERROR)|failed," /tmp/reg-$role.log | tail -5 | sed 's/^/    /'
