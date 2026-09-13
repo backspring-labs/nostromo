@@ -1,0 +1,27 @@
+# TLS for the relay's canonical hostname. Reachable on the tailnet only: the published port is
+# bound to the Jetson's tailnet address, and the DNS record resolves to that same private address,
+# so the name is public but the host is not.
+#
+# CLOUDFLARE_API_TOKEN comes from the host-local secrets file and is never in this repository.
+
+{
+	email {$ACME_EMAIL}
+	# Staging first. Let's Encrypt's production rate limits are low enough that a misconfigured
+	# first attempt can lock the name out for a week; switch-hostname.sh proves the chain against
+	# staging, then flips this.
+	acme_ca {$ACME_CA}
+}
+
+{$RELAY_HOSTNAME} {
+	tls {
+		dns cloudflare {$CLOUDFLARE_API_TOKEN}
+		resolvers 1.1.1.1 8.8.8.8
+	}
+
+	# The relay binds a community to the Host header, so it must arrive unchanged. Buzz is a
+	# WebSocket service; Caddy upgrades transparently.
+	reverse_proxy buzz-prod-relay-1:3000 {
+		header_up Host {host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+}

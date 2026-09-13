@@ -22,6 +22,21 @@ check "volumes on NVMe" ssh "$HOST" 'for v in $(docker volume ls -q --filter lab
 check "migrations"      ssh "$HOST" 'c=$(docker ps -q --filter label=com.docker.compose.service=relay); docker logs "$c" 2>&1 | grep -i -m1 migrat'
 check "secrets mode"    ssh "$HOST" 'stat -c "%a %U" /mnt/ssd/buzz/deploy/secrets.env | grep -q "^600 " && echo 600'
 
+# The Cloudflare token is long-lived by necessity and is used once every ~60 days, at renewal. A
+# revoked or expired token is therefore invisible until the certificate is already failing to
+# renew, and then for up to 30 more days until it actually expires. Checking it on every probe
+# turns a silent, delayed failure into a loud, immediate one. Skipped, not failed, before the
+# token exists. The token is read on the Jetson and never leaves it.
+if ssh "$HOST" 'grep -q "^CLOUDFLARE_API_TOKEN=..*" /mnt/ssd/buzz/deploy/secrets.env' 2>/dev/null; then
+  check "cloudflare token valid" ssh "$HOST" '
+    t=$(grep "^CLOUDFLARE_API_TOKEN=" /mnt/ssd/buzz/deploy/secrets.env | cut -d= -f2-)
+    r=$(curl -sS -H "Authorization: Bearer $t" https://api.cloudflare.com/client/v4/user/tokens/verify)
+    echo "$r" | grep -q "\"status\":\"active\"" || { echo "token not active: $(echo "$r" | head -c 120)"; exit 1; }
+    echo "active, id $(echo "$r" | sed -n "s/.*\"id\":\"\([a-f0-9]*\)\".*/\1/p" | head -1)"'
+else
+  echo "SKIP  cloudflare token valid: not installed yet (bin/set-cloudflare-token.sh)"
+fi
+
 check "serve tailnet-only" ssh "$HOST" 'tailscale serve status 2>&1 | grep -q "(tailnet only)" && ! tailscale serve status 2>&1 | grep -qi funnel && echo "serve on, funnel off"'
 
 echo "== from the Mac over the tailnet, TLS via Tailscale Serve"
