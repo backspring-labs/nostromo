@@ -41,9 +41,13 @@ Console: https://platform.openai.com
 2. Open the project → **Limits** → under **Spend** select **Edit spend limit**.
 3. **Monthly spend limit**: `70`. Turn on **Enforce a hard limit**. **Save**. If the page only offers a notification or budget without the enforce toggle, stop and report; the plan requires enforcement.
 4. Optional but useful: an alert threshold at `55` so you hear about it before the cutoff.
-5. **Model allow-listing: skip it.** The console presents the whole catalogue to hand-pick from, and the value does not justify the maintenance. The spend cap controls cost regardless of which model is called, and which model the agent actually uses is pinned in the harness configuration. A divergence between the two is caught by the §5 attribution probe, which reports the model each key reached. Per-model rate limits are likewise optional; the defaults are fine for a single agent.
+5. **Model allow-listing: do it.** The list is a checkbox set, so this is a few clicks. **Leave only `gpt-5.6-sol` checked** and uncheck everything else, on both projects.
 
-   **Do record the exact model identifier** shown in that list — the literal string passed as `model`. `crew/manifest.yaml` carries only the logical name `gpt-5.6-sol`, and `docs/source-baseline.md` has no row for either cloud model, which is a gap in the dependency ledger that NOSTROMO-0001 §31's substitution policy assumes is filled.
+   The reason is cost, not tidiness. Newer frontier models appear in this list enabled by default — `gpt-6-astra` was checked on first creation, 2026-09-13 — and a newer model is very likely more expensive per token. A harness pointed at the wrong model would burn the cap several times faster for identical work, and would do it silently. Restricting the project turns that into a loud failure, which is the same reason the spend limit is enforced provider-side rather than trusted to configuration.
+
+   Per-model rate limits are optional; the defaults are fine for a single agent.
+
+   The exact identifier is pinned in `docs/source-baseline.md`. If it ever differs from `crew/manifest.yaml`, the manifest is the design intent and the console is the fact — reconcile before launching anything.
 6. **Service accounts** (in the project's settings) → **Create** → name `parker`. This yields the key. A service-account key belongs to the project, not to your user, so it survives changes to your own account. Save it as `~/.config/nostromo/secrets/parker/openai.key`.
 7. Do not create a second key in this project for anything else.
 
