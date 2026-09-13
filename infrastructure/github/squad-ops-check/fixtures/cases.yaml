@@ -1,0 +1,98 @@
+# Paired control for the path boundary check.
+#
+# A guard proves it fires on the commit that motivated it, and a check that cannot fail
+# is no check at all. Every role therefore carries at least one case that must PASS and
+# one that must FAIL, plus the cases that decide what happens at the edges.
+cases:
+  # --- not our business -------------------------------------------------------------
+  - name: ordinary branch, touches everything
+    branch: feat/some-work
+    files: [src/squadops/app.py, sips/SIP-0999.md, tests/unit/test_x.py]
+    expect: pass
+    why: the check must be silent on work that is not the crew's
+
+  - name: empty branch name
+    branch: ""
+    files: [src/squadops/app.py]
+    expect: pass
+    why: an absent head ref is not a crew branch
+
+  - name: branch under nostromo/ but not a role namespace
+    branch: nostromo/scratch
+    files: [src/squadops/app.py]
+    expect: pass
+    why: nostromo/<role>/... is the shape; this is not it
+
+  # --- fail closed ------------------------------------------------------------------
+  - name: crew namespace with no declared boundary
+    branch: nostromo/mother/tracking
+    files: [README.md]
+    expect: fail
+    why: a namespace with no rules is an unreviewed boundary, not an unrestricted one
+
+  # --- ripley: design, not implementation --------------------------------------------
+  - name: ripley writes a standard
+    branch: nostromo/ripley/composition-roots
+    files: [docs/architecture/composition-roots.md, sips/SIP-0110.md]
+    expect: pass
+  - name: ripley writes implementation
+    branch: nostromo/ripley/composition-roots
+    files: [docs/architecture/composition-roots.md, src/squadops/factory.py]
+    expect: fail
+    why: the architect does not land the first change constrained by the rule
+  - name: ripley writes tests
+    branch: nostromo/ripley/x
+    files: [tests/unit/architecture/test_roots.py]
+    expect: fail
+
+  # --- parker: implementation, not accepted design -----------------------------------
+  - name: parker implements
+    branch: nostromo/parker/1250-envelope
+    files: [src/squadops/executor.py, tests/unit/test_executor.py, adapters/prefect.py]
+    expect: pass
+  - name: parker amends a SIP
+    branch: nostromo/parker/1250-envelope
+    files: [src/squadops/executor.py, sips/accepted/SIP-0103.md]
+    expect: fail
+    why: a divergence from accepted design returns to Ripley; the amendment is Ripley's act
+
+  # --- brett: bounded implementation --------------------------------------------------
+  - name: brett lands a guard
+    branch: nostromo/brett/regression-gate
+    files: [tests/unit/architecture/test_gate.py, scripts/dev/run_regression_tests.sh]
+    expect: pass
+  - name: brett touches architecture docs
+    branch: nostromo/brett/regression-gate
+    files: [docs/architecture/api-route-lanes.md]
+    expect: fail
+
+  # --- ash: allowlist, proof only ------------------------------------------------------
+  - name: ash writes a guard
+    branch: nostromo/ash/seam-census
+    files: [tests/unit/architecture/test_census.py, tests/fixtures/roll_replays/r1.json]
+    expect: pass
+  - name: ash edits the code it proves
+    branch: nostromo/ash/seam-census
+    files: [tests/unit/architecture/test_census.py, src/squadops/checks.py]
+    expect: fail
+    why: the author of a proof must not be able to modify the thing proved
+  - name: ash edits a doc
+    branch: nostromo/ash/seam-census
+    files: [docs/architecture/notes.md]
+    expect: fail
+    why: allowlist, not denylist — anything outside tests/ is outside Ash's boundary
+
+  # --- the boundary protects itself ----------------------------------------------------
+  - name: parker edits the rules file
+    branch: nostromo/parker/x
+    files: [.github/nostromo-path-boundaries.yml]
+    expect: fail
+    why: a guard the guarded party can edit is not a guard
+  - name: ripley edits the checker
+    branch: nostromo/ripley/x
+    files: [scripts/dev/check_nostromo_path_boundaries.py]
+    expect: fail
+  - name: ash edits the workflow
+    branch: nostromo/ash/x
+    files: [.github/workflows/nostromo-path-boundaries.yml]
+    expect: fail
