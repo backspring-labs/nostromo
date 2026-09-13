@@ -134,7 +134,8 @@ shared bot.
 
 - Rulesets on `squad-ops` are not yet created, so branch namespaces and path boundaries are unenforced.
 - No commit has yet been made under either identity, so attribution is proven for the token but not yet for
-  a commit in the tree.
+  a commit in the tree. *(Closed later the same day by the crew check probe below, which committed as
+  `nostromo-parker[bot]` on a branch that was then deleted.)*
 - Apps for Brett, Dallas, Mother, Ash and Lambert are not registered; each waits on its write flow being
   commissioned (NOSTROMO-0002 §45.4).
 
@@ -188,3 +189,74 @@ checks, admins included, force pushes off. Note that `required_approving_review_
 request can merge with no approval. The crew's control against self-approval is therefore that merging is
 owner-reserved (NOSTROMO-0002 §13), not the branch protection. Raising that count would change how the owner
 works on every pull request and is the owner's call.
+
+---
+
+# Crew check probe — end to end on squad-ops, 2026-09-13
+
+The remedy recommended above was built, merged as squad-ops#1511, and made a required check on `main`.
+This is the probe that establishes it works against the live repository rather than against its fixtures.
+
+Probe branch `nostromo/parker/probe-boundary`, pull request squad-ops#1512, both deleted afterwards.
+Every write below was made with a **minted `nostromo-parker` installation token**, not owner credentials,
+so the probe exercised the identity the design actually uses.
+
+## Paired control — both stages pass
+
+```text
+== positive: a commit inside parker's boundary, authored by parker ==
+PASS   src/squadops/_nostromo_probe.py          nostromo crew checks -> SUCCESS
+       ok: 1 changed file(s) are inside parker's boundary
+       ok: all commits authored by 328771233+nostromo-parker[bot]@users.noreply.github.com
+
+== negative control: one commit violating BOTH rules at once ==
+PASS   sips/NOSTROMO-PROBE-negative-control.md  nostromo crew checks -> FAILURE
+       FAIL: 1 path boundary violation(s) on branch nostromo/parker/probe-boundary
+         sips/NOSTROMO-PROBE-negative-control.md - parker may not touch sips/**
+       FAIL: 1 commit author(s) are not parker's identity
+         probe-not-parker@example.invalid
+         expected: 328771233+nostromo-parker[bot]@users.noreply.github.com
+```
+
+The negative control carried both violations in a single commit deliberately. A check that stops at the
+first failure would have reported only the path, and the attribution half would have been untested while
+appearing covered. Both fired, and each printed the remedy rather than only the verdict.
+
+## Incidental result: the ruleset refused the owner again, unprompted
+
+Bringing the branch onto the fixed `main` was first attempted with the owner's credentials through the
+`update-branch` endpoint and was refused — `Repository rule violations found / Cannot update this protected
+ref`. The same operation succeeded through parker's token. This was not a planned probe step; it is the
+ruleset enforcing itself during ordinary work, which is better evidence than the deliberate probe of
+2026-09-13 because nothing was staged for it.
+
+Deleting the branch afterwards produced the same pairing without being asked to: owner `422 Cannot delete
+this branch`, parker `204`. So all three of the ruleset's rules — creation, update and deletion — have now
+been shown to exclude the owner and admit exactly one App.
+
+## What this cost, and what it bought
+
+The first run of this probe failed for the wrong reason. `check_nostromo_crew_pr.py` still had
+`DEFAULT_RULES` pointing at the pre-rename filename, so the workflow died with `FileNotFoundError` on the
+first crew branch it ever saw. The 34 fixtures all passed because **every one of them passes `--rules`
+explicitly**, so the default path was the one line they could not exercise. Fixed in squad-ops#1515 and
+covered by two tests that assert the default resolves and matches the shipped filename.
+
+This is the argument for probing against the real repository even when the fixtures are green: the bug was
+in the wiring between the workflow and the script, which is exactly the seam a fixture replaces.
+
+## What this establishes
+
+- The path boundary and the attribution rule are both live on `squad-ops` `main` as a required check.
+- Both fail loudly, name the offending path and address, and state the remedy.
+- A compliant crew commit passes without owner intervention.
+- The branch ruleset holds against the owner during unplanned, ordinary operations.
+
+## What remains open
+
+- Only `parker` and `ripley` have identities; the boundaries file also declares `brett` and `ash`, whose
+  rules are fixture-tested but not yet probed against a real branch. Each waits on its App (NOSTROMO-0002
+  §45.4).
+- `universal_forbidden` is fixture-tested only. It was deliberately not probed live, because two of its
+  three paths are workflow files that no crew App can write anyway — the App permission set is the first
+  guard and the check is the second.
