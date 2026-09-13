@@ -24,7 +24,7 @@ Dependency ledger for Nostromo (NOSTROMO-PLAN-0001 §7.9, §18.4). Buzz, Herdr, 
 | Qwen3.6 35B-A3B Ollama tag and quantization | TBD (WP-4) | benchmark before pinning | https://ollama.com/library | — |
 | Node runtime on Spark | TBD (WP-4) | — | — | — |
 | OpenAI model, Ripley and Parker | `gpt-5.6-sol` — exact API identifier confirmed in the project model list 2026-09-13 | 2026-09-13, same list: `gpt-6-astra`, `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.5-pro`, `gpt-5.5`, `gpt-5.4-pro`, `gpt-5.3-codex` | https://platform.openai.com | project model list restricted to this id alone (WP-1 §1.2) |
-| Anthropic model, Dallas | TBD (WP-1) — `crew/manifest.yaml` carries only `model_family: opus` | — | https://platform.claude.com | — |
+| Anthropic model, Dallas | `claude-opus-5` (display name "Claude Opus 5"), confirmed available to the `nostromo-dallas` workspace 2026-09-13; organization on Scale tier, workspace rate limits unset so they inherit | 2026-09-13, same quota list: Claude Fable 5, Claude Opus 5, Claude Sonnet 5 | https://platform.claude.com | workspace spend limit $25; `crew/manifest.yaml` still says only `model_family: opus` and should carry the exact id |
 | Docker / Compose on Jetson | Docker `29.8.0` (build `88096ef`), Compose `v5.5.1`, data root `/mnt/ssd/docker` | preinstalled on the Jetson | https://docs.docker.com/engine/ | 2026-09-08 on nano |
 | Jetson OS | Ubuntu `22.04.5 LTS` (JetPack), aarch64, root on microSD, NVMe at `/mnt/ssd` | — | — | 2026-09-08 |
 | Tailscale on Jetson | `1.102.3`, MagicDNS `nano.tailc69e7d.ts.net`, HTTPS certificates enabled, Serve `https://nano.tailc69e7d.ts.net` (tailnet only) proxying to `127.0.0.1:3000`, Funnel off | — | https://tailscale.com | 2026-09-08 |
