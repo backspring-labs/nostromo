@@ -48,12 +48,23 @@ month with the credit balance instead, which needs no un-doing:
 | Project limits | `65` and `27`, enforce on | nothing |
 | Initial credit purchase | `$50` | — |
 | Auto reload | `$10` when the balance drops below `$5` | unchanged |
-| Monthly reload limit | `$50` | raise to `$95` |
+| Monthly reload limit | `$50` | raise to `$92` |
 
 **If you prefer prorated caps instead**, multiply each cap by the fraction of the month remaining, and put a
 calendar reminder on the first of the next month to raise all of them back. Set up on 2026-09-13, with
 eighteen of thirty days left, that is 60%: Parker `39`, Ripley `16`, Dallas `16`. The reminder is what makes
 this version safe; without it the prorated numbers become the permanent ones.
+
+**The reload limit is derived, not chosen.** Set it to the **sum of the enforced project caps**, which is
+`65 + 27 = 92`. That makes it a number anyone can re-derive and audit rather than a magic figure whose
+reasoning has to be remembered, and it keeps the second fence exactly in line with the first. The same rule
+gives Anthropic `27`, the sum of its one workspace limit.
+
+Enforcement lag means recorded spend can slightly exceed a cap, so in a month where both projects run to
+their limits the last few requests may return `insufficient_quota` (balance exhausted, account-wide) rather
+than `project_spend_limit_exceeded` (that project only). That is a difference in which error you see, not in
+how much you spend, and the $11 of headroom between the $139 configured envelope and the $150 ceiling
+absorbs it at the budget level.
 
 **Note on the first partial month.** Until the crew is commissioned, the only metered traffic is the
 attribution probes in §5 — one small request per key. Real burn begins when Parker starts implementing,
@@ -71,7 +82,7 @@ Console: https://platform.claude.com
 
 1. **Settings → Workspaces** → **Create workspace** → name `nostromo-dallas`, pick a colour → **Create**. It must be a new workspace: the Default Workspace cannot carry limits.
 
-   Starting mid-month, apply §1.3a here too: keep the workspace limit at its full `27` and bound the month with a smaller initial purchase, `$30` at the start of a full month or `$20` when part-way through.
+   Starting mid-month, apply §1.3a here too: keep the workspace limit at its full `27` and bound the month with a smaller initial purchase, `$27` at the start of a full month or `$20` when part-way through, with the monthly reload limit also `27` by the same derivation rule.
 2. Open the workspace → **Spend limits** tab → monthly spend limit `27`, plus an alert threshold around `20`. Workspace limits can be set lower than the organization's limits but not higher, and organization limits always apply as well, so confirm the organization limit under Settings leaves room for `$27` on top of your other Anthropic usage.
 3. **Rate limits** tab: confirm the Opus tier is available to the workspace. Leave the values at the organization defaults unless you want single-agent ceilings.
 4. Switch into the workspace using the **Workspaces** selector in the top-left, then **API keys** → **Create Key** → name `dallas`. The key must be scoped to this single workspace, not a multi-workspace key. Save it as `~/.config/nostromo/secrets/dallas/anthropic.key`.
