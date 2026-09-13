@@ -50,7 +50,13 @@ Console: https://platform.openai.com
    Per-model rate limits are optional; the defaults are fine for a single agent.
 
    The exact identifier is pinned in `docs/source-baseline.md`. If it ever differs from `crew/manifest.yaml`, the manifest is the design intent and the console is the fact — reconcile before launching anything.
-6. **Service accounts** (in the project's settings) → **Create** → name `parker`. This yields the key. A service-account key belongs to the project, not to your user, so it survives changes to your own account. Save it as `~/.config/nostromo/secrets/parker/openai.key`.
+6. **Service accounts** (in the project's own settings, not the organization's) → **Create** → name `parker`, lowercase. If a role is offered, choose **Member, not Owner**: a project-owner service account can change project settings, plausibly including the spend limit it is meant to be bounded by, and an account that can raise its own cap is not a boundary.
+
+   The key is shown once. A service-account key begins `sk-svcacct-` (observed 2026-09-13, 167 characters) and belongs to the project rather than to your user, so it survives any change to your own membership. Save it straight from the clipboard so it never enters shell history:
+
+   ```bash
+   pbpaste > ~/.config/nostromo/secrets/parker/openai.key && chmod 600 ~/.config/nostromo/secrets/parker/openai.key
+   ```
 7. Do not create a second key in this project for anything else.
 
 ### 1.3 Project `nostromo-ripley`, cap $25
