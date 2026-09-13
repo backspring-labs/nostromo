@@ -116,16 +116,19 @@ four permissions; this connector holds eight, across every repository.
 Measured on 2026-09-13: **zero commits and zero issues or pull requests** from it in either `squad-ops` or
 `nostromo`. It is installed and dormant on the two repositories that matter.
 
-**Recommended owner action: narrow it to selected repositories, excluding `squad-ops` and `nostromo`.** Not
-removal, since it is OpenAI's official connector and legitimate wherever it is actually used. Only scope is
-adjustable; an App declares its own permissions and the installer chooses only which repositories they apply
-to.
+**Resolved 2026-09-13: the owner uninstalled it entirely.** The recommendation had been to narrow it to
+selected repositories; the owner determined it had only ever been used for a test and removed it instead,
+which is the stronger outcome. Verified after the fact: `/orgs/backspring-labs/installations` now returns
+only `claude`, `nostromo-parker` and `nostromo-ripley`. Reinstalling later is a minute's work and would
+scope correctly at that point.
 
-This is design hygiene rather than a live exposure. The rulesets in §8.9 do constrain it, because a GitHub
-App is not a bypass actor unless named as one and this one will not be. The residual is that an identity
-with `workflows: write` can alter the definition of a check a ruleset requires — an edit those same rulesets
-would see. The stronger argument is simply that a dormant parallel path holding broader access than any crew
-member makes the boundary model harder to reason about while buying nothing.
+The `claude` App (app 1236702, installed 2026-02-02) remains. It is scoped to **selected** repositories
+rather than all, which is the right shape, and has zero commits or pull requests in `squad-ops` or
+`nostromo`. It carries the same `workflows: write` plus contents, issues, pull requests and discussions
+write. Which repositories it reaches is not visible to an organization-read token and must be checked on its
+Configure page. **Neither `squad-ops` nor `nostromo` should be on that list**: the crew has no use for it,
+and Dallas reviews under `nostromo-dallas` precisely so a review is attributable to a role rather than to a
+shared bot.
 
 ## What remains open
 
