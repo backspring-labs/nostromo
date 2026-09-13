@@ -56,6 +56,14 @@ for role in "${roles[@]}"; do
   done
   printf '  python              %s\n' "$(.venv/bin/python --version)"
 
+  # SquadOps materializes run roots under /tmp/squadops unless SQUADOPS_RUN_ROOT says otherwise.
+  # That path is shared by every Unix user on the box, and on the Spark it is already owned by the
+  # owner's account from their own runs, so the crew account cannot write to it — 109 tests failed
+  # on a PermissionError that surfaced as "coroutine raised StopIteration". Each role gets its own
+  # root, which also stops two roles colliding with each other.
+  export SQUADOPS_RUN_ROOT="$HOME/.cache/squadops/$role/runs"
+  mkdir -p "$SQUADOPS_RUN_ROOT"
+
   echo "  running the repository's own gate: scripts/dev/run_regression_tests.sh"
   start=$(date +%s)
   if PATH="$wt/.venv/bin:$PATH" bash scripts/dev/run_regression_tests.sh >/tmp/reg-$role.log 2>&1; then
