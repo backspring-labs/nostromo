@@ -33,6 +33,32 @@ Console: https://platform.openai.com
 
 Repeat 1.2 with name `nostromo-ripley`, **Monthly spend limit** `27`, **Enforce a hard limit** on, service account `ripley`, key saved as `~/.config/nostromo/secrets/ripley/openai.key`.
 
+### 1.3a Starting mid-month
+
+The spend limit is a **safety cap**, not a monthly allowance, and it should carry the correct year-round
+value. The monthly cycle resets tracked spend to zero and leaves the configured limit alone, so a prorated
+limit stays prorated until someone changes it back, and the failure is silent: the agent stops early next
+month for no visible reason.
+
+**Recommended when setting up part-way through a month.** Set the limits at their full values and bound the
+month with the credit balance instead, which needs no un-doing:
+
+| Control | Value now | Change at the start of the next full month |
+|---|---|---|
+| Project limits | `65` and `27`, enforce on | nothing |
+| Initial credit purchase | `$50` | — |
+| Auto reload | `$10` when the balance drops below `$5` | unchanged |
+| Monthly reload limit | `$50` | raise to `$95` |
+
+**If you prefer prorated caps instead**, multiply each cap by the fraction of the month remaining, and put a
+calendar reminder on the first of the next month to raise all of them back. Set up on 2026-09-13, with
+eighteen of thirty days left, that is 60%: Parker `39`, Ripley `16`, Dallas `16`. The reminder is what makes
+this version safe; without it the prorated numbers become the permanent ones.
+
+**Note on the first partial month.** Until the crew is commissioned, the only metered traffic is the
+attribution probes in §5 — one small request per key. Real burn begins when Parker starts implementing,
+which is gated behind WP-10.
+
 ### 1.4 Behaviour to expect at the cap
 
 When tracked spend reaches a project hard limit, requests billed to that project return HTTP `429` with error code `project_spend_limit_exceeded`. Enforcement is not instantaneous, so recorded spend can slightly exceed the amount. The limit resets on the next monthly cycle, or when you raise or remove it. An organization hard limit applies across all projects and produces its own error code.
@@ -44,6 +70,8 @@ When tracked spend reaches a project hard limit, requests billed to that project
 Console: https://platform.claude.com
 
 1. **Settings → Workspaces** → **Create workspace** → name `nostromo-dallas`, pick a colour → **Create**. It must be a new workspace: the Default Workspace cannot carry limits.
+
+   Starting mid-month, apply §1.3a here too: keep the workspace limit at its full `27` and bound the month with a smaller initial purchase, `$30` at the start of a full month or `$20` when part-way through.
 2. Open the workspace → **Spend limits** tab → monthly spend limit `27`, plus an alert threshold around `20`. Workspace limits can be set lower than the organization's limits but not higher, and organization limits always apply as well, so confirm the organization limit under Settings leaves room for `$27` on top of your other Anthropic usage.
 3. **Rate limits** tab: confirm the Opus tier is available to the workspace. Leave the values at the organization defaults unless you want single-agent ceilings.
 4. Switch into the workspace using the **Workspaces** selector in the top-left, then **API keys** → **Create Key** → name `dallas`. The key must be scoped to this single workspace, not a multi-workspace key. Save it as `~/.config/nostromo/secrets/dallas/anthropic.key`.
