@@ -173,7 +173,16 @@ Console: https://github.com/organizations/backspring-labs/settings/apps
 3. **Homepage URL**: `https://github.com/backspring-labs/nostromo`.
 4. **Callback URL**: leave empty. Leave the user-authorization options at their defaults; this App never acts on behalf of users.
 5. **Webhook**: untick **Active**. No webhook URL or secret.
-6. **Permissions → Repository permissions**: **Contents** = Read and write; **Pull requests** = Read and write; **Metadata** = Read-only (set automatically). Everything else stays No access. **Organization permissions** and **Account permissions**: none.
+6. **Permissions → Repository permissions**, exactly four and nothing else:
+
+   | Permission | Level | Why |
+   |---|---|---|
+   | **Contents** | Read and write | push branches |
+   | **Pull requests** | Read and write | open and update PRs |
+   | **Issues** | Read and write | file Finding Records and Bounded Task Cards; the repository's closure check requires every PR to close an open issue |
+   | **Metadata** | Read-only | set automatically, cannot be removed |
+
+   Everything else stays **No access**. **Organization permissions** and **Account permissions**: none at all.
 7. **Where can this GitHub App be installed?**: **Only on this account**.
 8. **Create GitHub App**.
 9. On the App's **General** page note the **App ID** near the top.
