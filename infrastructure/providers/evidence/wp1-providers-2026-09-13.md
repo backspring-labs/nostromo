@@ -104,10 +104,28 @@ secret is an unnecessary credential.
 
 ## Also present in the organization
 
-Two unrelated Apps are installed on `backspring-labs`: `claude` (selected repositories) and
-`chatgpt-codex-connector` (**all repositories**). Neither belongs to the crew. The second has organization-wide
-repository access, which is a broader surface than anything Nostromo grants itself, and is worth an owner
-review at some point — noted rather than acted on.
+Two unrelated Apps are installed on `backspring-labs`. `claude` is scoped to selected repositories, which is
+the right shape. `chatgpt-codex-connector` (app 1144995, installed 2026-02-03) is scoped to **all eleven
+repositories**, including both private ones, and holds `contents: write`, **`workflows: write`**,
+`actions: write`, `issues: write` and `pull_requests: write`.
+
+`workflows: write` is the permission this design deliberately withholds from every crew identity, because an
+agent that can edit workflow definitions can edit the checks that gate its own merges. The crew Apps hold
+four permissions; this connector holds eight, across every repository.
+
+Measured on 2026-09-13: **zero commits and zero issues or pull requests** from it in either `squad-ops` or
+`nostromo`. It is installed and dormant on the two repositories that matter.
+
+**Recommended owner action: narrow it to selected repositories, excluding `squad-ops` and `nostromo`.** Not
+removal, since it is OpenAI's official connector and legitimate wherever it is actually used. Only scope is
+adjustable; an App declares its own permissions and the installer chooses only which repositories they apply
+to.
+
+This is design hygiene rather than a live exposure. The rulesets in §8.9 do constrain it, because a GitHub
+App is not a bypass actor unless named as one and this one will not be. The residual is that an identity
+with `workflows: write` can alter the definition of a check a ruleset requires — an edit those same rulesets
+would see. The stronger argument is simply that a dormant parallel path holding broader access than any crew
+member makes the boundary model harder to reason about while buying nothing.
 
 ## What remains open
 
