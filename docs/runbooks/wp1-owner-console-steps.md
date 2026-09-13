@@ -140,7 +140,22 @@ using subscription auth as intended.
    Default Workspace cannot carry limits.
 4. Open the workspace → **Spend limits** tab → monthly spend limit `25`, plus an alert threshold around `20`. Workspace limits can be set lower than the organization's limits but not higher, and organization limits always apply as well, so confirm the organization limit under Settings leaves room for `$25` on top of your other Anthropic usage.
 5. **Rate limits** tab: confirm the Opus tier is available to the workspace, and **record the exact model identifier** for the same reason as §1.2 step 5 — the manifest says only `model_family: opus`. Leave the values at the organization defaults unless you want single-agent ceilings.
-6. Switch into the workspace using the **Workspaces** selector in the top-left, then **API keys** → **Create Key** → name `dallas`. The key must be scoped to this single workspace, not a multi-workspace key. Save it as `~/.config/nostromo/secrets/dallas/anthropic.key`.
+6. Switch into the workspace using the **Workspaces** selector in the top-left, then create the key.
+
+   **Prefer a service account over a personal key**, for the same reason as §1.2 step 6: a personal key is
+   archived if its user is removed from the organization, while a service account key belongs to the service
+   account. Create one named `dallas` (Settings → Service accounts, or the workspace's Service accounts tab),
+   add it to `nostromo-dallas`, then create its key.
+
+   **Set the expiration to `Never`.** The dropdown offers 3 hours, 1 day, 7 days, 30 days, a custom duration,
+   or Never, and **the choice cannot be changed after creation** — a shorter key has to be replaced rather
+   than extended. A 30-day key means Dallas silently stops working every month on an unguarded manual step,
+   which is the failure shape the record documents (#1061: every guarded step performed, the one unguarded
+   step missed twice by someone holding the checklist). If `Never` is greyed out, the organization has a
+   maximum expiration policy; change it under Settings first.
+
+   The key must be scoped to this single workspace, not a multi-workspace key. It begins `sk-ant-`, is shown
+   once, and goes to `~/.config/nostromo/secrets/dallas/anthropic.key` at mode 600.
 7. Nothing else is created in this workspace.
 
 Every API response carries an `anthropic-workspace-id` header, which is how the assistant's test request proves attribution: the header must equal the `wrkspc_…` ID of `nostromo-dallas`, and the request must appear under that workspace's usage.
