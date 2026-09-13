@@ -15,14 +15,14 @@ Dependency ledger for Nostromo (NOSTROMO-PLAN-0001 §7.9, §18.4). Buzz, Herdr, 
 | MinIO client (bucket init) | `minio/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727` | upstream pins the same release tag | https://hub.docker.com/r/minio/mc | 2026-09-08 on nano |
 | buzz-acp | TBD (WP-6) | ships with the Buzz relay commit | https://github.com/block/buzz/tree/main/crates/buzz-acp | — |
 | Buzz Persona Pack spec | TBD | `crates/buzz-persona/PERSONA_PACK_SPEC.md` at `3c7f288` | https://github.com/block/buzz/blob/main/crates/buzz-persona/PERSONA_PACK_SPEC.md | — |
-| Herdr | TBD (WP-4) | `v0.8.2` (2026-08-19) | https://github.com/herdrdev/herdr | — |
-| OpenCode (`opencode-ai`) | TBD (WP-4) | `1.18.29` | https://opencode.ai/docs/acp/ | — |
-| `@agentclientprotocol/codex-acp` | TBD (WP-7) | `1.10.0` | https://github.com/agentclientprotocol/codex-acp | — |
-| `@agentclientprotocol/claude-agent-acp` | TBD (WP-7) | `0.75.1` | https://www.npmjs.com/package/@agentclientprotocol/claude-agent-acp | — |
-| Gemini CLI (`@google/gemini-cli`) | TBD (WP-8) | `0.58.0` | https://github.com/google-gemini/gemini-cli | — |
-| Ollama on Spark | TBD (WP-4) | unknown until Spark preflight | https://ollama.com | — |
-| Qwen3.6 35B-A3B Ollama tag and quantization | TBD (WP-4) | benchmark before pinning | https://ollama.com/library | — |
-| Node runtime on Spark | TBD (WP-4) | — | — | — |
+| Herdr | TBD (WP-4) | `v0.9.0` (2026-09-07) | https://github.com/herdrdev/herdr | — |
+| OpenCode (`opencode-ai`) | TBD (WP-4) | `1.18.30` (2026-09-09) | https://opencode.ai/docs/acp/ | — |
+| `@agentclientprotocol/codex-acp` | TBD (WP-7) | `1.11.0` | https://github.com/agentclientprotocol/codex-acp | — |
+| `@agentclientprotocol/claude-agent-acp` | TBD (WP-7) | `0.76.0`, **`engines.node >= 22`** | https://www.npmjs.com/package/@agentclientprotocol/claude-agent-acp | — |
+| Gemini CLI (`@google/gemini-cli`) | TBD (WP-8) | `0.59.0`, `engines.node >= 20` | https://github.com/google-gemini/gemini-cli | — |
+| Ollama on Spark | `0.32.14`, service active, listening on `*:11434` (not loopback — see WP-4 evidence) | `0.32.14` | https://ollama.com | 2026-09-13 on spark (`infrastructure/spark/evidence/`) |
+| Qwen3.6 35B-A3B Ollama tag and quantization | `qwen3.6:35b-a3b`, manifest `07d35212591f`, **`Q4_K_M`**, `qwen35moe` 36.0B, context 262144, tools + thinking. 29 GB resident, 72–74 tok/s. **Mother runs reasoning off, Brett reasoning on at a 2048 budget** — both justified by a reproducing failure | as pinned | https://ollama.com/library | 2026-09-13 on spark |
+| Node runtime on Spark | TBD (WP-4) | `v24.21.0` Krypton LTS (2026-09-07); `v22.23.2` Jod also current. **`>= 22` is the binding constraint**, from `claude-agent-acp` | https://nodejs.org/dist/index.json | — |
 | OpenAI model, Ripley and Parker | `gpt-5.6-sol` — exact API identifier confirmed in the project model list 2026-09-13 | 2026-09-13, same list: `gpt-6-astra`, `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.5-pro`, `gpt-5.5`, `gpt-5.4-pro`, `gpt-5.3-codex` | https://platform.openai.com | project model list restricted to this id alone (WP-1 §1.2) |
 | Anthropic model, Dallas | `claude-opus-5` (display name "Claude Opus 5"), confirmed available to the `nostromo-dallas` workspace 2026-09-13; organization on Scale tier, workspace rate limits unset so they inherit | 2026-09-13, same quota list: Claude Fable 5, Claude Opus 5, Claude Sonnet 5 | https://platform.claude.com | workspace spend limit $25; `crew/manifest.yaml` still says only `model_family: opus` and should carry the exact id |
 | Docker / Compose on Jetson | Docker `29.8.0` (build `88096ef`), Compose `v5.5.1`, data root `/mnt/ssd/docker` | preinstalled on the Jetson | https://docs.docker.com/engine/ | 2026-09-08 on nano |
