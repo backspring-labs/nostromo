@@ -9,9 +9,24 @@ SECRETS="${NOSTROMO_SECRETS:-$HOME/.config/nostromo/secrets}"
 pem="$SECRETS/$role/github-app.pem"
 [[ -s "$pem" ]] || { echo "no App private key at $pem" >&2; exit 1; }
 
-# App and installation ids come from the crew manifest's github section; passed in until WP-1 records them.
-app_id="${GITHUB_APP_ID:?set GITHUB_APP_ID}"
-install_id="${GITHUB_APP_INSTALLATION_ID:?set GITHUB_APP_INSTALLATION_ID}"
+# App and installation ids come from the crew manifest, which WP-1 recorded. The environment still
+# overrides, for probing an App before it is in the manifest.
+MANIFEST="${NOSTROMO_MANIFEST:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/crew/manifest.yaml}"
+if [[ -n "${GITHUB_APP_ID:-}" && -n "${GITHUB_APP_INSTALLATION_ID:-}" ]]; then
+  app_id="$GITHUB_APP_ID"
+  install_id="$GITHUB_APP_INSTALLATION_ID"
+else
+  [[ -r "$MANIFEST" ]] || { echo "no manifest at $MANIFEST and no GITHUB_APP_ID in the environment" >&2; exit 1; }
+  ids=$(python3 -c '
+import sys, yaml
+manifest, role = sys.argv[1], sys.argv[2]
+gh = ((yaml.safe_load(open(manifest)) or {}).get("agents", {}).get(role) or {}).get("github")
+if not gh:
+    sys.exit(f"{role} has no github section in {manifest}; register the App first")
+print(gh["app_id"], gh["installation_id"])
+' "$MANIFEST" "$role") || exit 1
+  read -r app_id install_id <<<"$ids"
+fi
 
 b64url() { openssl base64 -A | tr '+/' '-_' | tr -d '='; }
 now=$(date +%s)
