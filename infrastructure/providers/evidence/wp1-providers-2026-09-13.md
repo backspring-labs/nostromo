@@ -11,6 +11,10 @@ are non-secret and are the values the launcher and the usage reports key on.
 | Ripley | OpenAI | project `nostromo-ripley` | `proj_UHuRAjJYSSAwI8uoOXModzo1` | $25/month, enforce on |
 | Dallas | Anthropic | workspace `nostromo-dallas` | `wrkspc_019QkXKoL5T12RqJB59Rkbq9` | $25/month |
 
+The Anthropic workspace identifier was **confirmed against the console by the owner on 2026-09-13**. This
+check was necessary rather than pedantic: the Default Workspace also returns a `wrkspc_` header, so the probe
+alone could not distinguish a correctly scoped key from one that had fallen back to Default.
+
 OpenAI organization `user-tcgcnsbtlnapfvmvztckfsc6`, organization hard limit `100`, monthly reload limit `95`.
 Anthropic organization `f61f4eab-90f4-4448-8dda-aaabe3eafcc9`, Scale tier, organization spend limit `30`,
 auto-reload to `25` when the balance reaches `10`.
@@ -56,10 +60,6 @@ a harness misconfigured onto a pricier model fails loudly instead of silently dr
 
 ## What remains open
 
-- **The Anthropic workspace identifier is unconfirmed against the console.** The Default Workspace also
-  returns a `wrkspc_` header, so the header alone does not prove the key is scoped to `nostromo-dallas`
-  rather than to Default. Confirm `wrkspc_019QkXKoL5T12RqJB59Rkbq9` matches what the console shows for
-  `nostromo-dallas`.
 - Keys are on the Mac and must move to the Spark host-local secret files (WP-1 §8.10).
 - GitHub Apps `nostromo-parker` and `nostromo-ripley` are not yet registered, so no identity or ruleset
   evidence exists.
