@@ -115,3 +115,28 @@ def test_attribution_is_skipped_rather_than_assumed_when_unknown():
     r = run("nostromo/parker/x", ["src/a.py"], ["anyone@example.com"], None)
     assert r.returncode == 0
     assert "attribution not checked" in r.stdout
+
+
+def test_the_default_rules_path_resolves(tmp_path):
+    """The one path the fixtures never exercised, because they always pass --rules.
+
+    A rename left DEFAULT_RULES pointing at a file that no longer existed, and every test
+    stayed green because each supplied the argument explicitly. Caught only by running the
+    check for real. This asserts the default the workflow actually relies on.
+    """
+    (tmp_path / ".github").mkdir()
+    (tmp_path / ".github" / RULES.name).write_text(RULES.read_text())
+    r = subprocess.run(
+        [sys.executable, str(CHECKER), "--branch", "nostromo/parker/x", "--files", "sips/SIP-1.md"],
+        capture_output=True, text=True, cwd=tmp_path,
+    )
+    assert r.returncode == 1, f"default rules path did not resolve:\n{r.stdout}{r.stderr}"
+    assert "may not touch sips/**" in r.stdout
+
+
+def test_the_default_rules_filename_matches_the_shipped_file():
+    """Belt and braces: the constant and the file on disk cannot drift apart again."""
+    sys.path.insert(0, str(CHECKER.parent))
+    from check_nostromo_crew_pr import DEFAULT_RULES
+
+    assert DEFAULT_RULES.name == RULES.name
