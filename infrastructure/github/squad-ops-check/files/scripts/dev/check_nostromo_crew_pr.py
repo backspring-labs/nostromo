@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Enforce Nostromo crew path boundaries on a pull request.
+"""Enforce the Nostromo crew contract on a pull request: path boundaries and commit attribution.
 
 A crew branch is `nostromo/<role>/...`. Each role may only touch the paths its role owns,
 declared in .github/nostromo-path-boundaries.yml. Anything that is not a crew branch is
@@ -9,11 +9,22 @@ This exists because GitHub refuses push rules on public source repositories, so 
 rulesets that guarantee *who* may write to a namespace cannot also constrain *what* they
 write. See Nostromo DEV-006.
 
-Usage:
-  check_nostromo_path_boundaries.py --branch <head-ref> --files-from <path|->
-  check_nostromo_path_boundaries.py --branch <head-ref> --files a/b.py c/d.py
+Two assertions, both only on crew branches:
 
-Exit 0 = allowed. Exit 1 = a boundary was crossed, or the branch names a role with no rules.
+  paths        the changed files stay inside the role's declared boundary
+  attribution  every commit is authored by that role's bot
+
+Attribution matters because the branch ruleset guarantees only one App may *push* to a
+namespace, while the commit *author* is a separate field any git config can set. A launcher
+that fails to export the author variables produces commits under whatever identity the host
+happens to hold, and nothing announces it.
+
+Usage:
+  check_nostromo_crew_pr.py --branch <ref> --files-from <path|-> [--authors a@b ...]
+                            [--expected-author <email>]
+
+Exit 0 = allowed. Exit 1 = a boundary was crossed, attribution is wrong, or the branch names
+a role with no rules.
 """
 
 from __future__ import annotations
@@ -81,6 +92,10 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--branch", required=True, help="pull request head ref")
     ap.add_argument("--rules", type=Path, default=DEFAULT_RULES)
+    ap.add_argument("--authors", nargs="*", default=None,
+                    help="commit author emails on this pull request")
+    ap.add_argument("--expected-author", default=None,
+                    help="the bot email this role's commits must carry; derived by the workflow")
     src = ap.add_mutually_exclusive_group(required=True)
     src.add_argument("--files-from", help="file of newline-separated paths, or - for stdin")
     src.add_argument("--files", nargs="*", help="paths directly")
@@ -106,18 +121,37 @@ def main(argv: list[str] | None = None) -> int:
         print("      Add its boundary before using the namespace, or rename the branch.")
         return 1
 
-    found = violations(files, role, rules)
-    if not found:
-        print(f"ok: {len(files)} changed file(s) are inside {role}'s boundary")
-        return 0
+    failed = False
 
-    print(f"FAIL: {len(found)} path boundary violation(s) on branch {args.branch}\n")
-    for v in found:
-        print(f"  {v}")
-    print(f"\n{role}'s boundary is declared in {args.rules}.")
-    print("If the work genuinely belongs outside it, it belongs to a different role — hand it off")
-    print("rather than widening the boundary. Widening is an owner decision.")
-    return 1
+    found = violations(files, role, rules)
+    if found:
+        failed = True
+        print(f"FAIL: {len(found)} path boundary violation(s) on branch {args.branch}\n")
+        for v in found:
+            print(f"  {v}")
+        print(f"\n{role}'s boundary is declared in {args.rules}.")
+        print("If the work genuinely belongs outside it, it belongs to a different role — hand it off")
+        print("rather than widening the boundary. Widening is an owner decision.\n")
+    else:
+        print(f"ok: {len(files)} changed file(s) are inside {role}'s boundary")
+
+    if args.expected_author and args.authors is not None:
+        wrong = sorted({a for a in args.authors if a and a != args.expected_author})
+        if wrong:
+            failed = True
+            print(f"FAIL: {len(wrong)} commit author(s) are not {role}'s identity\n")
+            for a in wrong:
+                print(f"  {a}")
+            print(f"\n  expected: {args.expected_author}")
+            print("\nThe ruleset controls who may push to this namespace; the commit author is a separate")
+            print("field. A mismatch means the launcher did not export the author variables, so the commit")
+            print("is attributed to whatever identity the host holds. Fix the launcher, not the history.")
+        else:
+            print(f"ok: all commits authored by {args.expected_author}")
+    elif args.authors is not None:
+        print("note: attribution not checked — no expected author supplied")
+
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

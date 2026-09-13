@@ -15,16 +15,20 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE = ROOT / "infrastructure" / "github" / "squad-ops-check"
-CHECKER = BASE / "files" / "scripts" / "dev" / "check_nostromo_path_boundaries.py"
-RULES = BASE / "files" / ".github" / "nostromo-path-boundaries.yml"
-CASES = yaml.safe_load((BASE / "fixtures" / "cases.yaml").read_text())["cases"]
+CHECKER = BASE / "files" / "scripts" / "dev" / "check_nostromo_crew_pr.py"
+RULES = BASE / "files" / ".github" / "nostromo-crew-boundaries.yml"
+_F = yaml.safe_load((BASE / "fixtures" / "cases.yaml").read_text())
+CASES = _F["cases"]
+ATTRIB = _F["attribution_cases"]
 
 
-def run(branch: str, files: list[str]):
-    return subprocess.run(
-        [sys.executable, str(CHECKER), "--branch", branch, "--rules", str(RULES), "--files", *files],
-        capture_output=True, text=True,
-    )
+def run(branch: str, files: list[str], authors=None, expected=None):
+    cmd = [sys.executable, str(CHECKER), "--branch", branch, "--rules", str(RULES), "--files", *files]
+    if expected is not None:
+        cmd += ["--expected-author", expected]
+    if authors is not None:
+        cmd += ["--authors", *authors]
+    return subprocess.run(cmd, capture_output=True, text=True)
 
 
 @pytest.mark.parametrize("case", CASES, ids=[c["name"] for c in CASES])
@@ -73,10 +77,41 @@ def test_a_non_crew_branch_is_never_this_check_s_business():
 def test_pattern_vocabulary_is_the_documented_two():
     """`dir/**` is at-or-below; everything else is fnmatch. Nothing subtler."""
     sys.path.insert(0, str(CHECKER.parent))
-    from check_nostromo_path_boundaries import matches
+    from check_nostromo_crew_pr import matches
 
     assert matches("src/a/b.py", "src/**")
     assert matches("src", "src/**")
     assert not matches("srcx/a.py", "src/**")
     assert not matches("a/src/b.py", "src/**")
     assert matches(".github/x.yml", ".github/x.yml")
+
+
+@pytest.mark.parametrize("case", ATTRIB, ids=[c["name"] for c in ATTRIB])
+def test_attribution_case(case):
+    """The ruleset controls who may push; the commit author is a separate field it cannot see."""
+    r = run(case["branch"], case["files"], case["authors"], case["expected_author"])
+    want = 0 if case["expect"] == "pass" else 1
+    assert r.returncode == want, (
+        f"{case['name']}: expected {case['expect']}, got rc={r.returncode}\n"
+        f"{case.get('why', '')}\n{r.stdout}{r.stderr}"
+    )
+
+
+def test_attribution_control_set_contains_both_outcomes():
+    assert {c["expect"] for c in ATTRIB} == {"pass", "fail"}
+
+
+def test_both_failures_are_reported_together():
+    """A run that stops at the first failure hides the second, and the reader fixes one thing twice."""
+    r = run("nostromo/parker/x", ["sips/SIP-0001.md"],
+            ["someone@example.com"], "328771233+nostromo-parker[bot]@users.noreply.github.com")
+    assert r.returncode == 1
+    assert "path boundary violation" in r.stdout
+    assert "not parker's identity" in r.stdout
+
+
+def test_attribution_is_skipped_rather_than_assumed_when_unknown():
+    """No expected author must not silently read as 'attribution fine'."""
+    r = run("nostromo/parker/x", ["src/a.py"], ["anyone@example.com"], None)
+    assert r.returncode == 0
+    assert "attribution not checked" in r.stdout

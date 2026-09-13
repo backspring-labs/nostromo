@@ -3,7 +3,7 @@
 # Branch rulesets guarantee that only one identity can write to `nostromo/<role>/**`.
 # They cannot constrain WHICH paths that identity touches, because GitHub refuses push
 # rules on public source repositories (Nostromo DEV-006). This file is the substitute,
-# enforced by scripts/dev/check_nostromo_path_boundaries.py as a required check.
+# enforced by scripts/dev/check_nostromo_crew_pr.py as a required check.
 #
 # Pattern semantics, deliberately small so a reader can predict them:
 #   "dir/**"  matches anything at or below dir/
@@ -15,9 +15,9 @@ version: 1
 
 # Applies to every crew role. A guard that the guarded party can edit is not a guard.
 universal_forbidden:
-  - ".github/nostromo-path-boundaries.yml"
-  - ".github/workflows/nostromo-path-boundaries.yml"
-  - "scripts/dev/check_nostromo_path_boundaries.py"
+  - ".github/nostromo-crew-boundaries.yml"
+  - ".github/workflows/nostromo-crew-checks.yml"
+  - "scripts/dev/check_nostromo_crew_pr.py"
 
 roles:
   # Warrant Officer: design artifacts and plans. Not implementation.

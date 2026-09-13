@@ -85,14 +85,58 @@ cases:
   # --- the boundary protects itself ----------------------------------------------------
   - name: parker edits the rules file
     branch: nostromo/parker/x
-    files: [.github/nostromo-path-boundaries.yml]
+    files: [.github/nostromo-crew-boundaries.yml]
     expect: fail
     why: a guard the guarded party can edit is not a guard
   - name: ripley edits the checker
     branch: nostromo/ripley/x
-    files: [scripts/dev/check_nostromo_path_boundaries.py]
+    files: [scripts/dev/check_nostromo_crew_pr.py]
     expect: fail
   - name: ash edits the workflow
     branch: nostromo/ash/x
-    files: [.github/workflows/nostromo-path-boundaries.yml]
+    files: [.github/workflows/nostromo-crew-checks.yml]
     expect: fail
+    why: outside ash's allowlist — note this would fail even without the universal rule
+  - name: brett edits the checker, which its denylist would otherwise permit
+    branch: nostromo/brett/x
+    files: [scripts/dev/check_nostromo_crew_pr.py]
+    expect: fail
+    why: isolates the universal rule — brett has a denylist, and scripts/ is not on it
+
+# --- commit attribution -----------------------------------------------------------
+# Only exercised when the case supplies authors and an expected author.
+attribution_cases:
+  - name: parker commits as itself
+    branch: nostromo/parker/x
+    files: [src/squadops/a.py]
+    authors: ["328771233+nostromo-parker[bot]@users.noreply.github.com"]
+    expected_author: "328771233+nostromo-parker[bot]@users.noreply.github.com"
+    expect: pass
+  - name: parker commits as the owner
+    branch: nostromo/parker/x
+    files: [src/squadops/a.py]
+    authors: ["jason.f.ladd@gmail.com"]
+    expected_author: "328771233+nostromo-parker[bot]@users.noreply.github.com"
+    expect: fail
+    why: the launcher failed to export the author variables; the ruleset cannot see this
+  - name: parker branch carries one good and one wrong author
+    branch: nostromo/parker/x
+    files: [src/squadops/a.py]
+    authors: ["328771233+nostromo-parker[bot]@users.noreply.github.com", "someone@example.com"]
+    expected_author: "328771233+nostromo-parker[bot]@users.noreply.github.com"
+    expect: fail
+    why: one correct commit does not excuse the rest
+  - name: ordinary branch, any author
+    branch: feat/whatever
+    files: [src/squadops/a.py]
+    authors: ["jason.f.ladd@gmail.com"]
+    expected_author: "328771233+nostromo-parker[bot]@users.noreply.github.com"
+    expect: pass
+    why: attribution is only the crew's contract
+  - name: path violation and bad author together
+    branch: nostromo/parker/x
+    files: [sips/SIP-0001.md]
+    authors: ["someone@example.com"]
+    expected_author: "328771233+nostromo-parker[bot]@users.noreply.github.com"
+    expect: fail
+    why: both must be reported, not just the first
