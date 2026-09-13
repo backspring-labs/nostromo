@@ -41,7 +41,9 @@ Console: https://platform.openai.com
 2. Open the project → **Limits** → under **Spend** select **Edit spend limit**.
 3. **Monthly spend limit**: `70`. Turn on **Enforce a hard limit**. **Save**. If the page only offers a notification or budget without the enforce toggle, stop and report; the plan requires enforcement.
 4. Optional but useful: an alert threshold at `55` so you hear about it before the cutoff.
-5. Same Limits page: if it offers model allow-listing, restrict the project to the GPT-5.6 family. If it offers per-model rate limits, lower them to single-agent levels; the defaults are fine if not.
+5. **Model allow-listing: skip it.** The console presents the whole catalogue to hand-pick from, and the value does not justify the maintenance. The spend cap controls cost regardless of which model is called, and which model the agent actually uses is pinned in the harness configuration. A divergence between the two is caught by the §5 attribution probe, which reports the model each key reached. Per-model rate limits are likewise optional; the defaults are fine for a single agent.
+
+   **Do record the exact model identifier** shown in that list — the literal string passed as `model`. `crew/manifest.yaml` carries only the logical name `gpt-5.6-sol`, and `docs/source-baseline.md` has no row for either cloud model, which is a gap in the dependency ledger that NOSTROMO-0001 §31's substitution policy assumes is filled.
 6. **Service accounts** (in the project's settings) → **Create** → name `parker`. This yields the key. A service-account key belongs to the project, not to your user, so it survives changes to your own account. Save it as `~/.config/nostromo/secrets/parker/openai.key`.
 7. Do not create a second key in this project for anything else.
 
@@ -100,7 +102,7 @@ Console: https://platform.claude.com
 
    Starting mid-month, apply §1.3a here too: keep the workspace limit at its full `25` and bound the month with a smaller initial purchase, `$25` at the start of a full month or `$20` when part-way through, with the monthly reload limit also `25` by the same derivation rule.
 2. Open the workspace → **Spend limits** tab → monthly spend limit `25`, plus an alert threshold around `20`. Workspace limits can be set lower than the organization's limits but not higher, and organization limits always apply as well, so confirm the organization limit under Settings leaves room for `$25` on top of your other Anthropic usage.
-3. **Rate limits** tab: confirm the Opus tier is available to the workspace. Leave the values at the organization defaults unless you want single-agent ceilings.
+3. **Rate limits** tab: confirm the Opus tier is available to the workspace, and **record the exact model identifier** for the same reason as §1.2 step 5 — the manifest says only `model_family: opus`. Leave the values at the organization defaults unless you want single-agent ceilings.
 4. Switch into the workspace using the **Workspaces** selector in the top-left, then **API keys** → **Create Key** → name `dallas`. The key must be scoped to this single workspace, not a multi-workspace key. Save it as `~/.config/nostromo/secrets/dallas/anthropic.key`.
 5. Nothing else is created in this workspace.
 
