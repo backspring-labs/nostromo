@@ -18,11 +18,13 @@ Console: https://platform.openai.com
 1. Settings → Organization → **Limits** (organization level). Note whether an organization hard limit exists and its amount.
 2. It must leave room for `$70 + $25 = $95` of Nostromo spend on top of any other API workloads billed to this organization. If an existing limit is lower than that, raise it.
 
-   **If no organization limit exists, set one at `110`.** The derivation is the sum of the project caps plus
-   about 15%: enough that it can never fire in a legitimate month, tight enough to catch a project created
-   without a limit or one whose limit was removed. Do not set it at `100` — with both projects at their caps
-   and enforcement lag on each, legitimate spend can reach the high nineties, and an organization limit that
-   fires in normal operation stops every project at once.
+   **Set 2026-09-13: `100`.** (The recommendation was `110`, derived as the sum of the project caps plus
+   about 15%. The owner set `100`, which leaves `$5` of headroom over the `$95` of caps — enough for
+   realistic enforcement lag, which is a propagation window measured in cents rather than dollars.)
+
+   **The headroom is `$5`, so two changes require raising this limit**, and both are silent failures if
+   missed: adding any other API work to this organization, since the limit spans every project; and raising
+   a project cap without moving the organization limit with it.
 
    **Add any other API work billed to this organization**, because the limit spans every project. Check the
    usage page grouped by project first. If other usage is substantial and variable, a separate organization
