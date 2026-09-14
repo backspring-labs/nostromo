@@ -137,33 +137,43 @@ nostromo.backspring.xyz   CN=nostromo.backspring.xyz   1 member (owner)     1 ev
 buzz.backspring.xyz       CN=buzz.backspring.xyz       1 member (owner)   169 events
 ```
 
-## What is not, and cannot be
+## Media: the limitation does not exist, after three wrong readings
 
-`BUZZ_MEDIA_BASE_URL` is a single `String` — verified at the point of use, not just where it is
-parsed: `url: format!("{}/{sha256}.{ext}", config.public_base_url)`. No per-community column exists
-in the schema and no per-request override exists in the code. **Every community's media links carry
-the primary host.**
+This section previously claimed every community's media links carry the primary community's
+hostname. **That is false.** The relay rewrites media URLs per tenant:
 
-**A neutral media host was tried and does not work.** Reading the router suggested media was a
-separate hash-keyed router outside the `/` WebSocket path's tenant binding, so a deployment-level
-`media.backspring.xyz` looked like the correct fix. Configured, certificated, and measured:
+```rust
+fn media_base_url_for_tenant(..) -> String { format!("{scheme}://{tenant_host}/media") }
+descriptor.url = format!("{base}/{}.{ext}", descriptor.sha256);
+```
+
+`rewrite_descriptor_urls_for_tenant` rebuilds every blob descriptor from the **request's** host;
+`BUZZ_MEDIA_BASE_URL` contributes only the scheme. A blob uploaded in `buzz.backspring.xyz` is
+served from `buzz.backspring.xyz`. There is no branding leak and no cross-community breakage.
+
+The design is careful: raw bytes are shared content-addressed storage, while the per-tenant read
+gate is a sidecar at `_meta/{community}/{sha}.json`, checked before any blob I/O because *"Storage
+is not authoritative"* — so a blob in another community is never observable through a global lookup.
+
+`BUZZ_MEDIA_BASE_URL` must still name a **mapped community host**, because media reads bind a tenant
+from the request host and an unmapped host 404s. A neutral `media.backspring.xyz` was configured,
+certificated, measured and reverted for that reason:
 
 ```text
 nostromo.backspring.xyz   /media/<hash> -> 401 {"error":"authentication failed"}
 media.backspring.xyz      /media/<hash> -> 404 {"error":"not found"}
 ```
 
-A mapped host's media router answers and demands auth; an unmapped host 404s. **Media is gated
-behind tenant binding**, so pointing `BUZZ_MEDIA_BASE_URL` at a host with no community made every
-media link dead. Reverted, and the DNS record deleted.
+### Three wrong readings, and what they have in common
 
-So the limitation is real and unavoidable in this version: **every community's media links carry the
-primary community's hostname.** Cosmetic between the owner's own communities; a genuine branding
-leak if a second community ever holds other people. Worth revisiting only if Buzz gains a
-per-community media base, or if a second community ever has external members.
+1. "Media base URL is global, so links leak the primary host" — read the parse, not the rewrite.
+2. "Media routes are not tenant-bound, so a neutral host works" — caught by measuring, not reading.
+3. "Links in one community will point at another and 404" — read the descriptor build, not the
+   rewrite that follows it.
 
-The lesson is the same one this record keeps producing: the reading of the code was plausible and
-wrong, and one comparison against a working host settled it in seconds.
+Each was a confident conclusion from reading one layer of a path that had another layer below it.
+The one that got caught early was the one that was **measured** rather than reasoned about. The
+owner's repeated "that doesn't seem right" was correct every time, against three confident answers.
 
 ## Communities do not auto-create — corrected
 
