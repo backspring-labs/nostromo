@@ -197,3 +197,45 @@ The tombstoned `nano.tailc69e7d.ts.net` community logs `NIP-43 membership reconc
 community write fenced` every 60 seconds. The deletion request is at `retention_pending`, unblocked
 and with no error, so the deletion is proceeding as designed; the background reconciler simply does
 not skip tombstoned communities. Log noise, not damage, and it should stop when retention elapses.
+
+---
+
+# The client provisions; the relay does not
+
+Joining `nostromo.backspring.xyz` produced the same three channels the `buzz.` community has —
+`Welcome`, `general`, `welcome-everyone` — which looked like an isolation failure and is not:
+
+```text
+Welcome           buzz     d944d4a0   01:21:09
+Welcome           nostromo cb959b66   02:32:32
+general           buzz     25b415b2   01:21:09
+general           nostromo 34f6c608   02:32:31
+```
+
+Distinct ids, distinct communities, created seventy minutes apart, 174 events against 54. **Buzz
+Desktop created them**, under the owner's key, as its default set for a new community. The relay
+provisioned nothing.
+
+The managed-agent roster behaves differently again: `managed-agents.json` lives in the app's
+support directory and is **per installation, not per community**, so the agent list — and the two
+agents deleted earlier — follows the owner into every community opened on that machine. Nothing was
+deleted "in nostromo"; there is only one list.
+
+## Why this matters beyond tidiness
+
+An opinionated client is creating **server-side resources** in a community without being asked, and
+holds a machine-wide notion of "your agents" that has no community scope at all. For a small team's
+chat app that is friendly. For a relay run as infrastructure it means **the crew's community shape
+must be asserted deliberately, not inherited from whatever a client does on join.**
+
+Two consequences for later work:
+
+- **WP-9** defines the crew's channel layout. That is the point to replace the defaults, not before;
+  deleting them now means deleting them twice.
+- The crew's community should be created through the **operator control plane** —
+  `POST /operator/communities` with an explicit host and initial owner — rather than appearing as a
+  side effect of `RELAY_URL` at startup and then being furnished by a client. That surface is now
+  enabled; it was disabled (empty `RELAY_OPERATOR_PUBKEYS`, fail closed) until 2026-09-13.
+
+Open question worth one cheap observation: whether Desktop provisions defaults on community
+**creation** or on every **open**. Deleting the three channels once and reopening answers it.
