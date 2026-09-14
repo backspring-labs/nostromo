@@ -83,3 +83,41 @@ An opinionated client provisions **server-side** resources into a community on j
 deliberately — WP-9 owns the channel layout, and the community itself should be created through the
 operator control plane with an explicit host and owner rather than furnished by whatever client
 opens it first.
+
+
+---
+
+# Executed 2026-09-13
+
+Final state: **no agent processes on the Mac, no agents with identities in the config**, three inert
+personas left, and one active community (`nostromo.backspring.xyz`) with two channels and one
+member — the owner. 17 probes pass.
+
+## What actually blocked it, which was none of the things first suspected
+
+**Deleting an agent leaves its `channel_members` row behind.** That orphan row is what stops the
+channel being deleted, and every provision-and-delete cycle added another. The `Welcome` channel in
+the deleted `buzz.` community had accumulated **nine** agent rows for six agents; `nostromo.`'s had
+five for three. This looks like an upstream bug: deleting an agent should take its channel
+memberships with it. It matters for WP-9, when seven crew identities start joining and leaving
+channels.
+
+Repair: delete the orphan rows, then `buzz-admin reconcile-channels --channel <uuid>` to republish
+the roster. Note reconcile **refuses on a deleted channel** — which is correct, not a failure.
+
+## Two wrong diagnoses along the way, with the same cause
+
+1. "The channel deletion did not work" — it had. `channels.deleted_at` was set; the row remains
+   because it is a **soft delete**. Checked for the row's existence and used `updated_at ==
+   created_at` as evidence instead of reading the `deleted_at` column in the schema printed moments
+   earlier.
+2. "Two new agents were spawned by opening the channel" — they were pre-existing orphan rows, not
+   new agents. Same cause: reading `channel_members` without joining against what still exists.
+
+Both were avoidable by checking the soft-delete column that the schema dump had already shown.
+
+## The shortcut that worked
+
+Deleting the whole `buzz.backspring.xyz` community removed its three channels, twelve memberships
+and nine stray agent identities in one approved operation — 607 rows — instead of nine manual
+removals. When a community exists only as a test, deleting the community beats tidying it.
