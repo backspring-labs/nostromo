@@ -53,8 +53,29 @@ should have come first: the `communities` table **has no owner column**. Ownersh
 `RELAY_OWNER_PUBKEY` at runtime. Restarting with the real key was sufficient. Data, certificate and
 community all survived a step that would have destroyed them for no reason.
 
-A stale community row for `nano.tailc69e7d.ts.net` remains from before the hostname switch. Inert —
-communities bind by request Host — and `buzz-admin deletions` removes it when wanted.
+### The stale community, removed
+
+The `nano.tailc69e7d.ts.net` community from before the hostname switch was deleted the same evening
+through `buzz-admin deletions`, which is a four-stage control plane worth describing: `submit`
+freezes a cross-store inventory and hashes it, `inspect` shows what the hash covers, `approve`
+signs off **that specific digest**, and only `run` deletes. The contents cannot change between
+approval and execution.
+
+Approved inventory: **3 rows** — 1 `audit_log`, 1 `events`, 1 `relay_members` (the discarded DEV-002
+placeholder). No channels, users or media. Result: `deletion_state = tombstone`, zero members,
+events and channels. The live community was untouched (1 member, 166 events, 3 channels) and all 17
+probes pass.
+
+**Trap.** `deletions submit --host` **defaults to `RELAY_URL`'s authority**, which is now the live
+community. Omitting `--host` would have queued `buzz.backspring.xyz` for deletion. The approval gate
+would have caught it — the inventory would have read 166 events rather than 3 — but only for an
+operator who actually reads the inventory before approving. Always pass `--host` explicitly.
+
+This also confirmed that communities are genuinely isolated tenants: `community_id` is the leading
+column of the primary key on `relay_members`, `channels` and `events`, and the two communities
+carried different owners. `RELAY_OWNER_PUBKEY` seeds the owner at community creation rather than
+overriding relay-wide, which is why the old community still showed the placeholder as its owner
+after the new one had been corrected.
 
 ---
 
