@@ -118,3 +118,57 @@ different gates, and the crew's design must not assume the first implies the sec
 - Channels `general`, `Welcome`, `welcome-everyone` were created by onboarding. Left deliberately;
   the crew's channel layout is WP-9's decision, not a tidy-up.
 - §10.5 Herdr remote connectivity was proven in WP-4 evidence part 2.
+
+---
+
+# Multi-tenancy, validated before minting identities
+
+The owner declined to accept a single-hostname config ahead of WP-5, on the grounds that the relay's
+ability to carry more than one community should be proven before seven handles are bound to a host.
+That was the right call and it found four things.
+
+## What is genuinely per-community
+
+`community_id` leads the primary key on `relay_members`, `channels` and `events`. Two communities
+ran side by side with separate certificates, separate event counts and the same owner:
+
+```text
+nostromo.backspring.xyz   CN=nostromo.backspring.xyz   1 member (owner)     1 event
+buzz.backspring.xyz       CN=buzz.backspring.xyz       1 member (owner)   169 events
+```
+
+## What is not, and cannot be
+
+`BUZZ_MEDIA_BASE_URL` is a single `String` — verified at the point of use, not just where it is
+parsed: `url: format!("{}/{sha256}.{ext}", config.public_base_url)`. No per-community column exists
+in the schema and no per-request override exists in the code. **Every community's media links carry
+the primary host.**
+
+This is less wrong than it first appears. Media routes are a separate router keyed by content hash
+and are **not** tenant-bound — only the `/` WebSocket path binds a community from the request Host.
+In Buzz's intended deployment shape (the provisioning example is `acme.communities.buzz.xyz`) the
+media host is deployment-level, like a CDN. The correct fix is therefore a neutral media hostname
+rather than a per-community one, and it remains unconfigured here.
+
+## Communities do not auto-create — corrected
+
+An earlier note in `buzz.env` claimed a hostname creates a community on first connection. It does
+not. `bind_community` **fails closed**: *"an unmapped host or a lookup failure fails closed with a
+generic rejection — never a default tenant"*, returning 404 without echoing the host so a caller
+cannot probe which communities exist.
+
+Only `RELAY_URL`'s host is auto-provisioned at startup, which is how all three of this deployment's
+communities came to exist — each was `RELAY_URL` at some point today. **`buzz.backspring.xyz` works
+side by side with `nostromo.backspring.xyz` by accident of history, not by configuration.**
+
+The supported path is the operator control plane: `POST /operator/communities` with `host` and
+`initial_owner_pubkey`, NIP-98 signed by a key in `RELAY_OPERATOR_PUBKEYS` against
+`RELAY_OPERATOR_API_ORIGIN`, with per-deployment tenant limits. Neither variable is set here. The
+same surface offers `archive`, `unarchive`, `transfer` and `list_owned_communities`.
+
+## An upstream observation
+
+The tombstoned `nano.tailc69e7d.ts.net` community logs `NIP-43 membership reconciliation failed —
+community write fenced` every 60 seconds. The deletion request is at `retention_pending`, unblocked
+and with no error, so the deletion is proceeding as designed; the background reconciler simply does
+not skip tombstoned communities. Log noise, not damage, and it should stop when retention elapses.
