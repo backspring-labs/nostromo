@@ -39,10 +39,11 @@ NIP-42 auth successful   pubkey 508cd1c7...
 HTTP bridge request      route /query   status 200
 ```
 
-**The placeholder was worse than the deviation recorded.** DEV-002 described an unused config
-value; `list-members` showed `d9775d28...` registered as an **admin**. Unusable — its private half
-was generated and discarded — but a phantom admin is not an unused setting. Removed; the owner is
-now the sole member.
+The placeholder appeared in `list-members` as an **admin**, not merely as a config value. That is
+exactly what DEV-002's own swap procedure anticipated — *"the relay demotes the placeholder to
+admin, then it is removed"* — and an earlier reading of this evidence wrongly called it a gap in
+the deviation. It was documented; it was simply demoted rather than deleted, which is the designed
+behaviour. `buzz-admin remove-member` removed it, and the owner is now the sole member.
 
 ### The wipe that was not needed
 

@@ -55,6 +55,13 @@ Security/cost impact:  Nobody can administer the relay until WP-3; the relay is 
 Temporary or permanent: Temporary.
 Owner approval:        Recorded for review.
 Revisit trigger:       WP-3 mints the owner keypair.
+Resolved:              2026-09-13. RELAY_OWNER_PUBKEY is the owner's real identity
+                       508cd1c7dbcddcc93b8168923cac49ef28bb02f0e60de549e44b01000d2bce5f, minted in Buzz
+                       Desktop and authenticated over NIP-42. The swap went exactly as the procedure above
+                       describes: on restart the relay promoted the owner and left the placeholder demoted to
+                       admin, and buzz-admin remove-member removed it. The owner is now the sole member.
+                       No data wipe was required — ownership is read from the environment at runtime, not
+                       stored per community, so the communities table has no owner column to correct.
 ```
 
 ```text
