@@ -197,7 +197,7 @@ Repeat 3.1 with the name `nostromo-ripley`, key at `~/.config/nostromo/secrets/r
 
 - Do not install either App on `nostromo` or any other repository.
 - Do not grant organization-level permissions, Administration, Workflows, or Actions.
-- Do not create Apps for Dallas, Brett, or Mother yet; they get identities when their write flows are commissioned in WP-9 and WP-10.
+- Do not create Apps for Mother, Ash or Lambert yet; they get identities when their write flows are commissioned. **Superseded for Dallas and Brett 2026-09-13:** both are needed earlier than this runbook assumed — see `dallas-brett-github-apps.md`. Dallas's is load-bearing, because §14's require-a-review-from-a-non-author rule can only see a review submitted under a distinct identity.
 - Do not put your personal token into any crew file. The Apps are the only GitHub credentials the crew will ever hold.
 
 **Report:** for each App, the slug (from its URL), the App ID, and the installation ID.
