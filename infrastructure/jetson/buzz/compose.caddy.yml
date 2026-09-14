@@ -19,7 +19,7 @@ services:
       - buzz.env
       - secrets.env
     environment:
-      RELAY_HOSTNAME: ${BUZZ_DOMAIN:?}
+      RELAY_HOSTNAMES: ${RELAY_HOSTNAMES:?set RELAY_HOSTNAMES in buzz.env}
       ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in buzz.env}
       ACME_CA: ${ACME_CA:?set ACME_CA in buzz.env}
     volumes:

@@ -1,4 +1,7 @@
-# TLS for the relay's canonical hostname. Reachable on the tailnet only: the published port is
+# TLS for every hostname this relay serves. Each one is a separate community — the relay binds by
+# request Host — so this block deliberately takes a LIST, not a single canonical name.
+#
+# Reachable on the tailnet only: the published port is
 # bound to the Jetson's tailnet address, and the DNS record resolves to that same private address,
 # so the name is public but the host is not.
 #
@@ -14,7 +17,7 @@
 	auto_https disable_redirects
 }
 
-{$RELAY_HOSTNAME} {
+{$RELAY_HOSTNAMES} {
 	tls {
 		dns cloudflare {$CLOUDFLARE_API_TOKEN}
 		resolvers 1.1.1.1 8.8.8.8
