@@ -144,11 +144,26 @@ parsed: `url: format!("{}/{sha256}.{ext}", config.public_base_url)`. No per-comm
 in the schema and no per-request override exists in the code. **Every community's media links carry
 the primary host.**
 
-This is less wrong than it first appears. Media routes are a separate router keyed by content hash
-and are **not** tenant-bound — only the `/` WebSocket path binds a community from the request Host.
-In Buzz's intended deployment shape (the provisioning example is `acme.communities.buzz.xyz`) the
-media host is deployment-level, like a CDN. The correct fix is therefore a neutral media hostname
-rather than a per-community one, and it remains unconfigured here.
+**A neutral media host was tried and does not work.** Reading the router suggested media was a
+separate hash-keyed router outside the `/` WebSocket path's tenant binding, so a deployment-level
+`media.backspring.xyz` looked like the correct fix. Configured, certificated, and measured:
+
+```text
+nostromo.backspring.xyz   /media/<hash> -> 401 {"error":"authentication failed"}
+media.backspring.xyz      /media/<hash> -> 404 {"error":"not found"}
+```
+
+A mapped host's media router answers and demands auth; an unmapped host 404s. **Media is gated
+behind tenant binding**, so pointing `BUZZ_MEDIA_BASE_URL` at a host with no community made every
+media link dead. Reverted, and the DNS record deleted.
+
+So the limitation is real and unavoidable in this version: **every community's media links carry the
+primary community's hostname.** Cosmetic between the owner's own communities; a genuine branding
+leak if a second community ever holds other people. Worth revisiting only if Buzz gains a
+per-community media base, or if a second community ever has external members.
+
+The lesson is the same one this record keeps producing: the reading of the code was plausible and
+wrong, and one comparison against a working host settled it in seconds.
 
 ## Communities do not auto-create — corrected
 
