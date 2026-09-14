@@ -43,12 +43,29 @@ Per community, in Buzz Desktop:
 The client records `buzz-welcome-channel-ensured.v2` in local storage, so a deleted welcome channel
 is not recreated.
 
-## Personas and the team: leave them
+## Personas: cannot be deleted, but can be deactivated
 
-The three `builtin:*` **personas** hold no keys, run nothing, and cannot be deleted while the
-built-in `Welcome Team` references them — `validate_persona_activation_change` refuses when a
-persona is `referenced_by_team`, and the built-in team itself cannot be deleted. That is a dead end
-and not worth pursuing: an inert template is not an agent.
+Built-in personas are undeletable by an explicit guard, and this is not the team blocking you:
+
+```rust
+if persona.is_builtin { return Err("Built-in agents cannot be deleted.".to_string()); }
+```
+
+The `referenced_by_team` rule below it applies to custom personas. So there is no delete path, ever.
+
+**But they can be deactivated** — removed from "My Agents" — which stops them rendering.
+`validate_persona_activation_change` refuses only when a managed agent or a team references the
+persona. So the order is:
+
+1. Remove every managed agent first (above). With none left, the ⋮ → Delete on a persona card
+   deactivates it. This worked immediately for Fizz and Honey.
+2. Pollen stays blocked, because the built-in `Welcome Team` still references `builtin:bumble` and
+   the team cannot be emptied through the UI.
+3. With **Buzz quit**, clear the team's `persona_ids` in `agents/teams.json` and set
+   `is_active: false` on the persona in `agents/managed-agents.json`.
+
+Verified 2026-09-13: this **survives a relaunch**. The built-in team is not re-seeded over an
+edited file, so all three stay hidden and the Agents screen is empty.
 
 Distinguishing the two in `~/Library/Application Support/xyz.block.buzz.app/agents/managed-agents.json`:
 
