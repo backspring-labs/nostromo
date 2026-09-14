@@ -13,6 +13,21 @@ trio are `respond_to: allowlist`, not `owner-only`.
 
 The Mac is meant to run no agents at all (NOSTROMO-0002 §35.4).
 
+## The mechanism
+
+`infrastructure/buzz/bin/purge-desktop-agents.sh` removes every provisioned agent — identities,
+logs, retention databases — and leaves the inert personas. It refuses to run while Buzz Desktop is
+open, because the app owns those files and will write over anything changed underneath it, and it
+backs the whole agents directory up to `~/.nostromo/backups/buzz-desktop-agents/<stamp>` first.
+
+```sh
+infrastructure/buzz/bin/purge-desktop-agents.sh --dry-run   # list what would go
+infrastructure/buzz/bin/purge-desktop-agents.sh             # do it
+```
+
+**It is the second step, not the first.** Purging while a `Welcome` channel still exists buys
+minutes: the channel is the trigger.
+
 ## Order — the trigger first, then the agents
 
 Per community, in Buzz Desktop:
