@@ -37,9 +37,13 @@ else
   echo "SKIP  cloudflare token valid: not installed yet (bin/set-cloudflare-token.sh)"
 fi
 
-check "serve tailnet-only" ssh "$HOST" 'tailscale serve status 2>&1 | grep -q "(tailnet only)" && ! tailscale serve status 2>&1 | grep -qi funnel && echo "serve on, funnel off"'
+# Tailscale Serve was replaced by Caddy on 2026-09-13: Serve cannot issue for a name outside the
+# tailnet, and the relay's hostname has to outlive the tailnet because every agent handle carries
+# it. What still matters is unchanged — 443 reachable only on the tailnet address, and Funnel off.
+check "443 on tailnet addr only" ssh "$HOST" 'ss -tln | awk "\$4 ~ /:443\$/ {print \$4}" | grep -qx "$(tailscale ip -4):443" && echo "bound to $(tailscale ip -4):443 only"'
+check "funnel off"               ssh "$HOST" '! tailscale funnel status 2>&1 | grep -qiE "^https|proxy" && echo "no funnel"'
 
-echo "== from the Mac over the tailnet, TLS via Tailscale Serve"
+echo "== from the Mac over the tailnet, TLS via Caddy"
 check "certificate"           bash -c "echo | openssl s_client -connect ${BUZZ_DOMAIN}:443 -servername ${BUZZ_DOMAIN} 2>/dev/null | openssl x509 -noout -issuer -enddate | tr '\n' ' '"
 check "NIP-11 relay info"     curl -fsS -H 'Accept: application/nostr+json' "${URL}/"
 check "well-known nostr.json" curl -fsS "${URL}/.well-known/nostr.json?name=probe"

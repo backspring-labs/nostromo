@@ -1,0 +1,41 @@
+# TLS terminator for the relay's canonical hostname (NOSTROMO-PLAN-0001 §9.6, amended).
+#
+# Applied only when this file is present; buzzctl includes it if it exists, so removing it and
+# restarting reverts to Tailscale Serve. Serve cannot issue for a name outside the tailnet, which
+# is why this exists at all, and Serve must be off before Caddy starts because both want :443 on
+# the tailnet address.
+services:
+  caddy:
+    build:
+      context: ./caddy
+    image: nostromo/caddy-cloudflare:2.11.4
+    restart: unless-stopped
+    depends_on:
+      - relay
+    # Bound to the tailnet address, never 0.0.0.0. The DNS name is public; the host is not.
+    ports:
+      - "${TAILNET_IP:?set TAILNET_IP in buzz.env}:443:443"
+    env_file:
+      - buzz.env
+      - secrets.env
+    environment:
+      RELAY_HOSTNAME: ${BUZZ_DOMAIN:?}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in buzz.env}
+      ACME_CA: ${ACME_CA:?set ACME_CA in buzz.env}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    # Required. Without it Compose puts this service on the project default network, where Docker's
+    # embedded DNS cannot resolve "relay" and every request returns 502 behind a valid certificate.
+    networks:
+      - buzz-net
+
+volumes:
+  # Labelled so probe.sh's "volumes on NVMe" check covers the certificate and account key too.
+  caddy-data:
+    labels:
+      com.buzz.volume: "true"
+  caddy-config:
+    labels:
+      com.buzz.volume: "true"

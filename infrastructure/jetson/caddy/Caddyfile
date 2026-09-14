@@ -10,6 +10,8 @@
 	# first attempt can lock the name out for a week; switch-hostname.sh proves the chain against
 	# staging, then flips this.
 	acme_ca {$ACME_CA}
+	# DNS-01 only; nothing inbound is ever opened, so the HTTP challenge is off.
+	auto_https disable_redirects
 }
 
 {$RELAY_HOSTNAME} {
@@ -20,7 +22,7 @@
 
 	# The relay binds a community to the Host header, so it must arrive unchanged. Buzz is a
 	# WebSocket service; Caddy upgrades transparently.
-	reverse_proxy buzz-prod-relay-1:3000 {
+	reverse_proxy relay:3000 {
 		header_up Host {host}
 		header_up X-Forwarded-Proto {scheme}
 	}

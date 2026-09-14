@@ -39,7 +39,13 @@ while read -r key; do
 done < <(grep -oE '^[A-Z0-9_]+' secrets.env.template)
 
 echo "==> pulling pinned images"
+# --ignore-buildable: the TLS terminator is built here from pinned bases, not pulled, and a plain
+# pull fails on it with "repository does not exist".
 ./buzzctl pull
+if [[ -f compose.caddy.yml ]]; then
+  echo "==> building the TLS terminator"
+  ./buzzctl build caddy
+fi
 echo "==> starting the stack"
 ./buzzctl start
 ./buzzctl status

@@ -5,13 +5,21 @@ set -euo pipefail
 DEPLOY=/mnt/ssd/buzz/deploy
 cd "$DEPLOY"
 compose() {
-  docker compose --env-file buzz.env --env-file secrets.env -f compose.yml -f compose.nostromo.yml "$@"
+  # compose.caddy.yml is included only if present. Deleting it and restarting reverts the host to
+  # Tailscale Serve, which is the escape hatch if the certificate path ever breaks.
+  # An "&&" statement here would abort under set -e whenever the file is absent, which is the
+  # normal case before the switch.
+  local extra=()
+  if [[ -f compose.caddy.yml ]]; then extra=(-f compose.caddy.yml); fi
+  docker compose --env-file buzz.env --env-file secrets.env \
+    -f compose.yml -f compose.nostromo.yml ${extra[@]+"${extra[@]}"} "$@"
 }
 case "${1:-help}" in
   start|up)   compose up -d --wait ;;
   stop|down)  compose down ;;
   restart)    compose up -d --wait --force-recreate relay ;;
-  pull)       compose pull ;;
+  pull)       compose pull --ignore-buildable ;;
+  build)      shift || true; compose build "$@" ;;
   status|ps)  shift || true; compose ps "$@" ;;
   logs)       shift || true; compose logs "${@:-relay}" ;;
   config)     compose config ;;
@@ -23,7 +31,8 @@ Usage: buzzctl <command>
   start            docker compose up -d --wait
   stop             stop containers, keep volumes
   restart          recreate the relay after buzz.env or image changes
-  pull             pull the pinned images
+  pull             pull the pinned images (skips locally built ones)
+  build [svc]      build the locally built images (the TLS terminator)
   status [args]    compose ps
   logs [svc] [-f]  compose logs (default service: relay)
   config           render the merged Compose config

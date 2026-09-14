@@ -25,15 +25,20 @@ fi
 grep -q "BUZZ_IMAGE=ghcr.io/block/buzz@${BUZZ_IMAGE_INDEX_DIGEST}" "$HERE/buzz/buzz.env" \
   || { echo "buzz.env BUZZ_IMAGE does not match upstream.lock" >&2; exit 1; }
 
-cp "$HERE/buzz/compose.nostromo.yml" "$HERE/buzz/buzz.env" "$HERE/buzz/secrets.env.template" "$LOCK" "$STAGE/"
+cp "$HERE/buzz/compose.nostromo.yml" "$HERE/buzz/compose.caddy.yml" \
+   "$HERE/buzz/buzz.env" "$HERE/buzz/secrets.env.template" "$LOCK" "$STAGE/"
+mkdir -p "$STAGE/caddy"
+cp "$HERE/caddy/Dockerfile" "$HERE/caddy/Caddyfile" "$STAGE/caddy/"
 cp "$HERE/bin/buzzctl" "$HERE/bin/backup.sh" "$HERE/bin/bootstrap-remote.sh" "$STAGE/"
-chmod 644 "$STAGE"/compose.yml "$STAGE"/compose.nostromo.yml "$STAGE"/buzz.env "$STAGE"/secrets.env.template "$STAGE"/upstream.lock
+chmod 644 "$STAGE"/compose.yml "$STAGE"/compose.nostromo.yml "$STAGE"/compose.caddy.yml \
+  "$STAGE"/buzz.env "$STAGE"/secrets.env.template "$STAGE"/upstream.lock "$STAGE"/caddy/*
 chmod 755 "$STAGE"/buzzctl "$STAGE"/backup.sh "$STAGE"/bootstrap-remote.sh
 
 echo "==> syncing to ${HOST}:${REMOTE_ROOT}/deploy"
 ssh "$HOST" "mkdir -p ${REMOTE_ROOT}/deploy ${REMOTE_ROOT}/backups && chmod 700 ${REMOTE_ROOT} ${REMOTE_ROOT}/deploy ${REMOTE_ROOT}/backups"
-rsync -a "$STAGE/compose.yml" "$STAGE/compose.nostromo.yml" "$STAGE/buzz.env" \
-  "$STAGE/secrets.env.template" "$STAGE/upstream.lock" "${HOST}:${REMOTE_ROOT}/deploy/"
+rsync -a "$STAGE/compose.yml" "$STAGE/compose.nostromo.yml" "$STAGE/compose.caddy.yml" \
+  "$STAGE/buzz.env" "$STAGE/secrets.env.template" "$STAGE/upstream.lock" "${HOST}:${REMOTE_ROOT}/deploy/"
+rsync -a "$STAGE/caddy/" "${HOST}:${REMOTE_ROOT}/deploy/caddy/"
 rsync -a "$STAGE/buzzctl" "$STAGE/backup.sh" "$STAGE/bootstrap-remote.sh" "${HOST}:${REMOTE_ROOT}/deploy/"
 
 echo "==> bootstrapping on ${HOST}"
