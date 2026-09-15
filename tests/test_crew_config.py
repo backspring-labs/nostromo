@@ -20,7 +20,9 @@ ENV = ROOT / "runtime" / "env"
 
 EXPECTED_AGENTS = {"mother", "ash", "ripley", "dallas", "parker", "brett", "lambert"}
 SPARK_AGENTS = {"mother", "ripley", "dallas", "parker", "brett"}  # NSTR-RUN-001
-MAC_AGENTS = {"ash", "lambert"}  # D-008
+# Retired 2026-09-14: no agent runs on the Mac (NOSTROMO-0002 §35.4), and the two roles this
+# named are gaining GitHub identities, so it no longer describes anything true.
+# MAC_AGENTS = {"ash", "lambert"}  # D-008
 LOCAL_AGENTS = {"mother", "brett"}  # NSTR-MOD-001, NSTR-MOD-002
 REPO_WRITING_AGENTS = {"ripley", "parker"}  # NSTR-ID-006, plan §8.7
 
@@ -179,9 +181,23 @@ def test_github_identities_are_unique_and_never_the_owner(agents, manifest):
     assert owner_login not in identities, "a crew member must not reuse the owner's GitHub login"
 
 
-def test_read_only_roles_have_no_github_identity(agents):
-    for name in MAC_AGENTS:
-        assert not agents[name].get("github_identity"), f"{name} reads a public repo and needs no identity"
+def test_a_declared_github_identity_is_backed_by_a_registered_app(agents):
+    """Derive the invariant instead of listing roles.
+
+    This replaces a test that asserted the *Mac* agents had no GitHub identity, using host as a
+    proxy for read-only. Both premises expired: no agent runs on the Mac, and NOSTROMO-0002 §45.4
+    gives Ash an App for `tests/**` and Lambert one for `education/`. A hardcoded set would have
+    gone quietly wrong; this cannot.
+    """
+    for name, agent in agents.items():
+        identity = agent.get("github_identity")
+        gh = agent.get("github")
+        if identity:
+            assert gh, f"{name} declares github_identity {identity!r} but has no registered App"
+            assert gh.get("app_id"), f"{name}: App recorded without an app_id"
+            assert gh.get("bot_user_id"), f"{name}: App recorded without a bot_user_id"
+        else:
+            assert not gh, f"{name} has App details but no github_identity — one of the two is wrong"
 
 
 def test_repo_writing_templates_carry_github_app_fields():
@@ -201,10 +217,30 @@ def test_spark_agents_use_herdr(agents):
         assert agents[name]["supervisor"] == "herdr", name
 
 
-def test_mac_agents_do_not_use_herdr(agents):
-    for name in MAC_AGENTS:
-        assert agents[name]["host"] == "mac", name
-        assert agents[name]["supervisor"] != "herdr", name
+def test_no_agent_runs_on_the_mac(agents):
+    """The Mac is a pure cockpit (NOSTROMO-0002 §35.4).
+
+    This replaces an earlier test asserting Ash and Lambert run on the Mac, which was
+    NOSTROMO-0001's design. Moving them to the Spark gives one agent host, one supervisor, one
+    launcher path and one permission model, and lets the Mac close without crew impact. It was
+    also enforced the hard way on 2026-09-13, when Buzz Desktop provisioned three agents there
+    and they had to be removed.
+    """
+    on_mac = [n for n, a in agents.items() if a.get("host") == "mac"]
+    assert not on_mac, f"these agents are on the Mac and should be on the Spark: {on_mac}"
+
+
+def test_every_agent_has_its_own_unix_account(agents):
+    """One account per role is what makes per-role controls deterministic rather than advisory.
+
+    Under a shared account an agent could read any sibling's keys and act as that role, which
+    would make "Dallas reviewed this" unfalsifiable.
+    """
+    accounts = {n: a.get("unix_account") for n, a in agents.items()}
+    missing = [n for n, u in accounts.items() if not u]
+    assert not missing, f"no unix_account recorded for: {missing}"
+    assert all(u == n for n, u in accounts.items()), f"account must equal the role name: {accounts}"
+    assert len(set(accounts.values())) == len(accounts), "two roles share a Unix account"
 
 
 # --- Model and harness bindings (NSTR-MOD-001 .. NSTR-MOD-007, D-013) ---------------

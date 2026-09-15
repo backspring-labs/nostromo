@@ -22,6 +22,9 @@ SECRET_KEYS = {
     "REDIS_PASSWORD",
     "BUZZ_S3_ACCESS_KEY",
     "BUZZ_S3_SECRET_KEY",
+    # Added 2026-09-13 with the DNS-01 certificate. Long-lived by necessity — Cloudflare has no
+    # short-lived exchange — so it is scoped to one zone's DNS and probe.sh checks it every run.
+    "CLOUDFLARE_API_TOKEN",
 }
 DIGEST = re.compile(r"@sha256:[0-9a-f]{64}$")
 HEX64 = re.compile(r"^[0-9a-f]{64}$")

@@ -1,27 +1,19 @@
-# Nostromo crew manifest: the canonical machine-readable crew registry.
-# Non-secret. Public Buzz keys are recorded in WP-5; private keys never live here.
-# Exact model tags are pinned in docs/source-baseline.md as each runtime is commissioned.
 version: 1
-
-# Relay hostname fixes the NIP-05 domain for every handle below (Buzz binds handle domain
-# to relay host). `hostname` is the bootstrap value: the Jetson's Tailscale MagicDNS name, TLS via
-# Tailscale Serve, never public. It WILL change to `final_hostname` before WP-5 mints identities
-# (plan §9.6, §12.10); handles below are rewritten to the final domain at that point.
 relay:
-  hostname: nano.tailc69e7d.ts.net
-  final_hostname: buzz.backspring.xyz
+  hostname: nostromo.backspring.xyz
   exposure: private-tailnet
-
+  url: wss://nostromo.backspring.xyz
+  community: nostromo.backspring.xyz
+  owner_pubkey: 508cd1c7dbcddcc93b8168923cac49ef28bb02f0e60de549e44b01000d2bce5f
 owner:
   display_name: Jason
   github_login: jasonLadd
   nip05: jason@nano.tailc69e7d.ts.net
-  buzz_pubkey: null   # WP-3
-
+  buzz_pubkey: null
 agents:
   mother:
     display_name: Mother
-    nip05: mother@nano.tailc69e7d.ts.net
+    nip05: mother@nostromo.backspring.xyz
     capability: orchestration
     host: spark
     supervisor: herdr
@@ -31,13 +23,14 @@ agents:
     budget_profile: local
     workspace_profile: control
     respond_to: allowlist
-    buzz_pubkey: null
-
+    buzz_pubkey: 0fe13d87cb0051685da767d8de393a2d8fff155fbcf1feeb0b1ca4f877a5b063
+    buzz_private_key: spark:~mother/.config/nostromo/secrets/buzz.key
+    unix_account: mother
   ash:
     display_name: Ash
-    nip05: ash@nano.tailc69e7d.ts.net
+    nip05: ash@nostromo.backspring.xyz
     capability: ideation_research
-    host: mac
+    host: spark
     supervisor: launchd
     harness: codex-acp
     provider: chatgpt
@@ -45,11 +38,12 @@ agents:
     budget_profile: chatgpt-plus
     workspace_profile: research
     respond_to: allowlist
-    buzz_pubkey: null
-
+    buzz_pubkey: e5a173a7e5ce83c5c228398711659f49262b1b768cea33832e78435709317697
+    buzz_private_key: spark:~ash/.config/nostromo/secrets/buzz.key
+    unix_account: ash
   ripley:
     display_name: Ripley
-    nip05: ripley@nano.tailc69e7d.ts.net
+    nip05: ripley@nostromo.backspring.xyz
     capability: architecture
     host: spark
     supervisor: herdr
@@ -57,7 +51,7 @@ agents:
     provider: openai
     model: gpt-5.6-sol
     provider_boundary: nostromo-ripley
-    github_identity: nostromo-ripley   # GitHub App, registered and installed WP-1 2026-09-13
+    github_identity: nostromo-ripley
     github:
       app_slug: nostromo-ripley
       app_id: 4931773
@@ -65,17 +59,23 @@ agents:
       bot_login: nostromo-ripley[bot]
       bot_user_id: 328774520
       commit_email: 328774520+nostromo-ripley[bot]@users.noreply.github.com
-      installed_on: [backspring-labs/squad-ops]
-      permissions: {contents: write, issues: write, pull_requests: write, metadata: read}
+      installed_on:
+      - backspring-labs/squad-ops
+      permissions:
+        contents: write
+        issues: write
+        pull_requests: write
+        metadata: read
     branch_namespace: nostromo/ripley
     budget_profile: ripley
     workspace_profile: architecture
     respond_to: allowlist
-    buzz_pubkey: null
-
+    buzz_pubkey: 5dd000d70cfb4316de6a81b7ea30a0eef59302522a9544add0cfc9cacae9ec44
+    buzz_private_key: spark:~ripley/.config/nostromo/secrets/buzz.key
+    unix_account: ripley
   dallas:
     display_name: Dallas
-    nip05: dallas@nano.tailc69e7d.ts.net
+    nip05: dallas@nostromo.backspring.xyz
     capability: adversarial_review
     host: spark
     supervisor: herdr
@@ -86,11 +86,12 @@ agents:
     budget_profile: dallas
     workspace_profile: review
     respond_to: allowlist
-    buzz_pubkey: null
-
+    buzz_pubkey: bfdf455488c1bddbb9a61f287c32ec7d940da566e96f6d262f60409b5b6c55a2
+    buzz_private_key: spark:~dallas/.config/nostromo/secrets/buzz.key
+    unix_account: dallas
   parker:
     display_name: Parker
-    nip05: parker@nano.tailc69e7d.ts.net
+    nip05: parker@nostromo.backspring.xyz
     capability: implementation
     host: spark
     supervisor: herdr
@@ -98,7 +99,7 @@ agents:
     provider: openai
     model: gpt-5.6-sol
     provider_boundary: nostromo-parker
-    github_identity: nostromo-parker   # GitHub App, registered and installed WP-1 2026-09-13
+    github_identity: nostromo-parker
     github:
       app_slug: nostromo-parker
       app_id: 4931663
@@ -106,17 +107,23 @@ agents:
       bot_login: nostromo-parker[bot]
       bot_user_id: 328771233
       commit_email: 328771233+nostromo-parker[bot]@users.noreply.github.com
-      installed_on: [backspring-labs/squad-ops]
-      permissions: {contents: write, issues: write, pull_requests: write, metadata: read}
+      installed_on:
+      - backspring-labs/squad-ops
+      permissions:
+        contents: write
+        issues: write
+        pull_requests: write
+        metadata: read
     branch_namespace: nostromo/parker
     budget_profile: parker
     workspace_profile: implementation
     respond_to: allowlist
-    buzz_pubkey: null
-
+    buzz_pubkey: 1a4e1fbefce7f6e0b63123fd86e4dce63a538614eecf443712377b5e557fee47
+    buzz_private_key: spark:~parker/.config/nostromo/secrets/buzz.key
+    unix_account: parker
   brett:
     display_name: Brett
-    nip05: brett@nano.tailc69e7d.ts.net
+    nip05: brett@nostromo.backspring.xyz
     capability: verification
     host: spark
     supervisor: herdr
@@ -126,13 +133,14 @@ agents:
     budget_profile: local
     workspace_profile: verification
     respond_to: allowlist
-    buzz_pubkey: null
-
+    buzz_pubkey: 3b7b029c96843910fc4660d7d22c514d69804f174fff43c74eaaa389b3fef14d
+    buzz_private_key: spark:~brett/.config/nostromo/secrets/buzz.key
+    unix_account: brett
   lambert:
     display_name: Lambert
-    nip05: lambert@nano.tailc69e7d.ts.net
+    nip05: lambert@nostromo.backspring.xyz
     capability: google_knowledge
-    host: mac
+    host: spark
     supervisor: launchd
     harness: gemini-acp
     provider: gemini
@@ -140,4 +148,6 @@ agents:
     budget_profile: existing-subscription
     workspace_profile: knowledge
     respond_to: allowlist
-    buzz_pubkey: null
+    buzz_pubkey: d17abac99a72f16b48e4548eb1f9220f6de040125e4c1cf05672fafc766085b7
+    buzz_private_key: spark:~lambert/.config/nostromo/secrets/buzz.key
+    unix_account: lambert

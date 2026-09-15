@@ -47,7 +47,12 @@ for role in "${ROLES[@]}"; do
   # 700, NOT 750. With a shared group, 750 would let every role read every other role's home and
   # reintroduce exactly the problem this script exists to solve.
   chmod 700 "/home/$role"
-  install -d -m 700 -o "$role" -g "$role" "/home/$role/.config/nostromo/secrets"
+  # install -d applies -o/-g only to the FINAL directory, so the intermediate ones were left
+  # owned by root and the role could not create anything beside `secrets`. Create each level.
+  for d in ".config" ".config/nostromo" ".config/nostromo/secrets"; do
+    install -d -m 700 -o "$role" -g "$role" "/home/$role/$d"
+  done
+  chown -R "$role:$role" "/home/$role/.config/nostromo"
 
   # Refuse to leave a role holding an escalation.
   for forbidden in sudo docker adm; do
