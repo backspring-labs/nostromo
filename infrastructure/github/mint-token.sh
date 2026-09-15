@@ -5,8 +5,15 @@
 # Usage: mint-token.sh <role>            e.g. mint-token.sh parker
 set -euo pipefail
 role="${1:?usage: mint-token.sh <role>}"
+# Two layouts, because two situations. On the Spark each ROLE HAS ITS OWN UNIX ACCOUNT, so its one
+# key sits flat in its own 700 directory and no sibling can read it. On the Mac a single account
+# holds every role's key, so they are separated by subdirectory instead.
 SECRETS="${NOSTROMO_SECRETS:-$HOME/.config/nostromo/secrets}"
-pem="$SECRETS/$role/github-app.pem"
+if [[ -s "$SECRETS/github-app.pem" ]]; then
+  pem="$SECRETS/github-app.pem"          # per-role account: the account is the role
+else
+  pem="$SECRETS/$role/github-app.pem"    # shared account: role as subdirectory
+fi
 [[ -s "$pem" ]] || { echo "no App private key at $pem" >&2; exit 1; }
 
 # App and installation ids come from the crew manifest, which WP-1 recorded. The environment still
