@@ -63,15 +63,53 @@ NIP-05 resolution through the relay's .well-known endpoint
 The controls are the half that establishes anything. A membership list that only ever admits and a
 lookup that only ever resolves have not been shown to exclude anything.
 
-## Still open in WP-5
+## §12.6 Allowlist — crew-wide for v1
 
-- §12.6 allowlist generation — **crew-wide for v1**, an owner decision. The allowlist governs who
-  may *address* an agent, not what an agent may *do*; the doing is constrained by the permission
-  profiles, path boundaries, rulesets and App permissions. Deriving edges now would encode an
-  assumption about a lifecycle nobody has run. The commissioning roll should record who actually
-  addressed whom so the edges come from measurement rather than guesswork.
-- §12.7 enrolment in `#nostromo-control` — the control channel does not exist yet.
-- Encrypted backup of all seven private keys to the Spark and the Mac, owner passphrase.
+`crew/allowlist.yaml`, generated from the manifest. Every crew member accepts the owner and the six
+other roles, and nobody else. It governs who may *address* an agent, not what an agent may *do* —
+the doing is held by the OpenCode permission profiles, path boundaries in CI, branch rulesets, App
+permissions and one Unix account per role. Parker cannot make Dallas approve something by messaging
+Dallas: Dallas's App has no contents write and the ruleset requires a review from a non-author.
+
+Narrower edges would encode an assumption about a lifecycle nobody has run, and a wrong edge fails
+as an agent silently unable to do its job — harder to diagnose than a message that should not have
+been allowed. **The commissioning roll should record who actually addresses whom**, so the edges are
+derived from measurement rather than guesswork.
+
+The residual, stated in the file: a role can message the role reviewing its work. That is influence,
+not a permissions hole, and the answer is Dallas's instructions — messages from the authoring role
+are context, never evidence.
+
+## §12.7 The standing channel
+
+**`#nostromo`** — private, stream, created 2026-09-14. Eight members: the owner and all seven crew,
+each matching its manifest handle.
+
+It is named for the ship because it is the only channel that is about the ship. Every other channel
+will be about a piece of work and will end with it. NOSTROMO-0001 §17 called for a control channel
+and then listed it among the work-item channels, muddling its own distinction; that is amended in
+the spec rather than quietly fixed.
+
+Why it had to come first: the design rests on each role holding real authority inside its remit and
+stopping sharply at its edge, and stopping is only safe if there is somewhere to stop *to*. Without
+this channel a role at the limit of its authority has nowhere to hand the decision back, and the
+only available failure is to proceed anyway — the exact class of failure the crew exists to prevent.
+
+## Key backup
+
+`crew-buzz-keys-20260915T020700Z.tar.gz.enc` — all seven private keys plus the manifest, AES-256
+with PBKDF2 at 600k iterations, passphrase held only by the owner. Two copies, byte-identical by
+sha256: `~/.nostromo/backups/crew-keys/` on the Mac and `/opt/nostromo/backups/crew-keys/` on the
+Spark, both mode 600. No crew role can read the Spark copy.
+
+Collected by ssh'ing **as each role**, so no single account ever held all seven on disk. The bundle
+was decrypted and its seven keys counted **before** distribution — an unverified backup is a guess.
+
+Agent keys are replaceable in a way the owner's key is not: if all seven were lost they could be
+regenerated and re-registered in minutes. What cannot be recovered is provenance — past messages and
+commits stay under the old keys. So this protects confidentiality first and recovery second.
+
+## WP-5 is complete
 
 
 ---
