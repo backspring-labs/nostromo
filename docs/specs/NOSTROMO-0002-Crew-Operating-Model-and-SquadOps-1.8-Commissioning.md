@@ -1552,7 +1552,7 @@ id and the line.
 ## 28. Channel and thread conventions
 
 ```text
-#nostromo-control        crew presence, status, blocked work, budget, escalations, the daily sweep
+#nostromo        crew presence, status, blocked work, budget, escalations, the daily sweep
 #nostromo-<work-item>    one channel per substantial work item
    └── threads           one per contract exchange: a challenge, a card, a review
 ```
@@ -1562,7 +1562,7 @@ id and the line.
   boundary — this is the mechanism that keeps one item's context out of another's.
 - **Threads for contract exchanges.** A Dallas challenge is a thread. A card assignment is a thread. A review
   is a thread. This gives each contract a stable address.
-- **Small items do not get a channel.** A localized Lane B repair runs in `#nostromo-control` with a thread.
+- **Small items do not get a channel.** A localized Lane B repair runs in `#nostromo` with a thread.
   Creating the whole roadmap's channel structure before the pattern is proven is explicitly not done.
 - **@mentions are the handoff event.** A handoff is an explicit @mention carrying the envelope. Handoffs are
   never inferred from silence, and an agent never begins work because a message merely mentioned its area.
@@ -1580,7 +1580,7 @@ seemed to imply it.
 ### 29.1 A new feature (Lane A)
 
 ```text
- 1. Owner states the objective in #nostromo-control, or Mother reads it from a milestone.
+ 1. Owner states the objective in #nostromo, or Mother reads it from a milestone.
  2. Mother opens the Nostromo tracking issue (lane A, state IDEA_CREATED), creates
     #nostromo-<item>, and posts the item header: identifier, lane, state, links.
  3. Mother @Ash if external evidence is needed. Ash researches and returns a durable artifact,
@@ -1651,7 +1651,7 @@ every state boundary.
 
 ### 29.3 Escalation
 
-Any crew member may escalate. The escalation is an @mention to the owner in `#nostromo-control` carrying:
+Any crew member may escalate. The escalation is an @mention to the owner in `#nostromo` carrying:
 the question as put, the options with what each costs, a recommendation, and what has already been done that
 does not depend on the answer. Mother marks the item `BLOCKED` with the reason.
 

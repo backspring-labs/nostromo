@@ -811,11 +811,17 @@ Meaningful initiatives SHOULD receive dedicated channels.
 Examples:
 
 ```text
-#nostromo-control
 #memory-console
 #cross-cycle-memory
 #runtime-embodiment
 ```
+
+**Amended 2026-09-14.** This list previously included the control channel alongside the work-item
+channels, which muddles the distinction the section had just drawn: a work-item channel is about a
+piece of work and ends with it, while the control channel is about the operation and persists. The
+control channel is now **`#nostromo`** — created 2026-09-14, private, the owner plus all seven crew.
+It needs no qualifier because it is not a subdivision of anything; every other channel is named for
+its work.
 
 A dedicated work-item channel reduces context pollution and aligns well with Buzz's channel-scoped ACP conversation behavior.
 
