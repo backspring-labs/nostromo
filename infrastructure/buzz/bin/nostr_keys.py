@@ -132,6 +132,20 @@ if __name__ == "__main__":
     if len(sys.argv) < 2 or sys.argv[1] == "--selftest":
         sys.exit(selftest())
     arg = sys.argv[1].strip()
+    if arg == "--pub":
+        # Derive the public key from a hex SECRET key. Explicit rather than inferred: a bare
+        # 64-char hex is ambiguous between a pubkey and a seckey, and guessing wrong silently
+        # produces a plausible-looking answer.
+        print(xonly_pubkey(sys.argv[2].strip()))
+        raise SystemExit(0)
+    if arg == "--generate":
+        import secrets as _s
+        while True:
+            sk = _s.token_bytes(32).hex()
+            if 1 <= int(sk, 16) < N:
+                break
+        print(f"{sk} {xonly_pubkey(sk)}")
+        raise SystemExit(0)
     if arg.startswith(("npub1", "nsec1")):
         hrp, hx = bech32_decode(arg)
         print(hx if hrp == "npub" else xonly_pubkey(hx))

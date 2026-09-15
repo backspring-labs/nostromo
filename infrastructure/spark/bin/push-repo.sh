@@ -12,6 +12,14 @@
 set -euo pipefail
 TARGET="${1:-nostromo@spark}"
 BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+
+# This mirrors COMMITTED work. Uncommitted edits silently do not travel, and the far side then runs
+# yesterday's script with today's arguments — which has now wasted two round trips.
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  echo "uncommitted changes — commit first, or they will not reach the Spark:" >&2
+  git status --short >&2
+  exit 1
+fi
 BARE=/opt/nostromo/nostromo.git
 WORK=/opt/nostromo/nostromo
 
