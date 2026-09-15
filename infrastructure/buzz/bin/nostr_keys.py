@@ -56,6 +56,83 @@ def xonly_pubkey(seckey_hex: str) -> str:
     return f"{pt[0]:064x}"
 
 
+# --- BIP-340 Schnorr signing -------------------------------------------------------------------
+# Needed because setting a NIP-05 handle means publishing a signed kind:0 event, and signing has to
+# happen ON the role's own account — signing centrally would require reading all seven private
+# keys, which would undo the per-account isolation the keys exist inside.
+#
+# Verified against the official BIP-340 test vectors in --selftest. This is the one place in the
+# repository doing cryptography by hand, so it refuses to be used if those vectors fail.
+
+import hashlib
+
+
+def _tagged_hash(tag: str, msg: bytes) -> bytes:
+    th = hashlib.sha256(tag.encode()).digest()
+    return hashlib.sha256(th + th + msg).digest()
+
+
+def _has_even_y(pt) -> bool:
+    return pt[1] % 2 == 0
+
+
+def _lift_x(x: int):
+    if x >= P:
+        return None
+    y_sq = (pow(x, 3, P) + 7) % P
+    y = pow(y_sq, (P + 1) // 4, P)
+    if pow(y, 2, P) != y_sq:
+        return None
+    return (x, y if y % 2 == 0 else P - y)
+
+
+def schnorr_sign(msg: bytes, seckey_hex: str, aux_rand: bytes = b"\x00" * 32) -> str:
+    d0 = int(seckey_hex, 16)
+    if not 1 <= d0 < N:
+        raise ValueError("private key out of range")
+    pt = _mul(d0)
+    d = d0 if _has_even_y(pt) else N - d0
+    t = d ^ int.from_bytes(_tagged_hash("BIP0340/aux", aux_rand), "big")
+    px = pt[0].to_bytes(32, "big")
+    rand = _tagged_hash("BIP0340/nonce", t.to_bytes(32, "big") + px + msg)
+    k0 = int.from_bytes(rand, "big") % N
+    if k0 == 0:
+        raise ValueError("nonce is zero")
+    r = _mul(k0)
+    k = k0 if _has_even_y(r) else N - k0
+    rx = r[0].to_bytes(32, "big")
+    e = int.from_bytes(_tagged_hash("BIP0340/challenge", rx + px + msg), "big") % N
+    return (rx + ((k + e * d) % N).to_bytes(32, "big")).hex()
+
+
+def schnorr_verify(msg: bytes, pubkey_hex: str, sig_hex: str) -> bool:
+    pt = _lift_x(int(pubkey_hex, 16))
+    if pt is None:
+        return False
+    sig = bytes.fromhex(sig_hex)
+    r, s = int.from_bytes(sig[:32], "big"), int.from_bytes(sig[32:], "big")
+    if r >= P or s >= N:
+        return False
+    e = int.from_bytes(_tagged_hash("BIP0340/challenge", sig[:32] + pt[0].to_bytes(32, "big") + msg), "big") % N
+    big_r = _add(_mul(s), _mul(N - e, pt))
+    return big_r is not None and _has_even_y(big_r) and big_r[0] == r
+
+
+def sign_event(seckey_hex: str, kind: int, content: str, tags=None, created_at=None) -> dict:
+    """Build and sign a Nostr event (NIP-01 id is sha256 over the canonical serialization)."""
+    import json as _j
+    import time as _t
+    tags = tags or []
+    pub = xonly_pubkey(seckey_hex)
+    created_at = created_at if created_at is not None else int(_t.time())
+    ser = _j.dumps([0, pub, created_at, kind, tags, content],
+                   separators=(",", ":"), ensure_ascii=False)
+    eid = hashlib.sha256(ser.encode()).hexdigest()
+    return {"id": eid, "pubkey": pub, "created_at": created_at, "kind": kind,
+            "tags": tags, "content": content,
+            "sig": schnorr_sign(bytes.fromhex(eid), seckey_hex)}
+
+
 # --- bech32 (BIP-173), as NIP-19 uses it -------------------------------------------------------
 CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 
@@ -104,6 +181,14 @@ def bech32_decode(s: str) -> tuple[str, str]:
     return hrp, bytes(_convertbits(data[:-6], 5, 8, False)).hex()
 
 
+def selftest_quiet() -> int:
+    """selftest with output suppressed, for callers that must refuse on failure."""
+    import contextlib, io
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+        return selftest()
+
+
 def selftest() -> int:
     ok = True
     # BIP-340 test vectors: secret key -> x-only public key.
@@ -124,6 +209,35 @@ def selftest() -> int:
     ok &= enc == npub and dec == hexpub
     print(f"  {'PASS' if enc == npub else 'FAIL'}  encode hex -> npub")
     print(f"  {'PASS' if dec == hexpub else 'FAIL'}  decode npub -> hex")
+    # BIP-340 signing vectors, verbatim from the specification: index, seckey, aux_rand, msg, sig.
+    for sk, aux, msg, want in [
+        ("0000000000000000000000000000000000000000000000000000000000000003",
+         "0000000000000000000000000000000000000000000000000000000000000000",
+         "0000000000000000000000000000000000000000000000000000000000000000",
+         "E907831F80848D1069A5371B402410364BDF1C5F8307B0084C55F1CE2DCA821525F66A4A85EA8B71E482A74F382D2CE5EBEEE8FDB2172F477DF4900D310536C0"),
+        ("B7E151628AED2A6ABF7158809CF4F3C762E7160F38B4DA56A784D9045190CFEF",
+         "0000000000000000000000000000000000000000000000000000000000000001",
+         "243F6A8885A308D313198A2E03707344A4093822299F31D0082EFA98EC4E6C89",
+         "6896BD60EEAE296DB48A229FF71DFE071BDE413E6D43F917DC8DCF8C78DE33418906D11AC976ABCCB20B091292BFF4EA897EFCB639EA871CFA95F6DE339E4B0A"),
+        ("C90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B14E5C9",
+         "C87AA53824B4D7AE2EB035A2B5BBBCCC080E76CDC6D1692C4B0B62D798E6D906",
+         "7E2D58D8B3BCDF1ABADEC7829054F90DDA9805AAB56C77333024B9D0A508B75C",
+         "5831AAEED7B44BB74E5EAB94BA9D4294C49BCF2A60728D8B4C200F50DD313C1BAB745879A5AD954A72C45A91C3A51D3C7ADEA98D82F8481E0E1E03674A6F3FB7"),
+    ]:
+        got = schnorr_sign(bytes.fromhex(msg), sk, bytes.fromhex(aux))
+        good = got.upper() == want
+        ok &= good
+        print(f"  {'PASS' if good else 'FAIL'}  BIP-340 sign {sk[:12]}...")
+        v = schnorr_verify(bytes.fromhex(msg), xonly_pubkey(sk), got)
+        ok &= v
+        print(f"  {'PASS' if v else 'FAIL'}  BIP-340 verify round trip")
+
+    # A tampered signature must not verify — a verifier that only ever says yes proves nothing.
+    bad = ("f" + got[1:]) if got[0] != "f" else ("0" + got[1:])
+    tampered_rejected = not schnorr_verify(bytes.fromhex(msg), xonly_pubkey(sk), bad)
+    ok &= tampered_rejected
+    print(f"  {'PASS' if tampered_rejected else 'FAIL'}  tampered signature rejected")
+
     print("selftest passed" if ok else "SELFTEST FAILED — do not trust this tool", file=sys.stderr if not ok else sys.stdout)
     return 0 if ok else 1
 
