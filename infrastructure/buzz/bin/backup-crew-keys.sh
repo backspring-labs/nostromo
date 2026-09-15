@@ -44,12 +44,15 @@ done
 cp crew/manifest.yaml "$TMP/manifest.yaml"   # so a restorer knows which key is whose
 
 echo "==> encrypting (AES-256, PBKDF2, 600k iterations)"
+# -pass fd:3 rather than env:PASS. Exporting the passphrase would put it in this process's
+# environment, readable through /proc by anything running as the same user; a file descriptor is
+# private to the process and never lands in a variable openssl can be asked to read.
 tar -czf - -C "$TMP" . | openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -salt \
-  -pass env:PASS -out "$TMP/$NAME"
+  -pass fd:3 -out "$TMP/$NAME" 3<<<"$PASS"
 
 # Prove it decrypts before distributing it. An unverified backup is a guess.
 echo "==> verifying the bundle decrypts and contains seven keys"
-n=$(openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -pass env:PASS -in "$TMP/$NAME" \
+n=$(openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -pass fd:3 -in "$TMP/$NAME" 3<<<"$PASS" \
      | tar -tzf - | grep -c '\.key$')
 [[ "$n" -eq 7 ]] || { echo "verification failed: found $n keys, expected 7" >&2; exit 1; }
 echo "    7 keys, round trip verified"
