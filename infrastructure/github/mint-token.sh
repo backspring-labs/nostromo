@@ -10,6 +10,16 @@ role="${1:?usage: mint-token.sh <role>}"
 # holds every role's key, so they are separated by subdirectory instead.
 SECRETS="${NOSTROMO_SECRETS:-$HOME/.config/nostromo/secrets}"
 if [[ -s "$SECRETS/github-app.pem" ]]; then
+  # In the per-role layout the Unix account IS the role, so asking for a different one is a
+  # mistake. Without this it silently signs with THIS role's key and GitHub returns a bewildering
+  # "JSON web token could not be decoded" — a correct refusal for an incomprehensible reason.
+  # id -un, not $USER: the latter is often unset in a non-interactive ssh session.
+  whoami_="$(id -un)"
+  if [[ "$whoami_" != "$role" ]]; then
+    echo "running as '$whoami_' but asked for '$role'. In the per-role layout an account may only" >&2
+    echo "mint its own token. Run it as $role." >&2
+    exit 1
+  fi
   pem="$SECRETS/github-app.pem"          # per-role account: the account is the role
 else
   pem="$SECRETS/$role/github-app.pem"    # shared account: role as subdirectory
