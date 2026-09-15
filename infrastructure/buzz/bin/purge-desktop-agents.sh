@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Remove every Buzz Desktop managed agent from this Mac, permanently.
 #
-# The Mac is the cockpit and runs no agents (NOSTROMO-0002 §35.4). Buzz Desktop disagrees: it
+# The Mac is the cockpit and runs no agents (Operating Model §35.4). Buzz Desktop disagrees: it
 # provisions a trio per community joined, each with its own Nostr identity and a running buzz-acp
 # process, and it recreates them whenever a `Welcome` channel is opened.
 #

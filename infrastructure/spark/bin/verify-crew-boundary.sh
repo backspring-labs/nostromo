@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Verify that the Nostromo crew account is contained (NOSTROMO-PLAN-0001 §11, NOSTROMO-0002 §45.4).
+# Verify that the Nostromo crew account is contained (NOSTROMO-PLAN-0001 §11, Operating Model §45.4).
 #
 # Run AS THE CREW USER, not as root: ssh nostromo@spark 'bash -s' < verify-crew-boundary.sh
 # Running it as the crew user is the point — it tests the boundary from the position an agent

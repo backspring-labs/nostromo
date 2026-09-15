@@ -1,6 +1,6 @@
 # Owner console steps: the `nostromo-dallas` and `nostromo-brett` GitHub Apps
 
-NOSTROMO-0002 §45.4. Both are registered the same way as `nostromo-parker` and `nostromo-ripley`
+Operating Model §45.4. Both are registered the same way as `nostromo-parker` and `nostromo-ripley`
 (`wp1-owner-console-steps.md` §3.1), and **only the permission table differs**. The differences are
 the whole point, so they are spelled out rather than left as "same as before".
 

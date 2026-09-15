@@ -2156,7 +2156,7 @@ Provider-side role-specific spend limits are mandatory for metered API agents.
 
 ### D-017 — $140 configured envelope
 
-Parker $70 + Ripley $25 + Dallas $25 + Plus $20 = $140. Revised 2026-09-13 from $65/$27/$27; see NOSTROMO-0002 §35.3.
+Parker $70 + Ripley $25 + Dallas $25 + Plus $20 = $140. Revised 2026-09-13 from $65/$27/$27; see Operating Model §35.3.
 
 ### D-018 — Buzz identity is durable
 

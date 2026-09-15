@@ -137,7 +137,7 @@ shared bot.
   a commit in the tree. *(Closed later the same day by the crew check probe below, which committed as
   `nostromo-parker[bot]` on a branch that was then deleted.)*
 - Apps for Brett, Dallas, Mother, Ash and Lambert are not registered; each waits on its write flow being
-  commissioned (NOSTROMO-0002 §45.4).
+  commissioned (Operating Model §45.4).
 
 ---
 
@@ -187,7 +187,7 @@ a ruleset can only reject a push, and passes trivially for every non-crew pull r
 `main`'s existing protection is SquadOps governance and was left alone: pull request required, four status
 checks, admins included, force pushes off. Note that `required_approving_review_count` is **0**, so a pull
 request can merge with no approval. The crew's control against self-approval is therefore that merging is
-owner-reserved (NOSTROMO-0002 §13), not the branch protection. Raising that count would change how the owner
+owner-reserved (Operating Model §13), not the branch protection. Raising that count would change how the owner
 works on every pull request and is the owner's call.
 
 ---
@@ -255,7 +255,7 @@ in the wiring between the workflow and the script, which is exactly the seam a f
 ## What remains open
 
 - Only `parker` and `ripley` have identities; the boundaries file also declares `brett` and `ash`, whose
-  rules are fixture-tested but not yet probed against a real branch. Each waits on its App (NOSTROMO-0002
+  rules are fixture-tested but not yet probed against a real branch. Each waits on its App (Operating Model
   §45.4).
 - `universal_forbidden` is fixture-tested only. It was deliberately not probed live, because two of its
   three paths are workflow files that no crew App can write anyway — the App permission set is the first

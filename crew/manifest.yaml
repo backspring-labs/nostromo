@@ -73,6 +73,7 @@ agents:
     buzz_pubkey: 5dd000d70cfb4316de6a81b7ea30a0eef59302522a9544add0cfc9cacae9ec44
     buzz_private_key: spark:~ripley/.config/nostromo/secrets/buzz.key
     unix_account: ripley
+    capability_note: architecture, plan authoring, sequencing, and the roadmap
   dallas:
     display_name: Dallas
     nip05: dallas@nostromo.backspring.xyz
@@ -105,7 +106,7 @@ agents:
         metadata: read
     github_identity: nostromo-dallas
     branch_namespace: null
-    branch_namespace_note: "deliberately none \u2014 the reviewer never pushes (NOSTROMO-0002 \xA745.4)"
+    branch_namespace_note: "deliberately none \u2014 the reviewer never pushes (Operating Model \xA745.4)"
   parker:
     display_name: Parker
     nip05: parker@nostromo.backspring.xyz
@@ -172,7 +173,7 @@ agents:
   lambert:
     display_name: Lambert
     nip05: lambert@nostromo.backspring.xyz
-    capability: google_knowledge
+    capability: navigation
     host: spark
     supervisor: launchd
     harness: gemini-acp
@@ -184,3 +185,5 @@ agents:
     buzz_pubkey: d17abac99a72f16b48e4548eb1f9220f6de040125e4c1cf05672fafc766085b7
     buzz_private_key: spark:~lambert/.config/nostromo/secrets/buzz.key
     unix_account: lambert
+    capability_note: "release notes, the release cut sequence, educational material and source manifests\
+      \ \u2014 all over CLOSED work. The roadmap is Ripley's, which keeps the closed-only rule intact."

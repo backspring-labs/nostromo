@@ -169,6 +169,6 @@ two checked steps, and `ruff` and `pytest` are asserted present afterwards.
 | Item | State |
 |---|---|
 | §11.11 Mother and Brett OpenCode permission profiles | next; nothing blocks it |
-| Brett and Dallas GitHub Apps | owner action (NOSTROMO-0002 §45.4); worktrees are ready and will bind identity the moment the manifest carries one |
-| Ash worktree and Lambert read-only checkout | NOSTROMO-0002 approval |
+| Brett and Dallas GitHub Apps | owner action (Operating Model §45.4); worktrees are ready and will bind identity the moment the manifest carries one |
+| Ash worktree and Lambert read-only checkout | Operating Model approval |
 | Launcher preflight assertions | `SQUADOPS_RUN_ROOT` set and writable; the role's App key present; the worktree's `user.email` matching the manifest |

@@ -20,7 +20,7 @@ ENV = ROOT / "runtime" / "env"
 
 EXPECTED_AGENTS = {"mother", "ash", "ripley", "dallas", "parker", "brett", "lambert"}
 SPARK_AGENTS = {"mother", "ripley", "dallas", "parker", "brett"}  # NSTR-RUN-001
-# Retired 2026-09-14: no agent runs on the Mac (NOSTROMO-0002 §35.4), and the two roles this
+# Retired 2026-09-14: no agent runs on the Mac (Operating Model §35.4), and the two roles this
 # named are gaining GitHub identities, so it no longer describes anything true.
 # MAC_AGENTS = {"ash", "lambert"}  # D-008
 LOCAL_AGENTS = {"mother", "brett"}  # NSTR-MOD-001, NSTR-MOD-002
@@ -185,7 +185,7 @@ def test_a_declared_github_identity_is_backed_by_a_registered_app(agents):
     """Derive the invariant instead of listing roles.
 
     This replaces a test that asserted the *Mac* agents had no GitHub identity, using host as a
-    proxy for read-only. Both premises expired: no agent runs on the Mac, and NOSTROMO-0002 §45.4
+    proxy for read-only. Both premises expired: no agent runs on the Mac, and Operating Model §45.4
     gives Ash an App for `tests/**` and Lambert one for `education/`. A hardcoded set would have
     gone quietly wrong; this cannot.
     """
@@ -218,7 +218,7 @@ def test_spark_agents_use_herdr(agents):
 
 
 def test_no_agent_runs_on_the_mac(agents):
-    """The Mac is a pure cockpit (NOSTROMO-0002 §35.4).
+    """The Mac is a pure cockpit (Operating Model §35.4).
 
     This replaces an earlier test asserting Ash and Lambert run on the Mac, which was
     NOSTROMO-0001's design. Moving them to the Spark gives one agent host, one supervisor, one

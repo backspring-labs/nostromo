@@ -1,6 +1,6 @@
 # OpenCode permission profiles
 
-NOSTROMO-PLAN-0001 §11.11, amended by NOSTROMO-0002 §2.1 and §45.4. Pinned to **OpenCode 1.18.30**;
+NOSTROMO-PLAN-0001 §11.11, amended by Operating Model §2.1 and §45.4. Pinned to **OpenCode 1.18.30**;
 the permission identifiers below were read out of that build, not from documentation, because the
 plan warns that the V1 and V2 syntaxes must not be mixed.
 
@@ -20,7 +20,7 @@ work that is specified well enough for a local model to execute, so Parker's tok
 that need frontier judgement. Two consequences, and they are the same consequence:
 
 - He **may edit, commit, and push to `nostromo/brett/**`** — inverted from the plan, which denied it
-  when he was a verification role (NOSTROMO-0002 §2.1). Offloading work means doing work.
+  when he was a verification role (Operating Model §2.1). Offloading work means doing work.
 - He **may never conclude**. `gh pr merge` and `gh pr review` are denied, `task` is denied so he
   cannot spawn an agent to conclude on his behalf, and `question` is **allowed** because escalating
   is his correct output when the card runs out.

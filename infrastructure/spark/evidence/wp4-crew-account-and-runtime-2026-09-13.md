@@ -149,7 +149,7 @@ A `remote-client-bridge` process is what proves the attach, rather than a TUI th
 ### §11.4 Workspaces
 
 `mother-control`, `ripley-architecture`, `dallas-review`, `parker-development`, `brett-verification`
-— the five the plan names. NOSTROMO-0002 would add `ash` and `lambert`, both now resident on the
+— the five the plan names. Operating Model would add `ash` and `lambert`, both now resident on the
 Spark; not created, because that spec is unapproved.
 
 ---
@@ -193,4 +193,4 @@ the sequence is the useful part: both looked convincing on three data points.
 | §11.6–11.7 crew worktrees on squad-ops, and validating each | the App private keys moving from the Mac to the crew account (WP-1 §8.10), then a credential helper minting per-role tokens |
 | §11.11 Mother and Brett OpenCode permission profiles | nothing; next after the worktrees |
 | Tool-call reliability through OpenCode, at volume | worth folding into the §11.9 benchmark now that ACP is proven |
-| `ash` and `lambert` workspaces | NOSTROMO-0002 approval |
+| `ash` and `lambert` workspaces | Operating Model approval |

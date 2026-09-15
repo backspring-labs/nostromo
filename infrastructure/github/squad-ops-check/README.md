@@ -32,7 +32,7 @@ GitHub** at check time rather than restated here, so the bot account stays the s
 
 Ash is an allowlist rather than a denylist because the author of a proof must not be able to modify the
 thing proved. Parker's exclusion of `sips/**` is not an obstacle to the amendment discipline: a divergence
-from an accepted design returns to Ripley, which NOSTROMO-0002 §6 already requires, and this makes that
+from an accepted design returns to Ripley, which Operating Model §6 already requires, and this makes that
 structural rather than remembered.
 
 ## Why it fails closed

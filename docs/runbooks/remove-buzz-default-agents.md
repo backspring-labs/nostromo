@@ -11,7 +11,7 @@ As of 2026-09-13 this machine had **six** agents — Fizz, Honey and Pollen twic
 `wss://buzz.backspring.xyz` and three to `wss://nostromo.backspring.xyz`, all running. Two of each
 trio are `respond_to: allowlist`, not `owner-only`.
 
-The Mac is meant to run no agents at all (NOSTROMO-0002 §35.4).
+The Mac is meant to run no agents at all (Operating Model §35.4).
 
 ## The mechanism
 

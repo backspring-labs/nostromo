@@ -17,7 +17,7 @@ It is deliberately external to SquadOps. It composes existing tools into a role-
 - [NOSTROMO-0001 — Development Crew Platform Specification](docs/specs/NOSTROMO-0001-Development-Crew-Platform-Spec.md): what Nostromo is and what it must guarantee.
 - [NOSTROMO-PLAN-0001 — Initial Crew and Infrastructure Bootstrap Plan](docs/specs/NOSTROMO-PLAN-0001-Initial-Crew-Infrastructure-Bootstrap.md): how to bootstrap it, as probe-gated work packages.
 
-- [NOSTROMO-0002 — Crew Operating Model and SquadOps 1.8 Commissioning Plan](docs/specs/NOSTROMO-0002-Crew-Operating-Model-and-SquadOps-1.8-Commissioning.md): how the crew works once it is live, and what must be true before it touches SquadOps 1.8 code. **Proposed, awaiting owner review.** It proposes four amendments to NOSTROMO-0001 and a change plan for this repository; neither has been applied.
+- [Operating Model — Crew Operating Model and SquadOps 1.8 Commissioning Plan](docs/specs/crew-operating-model.md): how the crew works once it is live, and what must be true before it touches SquadOps 1.8 code. **Proposed, awaiting owner review.** It proposes four amendments to NOSTROMO-0001 and a change plan for this repository; neither has been applied.
 
 The plan governs execution. The specification governs architecture. Contradictions are logged in [docs/deviations.md](docs/deviations.md) rather than resolved silently.
 

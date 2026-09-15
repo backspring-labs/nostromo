@@ -1,4 +1,4 @@
-# NOSTROMO-0002: Crew Operating Model and SquadOps 1.8 Commissioning Plan
+# Crew Operating Model and SquadOps 1.8 Commissioning Plan
 
 **Status.** Proposed. Awaiting owner review.
 **Date.** 2026-09-10.
@@ -758,9 +758,42 @@ exactly one moment to remember and it is attached to a procedure that already ha
 
 ### 10A.6 Access, and the boundary
 
-Lambert runs on the Spark under Herdr, with a **read-only** SquadOps checkout for curating manifests and
-write access to the Nostromo repository for `education/`. Lambert gets **no SquadOps write access of any
-kind**, because the role is a projection and a projection does not modify its source. Lambert needs no
+**Amended 2026-09-15 — Lambert is the Navigator, and gets SquadOps write.** The original scope was
+education alone, which was the smallest version of the function and left two related things unowned.
+A navigator reports where the ship is and where it has been. That is one job with three outputs:
+
+| Output | Over what |
+|---|---|
+| **Release notes and the release cut sequence** | merged work |
+| **Educational material and source manifests** | closed lines |
+| ~~Roadmap~~ | **Ripley's.** See below |
+
+**The roadmap stays with Ripley**, who already holds plan authoring and sequencing (§2.3). That is
+not a tidiness choice: a roadmap is about *open* work, and §10A.2's rule is that Lambert builds only
+over **closed** things. Giving Lambert the roadmap would have required weakening that rule. Leaving
+it with Ripley keeps Lambert's whole remit backward-looking and the rule intact, with no exception.
+Ripley decides what and in what order; Lambert renders it. The frontier produces the table; the
+bounded role's job begins when it exists.
+
+**Lambert owns the release *sequence*, never the *decision to cut*.** Assembling notes from merged
+work, bumping versions, producing and verifying packages, publishing docs — all downstream of a
+judgement somebody else made. "Is this releasable?" concludes that something is safe, which is
+frontier-tier by the capabilities analysis and is the exact class of call the record's delegation
+failures fall into. The owner, or Ripley, gives the go; the sequence then runs.
+
+Lambert runs on the Spark, with **path-bounded write access to SquadOps**:
+
+| | |
+|---|---|
+| Allowed | `docs/**`, `CHANGELOG.md`, release notes and release artifacts |
+| Forbidden | `src/**`, `adapters/**`, `tests/**`, `sips/**` |
+
+Enforced the same way as every other role — a branch namespace ruleset plus the crew check — and a
+GitHub App with contents write on `squad-ops`, plus the existing `education/` write on Nostromo.
+
+The original sentence read: *"Lambert gets no SquadOps write access of any kind, because the role is
+a projection and a projection does not modify its source."* That is still true of the **source**.
+A changelog is not the source; it is the projection, and it happens to live in the same repository. Lambert needs no
 browser: the manifest is the deliverable, and uploading sources into a notebook is a separate act the owner
 takes, or a future Enterprise API takes.
 

@@ -20,7 +20,7 @@ and credential helpers meant to constrain it. **Every per-role control was advis
 promise wearing the costume of a deterministic control.
 
 It matters beyond security. If Parker can act as Dallas then *"Dallas reviewed this"* stops being
-evidence of independent review, and NOSTROMO-0002's measurement apparatus rests on attribution
+evidence of independent review, and Operating Model's measurement apparatus rests on attribution
 being real.
 
 ## Shape

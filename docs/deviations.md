@@ -98,7 +98,7 @@ Revisit trigger:       Upstream moves to bind mounts.
 ```text
 ID:                    DEV-006
 Date:                  2026-09-13
-Spec/plan reference:   NOSTROMO-PLAN-0001 §8.9; NOSTROMO-0002 §14, §45.4
+Spec/plan reference:   NOSTROMO-PLAN-0001 §8.9; Operating Model §14, §45.4
 Expected:              Four rulesets on squad-ops — a branch ruleset and a path ruleset per repo-writing
                        identity — so that "Ripley's namespace cannot carry implementation changes and
                        Parker's namespace cannot carry SIP changes" is enforced server-side.
@@ -166,7 +166,7 @@ Security/cost impact:  Positive rather than neutral. The crew account cannot rea
                        The cost is that the Spark's copy advances only when the Mac pushes, so a stale
                        manifest is possible; the launcher should assert the commit it is running from.
 Temporary or permanent: Temporary. Superseded when nostromo-mother and nostromo-lambert are registered
-                       (NOSTROMO-0002 §45.4), both of which install on the nostromo repository and can
+                       (Operating Model §45.4), both of which install on the nostromo repository and can
                        mint a scoped installation token the way the squad-ops roles already do.
 Owner approval:        Recorded for review.
 Revisit trigger:       Registration of an App installed on the nostromo repository; or the organization

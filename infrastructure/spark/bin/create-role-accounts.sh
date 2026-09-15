@@ -9,7 +9,7 @@
 # promises; a boundary every agent can step over is a prompt promise.
 #
 # This matters beyond security. If Parker can act as Dallas then "Dallas reviewed this" stops being
-# evidence of independent review, and NOSTROMO-0002's whole measurement apparatus rests on
+# evidence of independent review, and Operating Model's whole measurement apparatus rests on
 # attribution being real.
 #
 # WHAT THIS DOES NOT CHANGE. An agent can still do anything its own role permits — that is the

@@ -83,7 +83,7 @@ after the new one had been corrected.
 
 Onboarding provisioned and started three managed agents — Fizz, Honey and Pollen — with real Nostr
 identities and running `buzz-acp` processes. **No crew agent is supposed to run on the Mac**
-(NOSTROMO-0002 §35.4); it is the cockpit. They were deleted the same evening. No processes remain,
+(Operating Model §35.4); it is the cockpit. They were deleted the same evening. No processes remain,
 and only the owner is a relay member. Three built-in *persona templates* remain and cannot be
 deleted while a built-in team references them: they hold no keys and run nothing.
 
