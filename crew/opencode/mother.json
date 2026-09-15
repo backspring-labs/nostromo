@@ -6,9 +6,14 @@
     "write": "deny",
     "bash": {
       "*": "deny",
-      "git status*": "allow", "git log*": "allow", "git diff*": "allow",
-      "gh pr view*": "allow", "gh pr list*": "allow",
-      "gh issue view*": "allow", "gh issue list*": "allow"
+      "buzz *": "allow",
+      "git status*": "allow",
+      "git log*": "allow",
+      "git diff*": "allow",
+      "gh pr view*": "allow",
+      "gh pr list*": "allow",
+      "gh issue view*": "allow",
+      "gh issue list*": "allow"
     },
     "webfetch": "deny",
     "task": "deny",
