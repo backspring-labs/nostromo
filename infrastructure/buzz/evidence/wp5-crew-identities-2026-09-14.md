@@ -72,3 +72,26 @@ lookup that only ever resolves have not been shown to exclude anything.
   addressed whom so the edges come from measurement rather than guesswork.
 - §12.7 enrolment in `#nostromo-control` — the control channel does not exist yet.
 - Encrypted backup of all seven private keys to the Spark and the Mac, owner passphrase.
+
+
+---
+
+# Retiring an identity is a supported flow, not a cleanup job
+
+Established 2026-09-14 while chasing what looked like leftover rows from Buzz Desktop's deleted
+default agents. It was not residue. **Every published agent tombstones on deletion**, enqueueing a
+**NIP-IA kind:9035 archive request** in the same transaction as the local removal — which, per the
+source, *"stops the identity appearing in member pickers and autocomplete"*.
+
+All seven deleted identities were present in `archived_identities` with `consent_path: admin`, the
+owner as `actor`, `reason: retired`, and a `request_event_id` pointing at the archive request.
+Seven kind:9035 events and seven kind:5 deletions existed alongside them.
+
+The user rows and kind:0 profiles persisting is **correct**: Nostr is an append-only log of signed
+events, and a published identity is retracted by archival rather than deletion. An earlier reading
+of this called it an upstream defect and removed those rows by hand — unnecessary, and it deleted
+records the system deliberately retains.
+
+**For WP-9.** Retiring a crew role uses this flow: archive the identity (kind:9035), leave its
+channels, remove relay membership. Its published events and authored commits remain, which is right
+— that history is the provenance the evaluation depends on. Do not hand-delete rows.
