@@ -28,5 +28,7 @@ ssh "$TARGET" "test -d $BARE || { git init --quiet --bare $BARE && \
 git push --quiet "$TARGET:$BARE" "$BRANCH:$BRANCH"
 ssh "$TARGET" "test -d $WORK || git clone --quiet $BARE $WORK
 cd $WORK && git fetch --quiet origin && git checkout --quiet $BRANCH && \
-  git reset --quiet --hard origin/$BRANCH && chmod -R a+rX $WORK && \
+  git reset --quiet --hard origin/\$BRANCH && \
+  find $WORK -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null; \
+  chmod -R a+rX,go-w $WORK && \
   echo \"nostromo on \$(hostname) at \$(git log --oneline -1)\""
