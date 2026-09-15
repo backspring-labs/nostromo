@@ -89,6 +89,23 @@ agents:
     buzz_pubkey: bfdf455488c1bddbb9a61f287c32ec7d940da566e96f6d262f60409b5b6c55a2
     buzz_private_key: spark:~dallas/.config/nostromo/secrets/buzz.key
     unix_account: dallas
+    github:
+      app_slug: nostromo-dallas
+      app_id: 4948090
+      installation_id: 161796914
+      bot_login: nostromo-dallas[bot]
+      bot_user_id: 329343699
+      commit_email: 329343699+nostromo-dallas[bot]@users.noreply.github.com
+      installed_on:
+      - backspring-labs/squad-ops
+      permissions:
+        pull_requests: write
+        contents: read
+        issues: read
+        metadata: read
+    github_identity: nostromo-dallas
+    branch_namespace: null
+    branch_namespace_note: "deliberately none \u2014 the reviewer never pushes (NOSTROMO-0002 \xA745.4)"
   parker:
     display_name: Parker
     nip05: parker@nostromo.backspring.xyz
@@ -136,6 +153,22 @@ agents:
     buzz_pubkey: 3b7b029c96843910fc4660d7d22c514d69804f174fff43c74eaaa389b3fef14d
     buzz_private_key: spark:~brett/.config/nostromo/secrets/buzz.key
     unix_account: brett
+    github:
+      app_slug: nostromo-brett
+      app_id: 4948137
+      installation_id: 161797366
+      bot_login: nostromo-brett[bot]
+      bot_user_id: 329345589
+      commit_email: 329345589+nostromo-brett[bot]@users.noreply.github.com
+      installed_on:
+      - backspring-labs/squad-ops
+      permissions:
+        contents: write
+        pull_requests: write
+        issues: read
+        metadata: read
+    github_identity: nostromo-brett
+    branch_namespace: nostromo/brett
   lambert:
     display_name: Lambert
     nip05: lambert@nostromo.backspring.xyz
