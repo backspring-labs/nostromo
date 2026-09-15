@@ -58,7 +58,11 @@ n=$(openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -pass fd:3 -in "$TMP/$NAME"
 echo "    7 keys, round trip verified"
 
 mkdir -p "$MAC_DIR"; install -m 600 "$TMP/$NAME" "$MAC_DIR/$NAME"
-ssh "$HOST" "mkdir -p $SPARK_DIR && chmod 755 $SPARK_DIR" 2>/dev/null || true
+
+# As nostromo, which OWNS /opt/nostromo — the owner's account cannot write there. The earlier
+# version ran this as the owner and swallowed the failure with `|| true`, so the directory never
+# existed and scp failed with a bare "No such file or directory".
+ssh -n "nostromo@$HOST" "mkdir -p $SPARK_DIR && chmod 700 $SPARK_DIR"
 scp -q "$TMP/$NAME" "nostromo@$HOST:$SPARK_DIR/$NAME"
 ssh -n "nostromo@$HOST" "chmod 600 $SPARK_DIR/$NAME"
 
