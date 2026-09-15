@@ -185,5 +185,7 @@ agents:
     buzz_pubkey: d17abac99a72f16b48e4548eb1f9220f6de040125e4c1cf05672fafc766085b7
     buzz_private_key: spark:~lambert/.config/nostromo/secrets/buzz.key
     unix_account: lambert
-    capability_note: "release notes, the release cut sequence, educational material and source manifests\
-      \ \u2014 all over CLOSED work. The roadmap is Ripley's, which keeps the closed-only rule intact."
+    capability_note: "the release cut sequence (steps 1-4 and 7, never 5, and 6 only on the owner's go),\
+      \ release packages, CHANGELOG maintenance, educational material and source manifests \u2014 all\
+      \ over CLOSED work. docs/ROADMAP.md is Ripley's; Lambert's timeline entry goes through her."
+    branch_namespace: nostromo/lambert

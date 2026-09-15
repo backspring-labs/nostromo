@@ -781,12 +781,57 @@ judgement somebody else made. "Is this releasable?" concludes that something is 
 frontier-tier by the capabilities analysis and is the exact class of call the record's delegation
 failures fall into. The owner, or Ripley, gives the go; the sequence then runs.
 
+### 10A.6a The release cut, step by step
+
+SquadOps' cut is a seven-step procedure in its `CLAUDE.md`, written down because #789 cost six
+consecutive releases tagged and never advertised. Lambert does not inherit all of it.
+
+| Step | | Lambert? |
+|---|---|---|
+| 1 | `version_cli.py bump` — the only sanctioned bump path | **yes**, mechanical, guarded by `test_docs_version_sync.py` |
+| 2 | Version markers in sync across `CLAUDE.md`, `README.md`, `docs/ROADMAP.md` | **yes**, via the bump script, same guard |
+| 3 | Rotate `CHANGELOG.md` — `[Unreleased]` → `[x.y.z]`, open a fresh one | **yes**, mechanical, same guard |
+| 4 | ROADMAP timeline entry | **yes** — and see the collision below |
+| 5 | SIP promotion sweep — *"promote what is genuinely implemented"* | **NO** |
+| 6 | `git tag && git push` — the Release publishes itself from the CHANGELOG | owner's go; see below |
+| 7 | Capture screenshots, then build and commit the release package | **yes**, including the showcase choice |
+
+**Step 5 is the one that must never be Lambert's.** "Promote what is *genuinely implemented*"
+concludes that work is done — the precise verb class the capabilities analysis tiers `F` and the
+class every delegation failure in the record falls into. A phased SIP with open children staying
+`accepted` with the gap named is a judgement about completeness, not a rotation of text.
+
+**Step 6 is the cut itself.** Pushing the tag publishes the Release. The go is the owner's (or
+Ripley's); Lambert may execute it once given, and may never decide it.
+
+**Step 7 contains a judgement Lambert may make.** The package check *"takes no view on WHICH cycle
+to show"* — that is editorial: which cycle best represents this release, and why. Choosing what to
+exhibit is curation, which is the role. It is not a claim that anything is safe.
+
+**Step 4 is unguarded, and SquadOps says so in its own procedure.** Giving it an owner moves it
+from unguarded-and-unowned to unguarded-but-owned, which is the cheaper half of the fix.
+
+**The ROADMAP collision, named rather than left to be discovered.** `docs/ROADMAP.md` holds both a
+forward plan, which is Ripley's (§2.3), and a timeline of what shipped, which is Lambert's. Path
+boundaries are file-granular and cannot split one file between two roles. Until the file is split,
+Ripley owns `docs/ROADMAP.md` and **Lambert's timeline entry goes through Ripley** — the same shape
+as any other bounded role handing work to the role that owns the artifact.
+
 Lambert runs on the Spark, with **path-bounded write access to SquadOps**:
 
 | | |
 |---|---|
-| Allowed | `docs/**`, `CHANGELOG.md`, release notes and release artifacts |
-| Forbidden | `src/**`, `adapters/**`, `tests/**`, `sips/**` |
+| Allowed | `CHANGELOG.md`, `site/content/releases/**`, `docs/**` except `docs/ROADMAP.md` |
+| Forbidden | `src/**`, `adapters/**`, `tests/**`, `sips/**`, `docs/ROADMAP.md` |
+
+**`sips/**` forbidden is what enforces step 5**: Lambert cannot promote a SIP because Lambert cannot
+write one. The boundary carries the rule, rather than a sentence asking Lambert to remember it.
+
+**One exception, stated because it is one.** Step 2 syncs version markers in `CLAUDE.md` and
+`README.md` — files whose wider content is governance, not release text. The bump script is the only
+sanctioned path and its diff is small and auditable, so the exception is: Lambert may touch those
+two files **only through `version_cli.py`**, and Dallas reviews the cut like any other change. A
+path boundary cannot express "only via this script"; this one is held by review.
 
 Enforced the same way as every other role — a branch namespace ruleset plus the crew check — and a
 GitHub App with contents write on `squad-ops`, plus the existing `education/` write on Nostromo.
