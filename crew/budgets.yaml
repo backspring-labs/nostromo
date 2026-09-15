@@ -1,4 +1,4 @@
-# Nostromo budget profiles (NOSTROMO-0001 Part VII; NOSTROMO-PLAN-0001 §7.7).
+# Nostromo budget profiles (Platform Spec Part VII; Bootstrap Plan §7.7).
 # Provider hard limits are enforced in the provider console (WP-1), never by prompt alone.
 version: 1
 

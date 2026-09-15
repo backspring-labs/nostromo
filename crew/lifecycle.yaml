@@ -1,4 +1,4 @@
-# Work-item lifecycle states (NOSTROMO-0001 §14).
+# Work-item lifecycle states (Platform Spec §14).
 # Allowed transitions and the durable state store are defined in WP-9.
 # State must never exist only in an agent's conversation memory.
 version: 1

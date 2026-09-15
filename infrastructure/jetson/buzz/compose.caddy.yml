@@ -1,4 +1,4 @@
-# TLS terminator for the relay's canonical hostname (NOSTROMO-PLAN-0001 §9.6, amended).
+# TLS terminator for the relay's canonical hostname (Bootstrap Plan §9.6, amended).
 #
 # Applied only when this file is present; buzzctl includes it if it exists, so removing it and
 # restarting reverts to Tailscale Serve. Serve cannot issue for a name outside the tailnet, which

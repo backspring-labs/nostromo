@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Benchmark a local Ollama model against the two roles Nostromo binds to local inference
-# (NOSTROMO-PLAN-0001 §11.9). Run ON the Spark. Writes a markdown report to stdout.
+# (Bootstrap Plan §11.9). Run ON the Spark. Writes a markdown report to stdout.
 #
 # The point is not to compare models. It is to establish that this baseline is operationally
 # acceptable for Mother's routing and Brett's collection, and — the part that matters — that it

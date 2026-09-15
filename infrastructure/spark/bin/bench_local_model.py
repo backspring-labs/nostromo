@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Benchmark a local Ollama model for Mother's and Brett's work (NOSTROMO-PLAN-0001 §11.9).
+"""Benchmark a local Ollama model for Mother's and Brett's work (Bootstrap Plan §11.9).
 
 Standard library only: the Spark carries python3 and nothing else is assumed installed.
 """

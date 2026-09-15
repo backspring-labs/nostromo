@@ -1,6 +1,6 @@
 # WP-3 evidence — owner identity and relay control
 
-**Date.** 2026-09-13. Covers NOSTROMO-PLAN-0001 §10.1–§10.4.
+**Date.** 2026-09-13. Covers Bootstrap Plan §10.1–§10.4.
 
 ---
 

@@ -2,14 +2,14 @@
 
 **Status.** Proposed. Awaiting owner review.
 **Date.** 2026-09-10.
-**Supersedes.** Nothing. Amends NOSTROMO-0001 where §1.3 says so.
+**Supersedes.** Nothing. Amends Platform Spec where §1.3 says so.
 **Governs.** How the Nostromo crew works once it is live, and what must be true before it touches SquadOps 1.8 code.
 
 ---
 
 ## 1. What this document is
 
-NOSTROMO-0001 says what Nostromo is. NOSTROMO-PLAN-0001 says how to stand it up. Neither says how the crew
+Platform Spec says what Nostromo is. Bootstrap Plan says how to stand it up. Neither says how the crew
 *works* once the processes are running, because when they were written there was no evidence about how this
 particular repository is actually maintained. That evidence now exists, in six documents derived from the
 SquadOps record:
@@ -53,7 +53,7 @@ configuration files and commissioning gates. The only things it asks of the Squa
 issue shape conventions, branch namespaces and rulesets — all of which the repository already uses in some
 form, and none of which alter what SquadOps does.
 
-### 1.3 Amendments to NOSTROMO-0001
+### 1.3 Amendments to Platform Spec
 
 Six changes. The first five are argued in §2; the sixth is scope definition rather than reversal and is argued in §10A.
 
@@ -66,7 +66,7 @@ Six changes. The first five are argued in §2; the sixth is scope definition rat
 | §14 Lifecycle | one sixteen-state ladder | two lanes: Lane A (design) keeps the ladder; Lane B (finding) gets its own nine states | `fix` is 381 of 935 merged PRs against `feat` 173; 263 of 535 issue bodies cite a live cycle id |
 | §10 Roster | seven agents, Brett capability `verification` | seven agents unchanged; Brett's capability becomes `bounded_implementation` plus `evidence_collection`; three new capabilities are routed | the verification capability splits at the `L`/`F` line and cannot be held by one role |
 
-No other section of NOSTROMO-0001 changes. The architecture principles, the topology, the identity model,
+No other section of Platform Spec changes. The architecture principles, the topology, the identity model,
 the budget boundaries, the record-versus-workbench rule and the owner-authority list all survive the
 evidence intact, and in several places the evidence is a direct vindication of them.
 
@@ -80,9 +80,9 @@ evidence, not authority: two of the six end with the current design substantiall
 
 ### 2.1 Brett concludes — resolved against the current design
 
-**Current design.** NOSTROMO-0001 §11.6 gives Brett "failure classification", "regression verification" and
+**Current design.** Platform Spec §11.6 gives Brett "failure classification", "regression verification" and
 "QA conclusions", on local Qwen3.6 35B-A3B, with production edit and commit denied
-(NOSTROMO-PLAN-0001 §11.11).
+(Bootstrap Plan §11.11).
 
 **The record.** Every conclusion verb in that list is tiered `F`. Capability 5.4 (re-run the same invocation
 before judging whether a red pre-existed) and 5.5 (distinguish a failure *caused* by the change from one
@@ -167,7 +167,7 @@ Dallas cannot review every PR, so he must review the ones where the record says 
 
 ### 2.6 The handoff envelope is right but empty — confirmed, and filled
 
-**Current design.** NOSTROMO-0001 §15 defines a generic handoff envelope: work item, state, GitHub refs,
+**Current design.** Platform Spec §15 defines a generic handoff envelope: work item, state, GitHub refs,
 Buzz thread, capability requested, request, acceptance criteria, unresolved issues, return condition.
 
 **The record.** The envelope is correct and deliberately generic. What it lacks is payloads. Four of the
@@ -670,7 +670,7 @@ permanent role to justify a persona.
 
 ## 10A. Lambert — Knowledge projection, and the source-manifest system
 
-Lambert keeps the character NOSTROMO-0001 §11.7 defines: the Google knowledge projection, $0 incremental,
+Lambert keeps the character Platform Spec §11.7 defines: the Google knowledge projection, $0 incremental,
 off the critical engineering path, and explicitly unable to block SquadOps development by being unavailable.
 
 **Lambert moves to the Spark, under Herdr, with the rest of the crew.** Curating a source manifest means
@@ -922,7 +922,7 @@ green including the non-required ones, and the closure reference resolves — th
 
 ## 13. Owner-reserved authority
 
-Derived from the record, not invented. Each item below appears in `instructions.md`, in NOSTROMO-0001 §16, or
+Derived from the record, not invented. Each item below appears in `instructions.md`, in Platform Spec §16, or
 in the SquadOps record's own standing escalation list, and most appear in all three.
 
 The owner exclusively decides:
@@ -974,7 +974,7 @@ drifts.
 
 ## 15. The contract model
 
-NOSTROMO-0001 §15 defines a handoff **envelope**: work item, lifecycle state, canonical GitHub references,
+Platform Spec §15 defines a handoff **envelope**: work item, lifecycle state, canonical GitHub references,
 Buzz thread, capability requested, explicit request, acceptance criteria, unresolved issues, return condition.
 That envelope stays exactly as written. It is the transport.
 
@@ -984,7 +984,7 @@ the payload is what they need in order to answer without rediscovering architect
 Three rules govern every contract below.
 
 **The record rule.** GitHub holds the canonical content. Buzz holds a reference and the conversation around
-it. Nothing accepted lives only in Buzz history. This is NOSTROMO-0001's rule and the SquadOps record's
+it. Nothing accepted lives only in Buzz history. This is Platform Spec's rule and the SquadOps record's
 independently — a decision recorded only in a surface that is later superseded is a decision that disappears.
 
 **The presence rule.** Mother checks that a contract's mandatory fields are *present* before routing. Mother
@@ -1899,7 +1899,7 @@ the change is proven or an experiment. Nothing here is presented as settled that
 Two variables change together, which is exactly the confound the evaluation design forbids. They must be
 separated.
 
-**The model.** NOSTROMO-0001 §11.6 chose the *general* Qwen3.6 35B-A3B deliberately, "not a
+**The model.** Platform Spec §11.6 chose the *general* Qwen3.6 35B-A3B deliberately, "not a
 coding-specialized variant", because the role was verification and evidence reasoning. Under this operating
 model the role is bounded implementation, and the reasoning is that a coding-tuned variant should be better
 at it. **That reasoning is a hypothesis and is not evidence.** It is tested by holding harness, task packet,
@@ -1981,7 +1981,7 @@ simplification worth taking deliberately rather than noticing later:
 - no `launchd` agent management, no Mac-local agent secrets, no second auth surface;
 - the Mac closes, sleeps or reboots with zero crew impact, which the plan previously accepted only for the
   lightweight roles;
-- NOSTROMO-0001 §27 (Mac agent process affinity) and the plan's WP-8 largely dissolve into WP-7.
+- Platform Spec §27 (Mac agent process affinity) and the plan's WP-8 largely dissolve into WP-7.
 
 The Mac keeps what it was always best at: Buzz Desktop, the owner identity, the control channel, `gh`, and
 SSH to the Spark and the Jetson.
@@ -2003,7 +2003,7 @@ ninety-five minutes of swap thrash, `sshd` could not fault its own pages in, and
 cycle. The host had no memory containment at the time. The verification-set driver's own preflight already
 refuses to run while another run is in flight.
 
-NOSTROMO-0001 §80 names this risk and assumes phase separation. This section makes it deterministic.
+Platform Spec §80 names this risk and assumes phase separation. This section makes it deterministic.
 
 ### 36.1 The two modes
 
@@ -2604,8 +2604,8 @@ Every row names the actual current file. `R` = required before commissioning. `F
 
 | File | Change | When |
 |---|---|---|
-| `docs/specs/NOSTROMO-0001-*.md` | the four amendments in §1.3, each as a dated amendment section rather than a silent edit | **R** |
-| `docs/specs/NOSTROMO-PLAN-0001-*.md` | WP-1 §8.7 App permissions; WP-4 §11.11 Brett's permission profile and the Node runtime both harnesses need; WP-8 folds into WP-7 now that no agent runs on the Mac (§35.4); WP-9 persona content; WP-10 commissioning replaced by §40–§42 | **R** |
+| `docs/specs/platform-spec.md` | the four amendments in §1.3, each as a dated amendment section rather than a silent edit | **R** |
+| `docs/specs/bootstrap-plan.md` | WP-1 §8.7 App permissions; WP-4 §11.11 Brett's permission profile and the Node runtime both harnesses need; WP-8 folds into WP-7 now that no agent runs on the Mac (§35.4); WP-9 persona content; WP-10 commissioning replaced by §40–§42 | **R** |
 | `README.md` | resolve both open decisions: lifecycle store (§25) and reviewer checkout (§38.1) | **R** |
 | `docs/source-baseline.md` | pin Brett's model and harness once §35.1 resolves | F |
 
@@ -2620,7 +2620,7 @@ exactly where it must not be. The payload rides inside it as a link plus a type.
 
 # Part XV — Implementation Sequencing
 
-## 46. Where this work sits against NOSTROMO-PLAN-0001
+## 46. Where this work sits against Bootstrap Plan
 
 The existing plan's dependency graph is sound and is not replaced. WP-0 is done; WP-2 completed on
 2026-09-08 with the Buzz relay live, closed and reboot-proven. This document's work attaches to the existing
@@ -2645,7 +2645,7 @@ WP-13 1.8 activation                                NEW (§44)
 
 ### 46.1 The phases
 
-**Phase 0 — Reconcile the design.** No infrastructure. Amend NOSTROMO-0001 with §1.3's four changes. Update
+**Phase 0 — Reconcile the design.** No infrastructure. Amend Platform Spec with §1.3's four changes. Update
 `crew/lifecycle.yaml` to two lanes, `crew/capabilities.yaml` to the new routing, `crew/manifest.yaml` for
 Brett and Mother. Write the contract templates into `contracts/`. Extend the test suite. Owner reviews and
 approves the shapes.

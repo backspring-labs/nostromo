@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Mirror the Nostromo repo to the Spark (NOSTROMO-PLAN-0001 §11.2).
+# Mirror the Nostromo repo to the Spark (Bootstrap Plan §11.2).
 #
 # Driven from the Mac, like the Jetson. Deploy keys are disabled organization-wide on
 # backspring-labs — a posture worth keeping — and no crew account holds a GitHub credential, so the

@@ -4,8 +4,8 @@
 
 **Basis.** The three companion documents in this directory — `maintainer-lessons-learned.md`,
 `maintainer-work-archetypes.md`, `maintainer-interface-handoff-contracts.md` — and a read of the
-Nostromo repository as it stood on 2026-09-10: `NOSTROMO-0001` (the platform spec),
-`NOSTROMO-PLAN-0001` (the bootstrap plan), `instructions.md`, `crew/manifest.yaml`,
+Nostromo repository as it stood on 2026-09-10: `Platform Spec` (the platform spec),
+`Bootstrap Plan` (the bootstrap plan), `instructions.md`, `crew/manifest.yaml`,
 `crew/capabilities.yaml`, `crew/lifecycle.yaml`, `crew/budgets.yaml`, `docs/deviations.md`.
 
 **Short version.** The approach is sound, its constitution already encodes most of what the
@@ -66,7 +66,7 @@ conditions.
 
 ### 2. Brett is on the wrong side of the line the capabilities document drew
 
-`NOSTROMO-0001` §11.6 gives Brett "failure classification" and "QA conclusions" on local
+`Platform Spec` §11.6 gives Brett "failure classification" and "QA conclusions" on local
 Qwen3.6 35B-A3B, deliberately not a coding variant. The capabilities document's allocation note
 says: "Anything concluding 'clean', 'green', 'passing' or 'safe' is frontier — or returns raw
 evidence for a frontier model to conclude from."
@@ -122,7 +122,7 @@ deploy's, silently.
 
 ### 6. What Nostromo's handoff contract carries, and what it does not
 
-`NOSTROMO-0001` §15 defines a handoff as an envelope: work-item id, lifecycle state, canonical
+`Platform Spec` §15 defines a handoff as an envelope: work-item id, lifecycle state, canonical
 GitHub references, Buzz thread or Canvas, capability requested, explicit request, acceptance
 criteria or question, known unresolved issues, required return condition. That is the right
 envelope and it is deliberately generic.

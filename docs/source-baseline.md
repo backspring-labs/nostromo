@@ -1,6 +1,6 @@
 # Source Baseline
 
-Dependency ledger for Nostromo (NOSTROMO-PLAN-0001 §7.9, §18.4). Buzz, Herdr, the ACP adapters, OpenCode, and Ollama are privileged development dependencies and must be reconstructable against a known set.
+Dependency ledger for Nostromo (Bootstrap Plan §7.9, §18.4). Buzz, Herdr, the ACP adapters, OpenCode, and Ollama are privileged development dependencies and must be reconstructable against a known set.
 
 **Pinned** is what is actually installed and validated on a host. **Observed latest** is what upstream published when this table was last refreshed, recorded so the next work package starts from a known point. A row is pinned only when its work package has verified it in place.
 
@@ -37,4 +37,4 @@ Dependency ledger for Nostromo (NOSTROMO-PLAN-0001 §7.9, §18.4). Buzz, Herdr, 
 1. Record the observed-latest column before starting a work package that installs the component.
 2. Install and validate on the target host.
 3. Move the exact version, tag, or commit into the Pinned column and date the Validated column.
-4. Do not track `main` after commissioning (NOSTROMO-0001 §60).
+4. Do not track `main` after commissioning (Platform Spec §60).

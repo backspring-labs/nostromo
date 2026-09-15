@@ -1,6 +1,6 @@
 # WP-4 evidence, part 2 — the crew account, the runtime, and the harness
 
-**Date.** 2026-09-13. **Host.** `spark`. Covers NOSTROMO-PLAN-0001 §11.2–§11.5 and §11.10.
+**Date.** 2026-09-13. **Host.** `spark`. Covers Bootstrap Plan §11.2–§11.5 and §11.10.
 Part 1 covers the preflight, the Ollama baseline and the local-model benchmark.
 
 ---

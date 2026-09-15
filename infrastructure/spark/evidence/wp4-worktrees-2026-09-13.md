@@ -1,7 +1,7 @@
 # WP-4 evidence, part 3 — crew worktrees on squad-ops
 
 **Date.** 2026-09-13. **Host.** `spark`, crew account `nostromo`.
-Covers NOSTROMO-PLAN-0001 §11.6–§11.7.
+Covers Bootstrap Plan §11.6–§11.7.
 
 ---
 

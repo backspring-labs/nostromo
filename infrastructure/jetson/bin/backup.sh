@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs ON the Jetson. Minimum recovery copy (NOSTROMO-PLAN-0001 §9.9): secrets, Postgres dump, git/media/redis
+# Runs ON the Jetson. Minimum recovery copy (Bootstrap Plan §9.9): secrets, Postgres dump, git/media/redis
 # volumes, and the config that produced them. Output: /mnt/ssd/buzz/backups/<UTC stamp>/ (mode 700).
 # Keeps the newest $KEEP sets. Copy the newest set off-host afterwards; a same-disk copy is not disaster recovery.
 set -euo pipefail

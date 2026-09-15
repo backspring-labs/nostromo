@@ -1,6 +1,6 @@
 # Implementation Deviation Log
 
-Every meaningful deviation between NOSTROMO-0001, NOSTROMO-PLAN-0001, and what tooling actually allows is recorded here (NOSTROMO-PLAN-0001 §29). Only a true architecture contradiction revises the specification; everything else is logged and, where needed, approved.
+Every meaningful deviation between Platform Spec, Bootstrap Plan, and what tooling actually allows is recorded here (Bootstrap Plan §29). Only a true architecture contradiction revises the specification; everything else is logged and, where needed, approved.
 
 ## Entry template
 
@@ -22,7 +22,7 @@ Revisit trigger:
 ```text
 ID:                    DEV-001
 Date:                  2026-09-08
-Spec/plan reference:   NOSTROMO-0001 §20; NOSTROMO-PLAN-0001 §9.6
+Spec/plan reference:   Platform Spec §20; Bootstrap Plan §9.6
 Expected:              wss:// on nano.tailc69e7d.ts.net with Tailscale Serve terminating TLS
 Actual tooling constraint: HTTPS certificates are not enabled for the tailnet (CertDomains null), and
                        tailscale serve needs root or the operator setting, which needs sudo; sudo on the
@@ -42,7 +42,7 @@ Resolved:              2026-09-08, same day. Owner enabled HTTPS certificates an
 ```text
 ID:                    DEV-002
 Date:                  2026-09-08
-Spec/plan reference:   NOSTROMO-PLAN-0001 §9.5 (owner pubkey listed as a WP-2 input); owner-identity hold of 2026-09-07
+Spec/plan reference:   Bootstrap Plan §9.5 (owner pubkey listed as a WP-2 input); owner-identity hold of 2026-09-07
 Expected:              RELAY_OWNER_PUBKEY set to the owner's real pubkey
 Actual tooling constraint: buzz-relay at c045321a refuses to start in closed mode without RELAY_OWNER_PUBKEY
                        (crates/buzz-relay/src/main.rs, "RELAY_OWNER_PUBKEY required when
@@ -67,7 +67,7 @@ Resolved:              2026-09-13. RELAY_OWNER_PUBKEY is the owner's real identi
 ```text
 ID:                    DEV-003
 Date:                  2026-09-08
-Spec/plan reference:   NOSTROMO-PLAN-0001 §9.2, §9.3
+Spec/plan reference:   Bootstrap Plan §9.2, §9.3
 Expected:              Use the upstream production bundle as shipped, overlays only
 Actual tooling constraint: Upstream deploy/compose/run.sh hard-codes "-f compose.yml", so the Nostromo overlay
                        (port binding, env-file split, digest pins) cannot be loaded through it.
@@ -82,7 +82,7 @@ Revisit trigger:       Upstream run.sh honours COMPOSE_FILE or an extra -f.
 ```text
 ID:                    DEV-004
 Date:                  2026-09-08
-Spec/plan reference:   NOSTROMO-PLAN-0001 §9.4
+Spec/plan reference:   Bootstrap Plan §9.4
 Expected:              A chosen NVMe-backed directory for durable state
 Actual tooling constraint: Upstream Compose declares named Docker volumes; switching to bind mounts would fork
                        upstream semantics.
@@ -98,7 +98,7 @@ Revisit trigger:       Upstream moves to bind mounts.
 ```text
 ID:                    DEV-006
 Date:                  2026-09-13
-Spec/plan reference:   NOSTROMO-PLAN-0001 §8.9; Operating Model §14, §45.4
+Spec/plan reference:   Bootstrap Plan §8.9; Operating Model §14, §45.4
 Expected:              Four rulesets on squad-ops — a branch ruleset and a path ruleset per repo-writing
                        identity — so that "Ripley's namespace cannot carry implementation changes and
                        Parker's namespace cannot carry SIP changes" is enforced server-side.
@@ -133,7 +133,7 @@ Revisit trigger:       The CI check landing; or squad-ops ceasing to be a public
 ```text
 ID:                    DEV-005
 Date:                  2026-09-08
-Spec/plan reference:   NOSTROMO-PLAN-0001 §9.8, §20 completion probe ("Jetson reboot preserves state")
+Spec/plan reference:   Bootstrap Plan §9.8, §20 completion probe ("Jetson reboot preserves state")
 Expected:              A reboot as part of WP-2 evidence
 Actual tooling constraint: Reboot needs sudo, which prompts for a password on the Jetson.
 Chosen workaround:     Proved a relay container restart and a full stack stop/start with stable identity.
@@ -150,7 +150,7 @@ Resolved:              2026-09-08. Owner rebooted the nano; tailscaled started b
 ```text
 ID:                    DEV-007
 Date:                  2026-09-13
-Spec/plan reference:   NOSTROMO-PLAN-0001 §11.2 ("Clone the new private nostromo repo onto Spark")
+Spec/plan reference:   Bootstrap Plan §11.2 ("Clone the new private nostromo repo onto Spark")
 Expected:              The crew account on the Spark clones backspring-labs/nostromo from GitHub.
 Actual tooling constraint: Deploy keys are disabled organization-wide on backspring-labs. A read-only
                        deploy key was generated on the Spark and refused at registration:
@@ -176,7 +176,7 @@ Revisit trigger:       Registration of an App installed on the nostromo reposito
 ```text
 ID:                    DEV-008
 Date:                  2026-09-13
-Spec/plan reference:   NOSTROMO-PLAN-0001 §11.10, §11.13 ("opencode acp starts as an ACP-compatible
+Spec/plan reference:   Bootstrap Plan §11.10, §11.13 ("opencode acp starts as an ACP-compatible
                        stdio process"; "OpenCode->Ollama works independently")
 Expected:              Both `opencode run` and `opencode acp` usable against the local Ollama provider.
 Actual tooling constraint: `opencode run` (OpenCode 1.18.30, linux-arm64) succeeded twice and then hung

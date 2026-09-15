@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Git credential helper for a Nostromo crew role (NOSTROMO-PLAN-0001 §11.6).
+# Git credential helper for a Nostromo crew role (Bootstrap Plan §11.6).
 #
 # Mints a GitHub App installation token on demand and hands it to git. The token lives an hour and
 # is never written to disk, so there is no long-lived credential in the crew account for an agent

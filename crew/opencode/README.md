@@ -1,6 +1,6 @@
 # OpenCode permission profiles
 
-NOSTROMO-PLAN-0001 §11.11, amended by Operating Model §2.1 and §45.4. Pinned to **OpenCode 1.18.30**;
+Bootstrap Plan §11.11, amended by Operating Model §2.1 and §45.4. Pinned to **OpenCode 1.18.30**;
 the permission identifiers below were read out of that build, not from documentation, because the
 plan warns that the V1 and V2 syntaxes must not be mixed.
 

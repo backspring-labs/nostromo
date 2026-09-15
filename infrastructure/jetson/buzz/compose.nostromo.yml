@@ -1,7 +1,7 @@
 # Nostromo overlay for the upstream Buzz production Compose bundle
 # (block/buzz deploy/compose/compose.yml at the commit in upstream.lock). Applied by buzzctl as:
 #   docker compose --env-file buzz.env --env-file secrets.env -f compose.yml -f compose.nostromo.yml
-# NOSTROMO-PLAN-0001 §9.3: only this overlay lives in the repo; the upstream file is fetched at the pin.
+# Bootstrap Plan §9.3: only this overlay lives in the repo; the upstream file is fetched at the pin.
 # Every image is pinned by registry digest so a re-install reproduces exactly what was validated.
 services:
   relay:

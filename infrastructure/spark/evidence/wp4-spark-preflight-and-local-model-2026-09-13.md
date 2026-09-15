@@ -1,7 +1,7 @@
 # WP-4 evidence, part 1 — Spark preflight and the local model baseline
 
 **Date.** 2026-09-13. **Host.** `spark` (100.117.233.38) over Tailscale SSH.
-Covers NOSTROMO-PLAN-0001 §11.1, §11.8 and §11.9. Nothing was installed and nothing on the host
+Covers Bootstrap Plan §11.1, §11.8 and §11.9. Nothing was installed and nothing on the host
 was modified to produce this record.
 
 ---

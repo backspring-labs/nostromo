@@ -1,4 +1,4 @@
-"""Invariants for the Jetson Buzz relay deployment (NOSTROMO-PLAN-0001 WP-2).
+"""Invariants for the Jetson Buzz relay deployment (Bootstrap Plan WP-2).
 
 These guard the boundaries the plan cares about: the relay is pinned, closed, bound only to the
 tailnet, configured from a repo-managed file that can never carry a secret, and in step with the

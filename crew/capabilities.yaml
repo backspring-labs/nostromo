@@ -1,4 +1,4 @@
-# Capability routing table (NOSTROMO-PLAN-0001 §16.4).
+# Capability routing table (Bootstrap Plan §16.4).
 # Mother resolves a requested capability to an agent here, never from prompt assumptions.
 version: 1
 

@@ -1,6 +1,6 @@
 # Nostromo crew allowlist — generated from crew/manifest.yaml, non-secret.
 #
-# Crew-wide for v1 (NOSTROMO-PLAN-0001 §12.6, owner decision 2026-09-14): every crew member
+# Crew-wide for v1 (Bootstrap Plan §12.6, owner decision 2026-09-14): every crew member
 # accepts the owner and every other crew member, and nobody else.
 #
 # This governs who may ADDRESS an agent, not what an agent may DO. The doing is constrained by

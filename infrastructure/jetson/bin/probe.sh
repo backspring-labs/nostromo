@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# WP-2 health and boundary probes, run from the Mac (NOSTROMO-PLAN-0001 §9.8). Prints evidence, never secrets.
+# WP-2 health and boundary probes, run from the Mac (Bootstrap Plan §9.8). Prints evidence, never secrets.
 # Usage: infrastructure/jetson/bin/probe.sh [ssh-host]   (default: nano; SPARK_HOST overrides the Spark alias)
 set -uo pipefail
 HOST="${1:-nano}"

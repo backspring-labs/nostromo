@@ -1,4 +1,4 @@
-# NOSTROMO-PLAN-0001: Initial Crew and Infrastructure Bootstrap Plan
+# Initial Crew and Infrastructure Bootstrap Plan
 
 **Status:** Draft Execution Plan  
 **Version:** 0.1  
@@ -6,7 +6,7 @@
 **Owner:** Jason Ladd  
 **Project:** Nostromo  
 **Primary Product Under Development:** SquadOps  
-**Requirements Baseline:** `NOSTROMO-0001-Development-Crew-Platform-Spec.md`  
+**Requirements Baseline:** `platform-spec.md`  
 **Document Class:** Nostromo Execution Plan — not a SquadOps SIP  
 **Execution Style:** Host-scoped, probe-gated, evidence-bearing
 
@@ -14,7 +14,7 @@
 
 # 1. Purpose
 
-This plan implements the architecture and requirements defined by **NOSTROMO-0001: Development Crew Runtime, Collaboration, and Infrastructure Specification**.
+This plan implements the architecture and requirements defined by **Platform Spec: Development Crew Runtime, Collaboration, and Infrastructure Specification**.
 
 The specification defines **what Nostromo is and what it must guarantee**. This document defines **how to bootstrap it in a controlled sequence** across the physical infrastructure:
 
@@ -34,7 +34,7 @@ The intended outcome is not merely that seven agents can answer messages. The ou
 
 This plan MUST be executed against:
 
-> `NOSTROMO-0001-Development-Crew-Platform-Spec.md`
+> `platform-spec.md`
 
 If an implementation step conflicts with that specification:
 
@@ -44,7 +44,7 @@ If an implementation step conflicts with that specification:
    - a tooling/version implementation detail;
    - a temporary compatibility deviation;
    - or a true architecture contradiction;
-4. only architecture contradictions should cause revision of NOSTROMO-0001.
+4. only architecture contradictions should cause revision of Platform Spec.
 
 This plan may refine commands, filenames, package versions, paths, and operational mechanics without revising the specification so long as the specification's contracts remain intact.
 
@@ -313,7 +313,7 @@ runtime/manifests/<agent>.yaml
 
 - GitHub access
 - git and GitHub CLI or equivalent
-- local copy of `NOSTROMO-0001-Development-Crew-Platform-Spec.md`
+- local copy of `platform-spec.md`
 - this plan
 
 ---
@@ -339,8 +339,8 @@ Clone it to the Mac.
 Place:
 
 ```text
-NOSTROMO-0001-Development-Crew-Platform-Spec.md
-NOSTROMO-PLAN-0001-Initial-Crew-Infrastructure-Bootstrap.md
+platform-spec.md
+bootstrap-plan.md
 ```
 
 at the repository root or under a `docs/specs/` convention if a clear document hierarchy is preferred.
@@ -356,8 +356,8 @@ Initial scaffold:
 ```text
 nostromo/
 ├── README.md
-├── NOSTROMO-0001-Development-Crew-Platform-Spec.md
-├── NOSTROMO-PLAN-0001-Initial-Crew-Infrastructure-Bootstrap.md
+├── platform-spec.md
+├── bootstrap-plan.md
 ├── .gitignore
 │
 ├── .plugin/
@@ -2410,7 +2410,7 @@ Mother should receive this machine-readable mapping.
 
 # 16.5 Lifecycle definition
 
-Commit lifecycle state machine from NOSTROMO-0001.
+Commit lifecycle state machine from Platform Spec.
 
 At minimum:
 
@@ -2775,7 +2775,7 @@ Record:
 
 # 17.14 WP-10 acceptance
 
-The commissioning roll passes when all of NOSTROMO-0001 AC-01 through AC-16 are either:
+The commissioning roll passes when all of Platform Spec AC-01 through AC-16 are either:
 
 - demonstrated;
 - or explicitly marked with remaining corrective work.
@@ -2975,7 +2975,7 @@ Turn the Jetson Orin Nano Super into a stable private Buzz appliance.
 
 ## Inputs
 
-- NOSTROMO-0001
+- Platform Spec
 - this plan
 - owner Buzz public key
 - selected Buzz release/image
@@ -3347,8 +3347,8 @@ Crew instructions: instructions.md
 ## Repo
 
 - [ ] Private `nostromo` repository exists
-- [ ] NOSTROMO-0001 committed
-- [ ] NOSTROMO-PLAN-0001 committed
+- [ ] Platform Spec committed
+- [ ] Bootstrap Plan committed
 - [ ] manifest parses
 - [ ] budget test passes
 - [ ] no secrets committed
@@ -3498,7 +3498,7 @@ The setup agent MUST stop and report rather than improvise if:
 12. an agent's process cannot be bound to the intended worktree.
 13. provider usage is attributed to the wrong project/workspace.
 14. secrets appear in git or logs.
-15. a current tool version invalidates a critical architectural assumption in NOSTROMO-0001.
+15. a current tool version invalidates a critical architectural assumption in Platform Spec.
 16. a crew commit or pull request attributes to the owner's personal account rather than the crew's GitHub App, or the required rulesets cannot be created on `squad-ops`.
 
 A stop condition should produce:
@@ -3747,7 +3747,7 @@ The condensed order is:
 
 # 32. Definition of Done
 
-`NOSTROMO-PLAN-0001` is complete when the owner can sit at the Mac and:
+`Bootstrap Plan` is complete when the owner can sit at the Mac and:
 
 1. open Buzz Desktop;
 2. see the seven stable Nostromo crew identities;

@@ -1,6 +1,6 @@
 # One Unix account per crew role
 
-**Date.** 2026-09-14. **Host.** `spark`. Amends NOSTROMO-PLAN-0001 §11 and closes the residual
+**Date.** 2026-09-14. **Host.** `spark`. Amends Bootstrap Plan §11 and closes the residual
 recorded in `wp4-crew-account-and-runtime-2026-09-13.md`.
 
 ## Why this was brought forward

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Bootstrap and validate each crew worktree (NOSTROMO-PLAN-0001 §11.6–§11.7).
+# Bootstrap and validate each crew worktree (Bootstrap Plan §11.6–§11.7).
 #
 # Runs ON the Spark as the crew account. The point of §11.7 is stated in the plan: prove any later
 # failure is not simply a broken worktree. So this runs the repository's OWN gate —

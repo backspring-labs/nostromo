@@ -1,6 +1,6 @@
 # WP-1 owner console steps: provider and GitHub boundaries
 
-Owner-side steps for NOSTROMO-PLAN-0001 WP-1 (§8.1 to §8.9). Every item here is a browser action only the owner can take. Everything after it (key placement on the Spark, rulesets, attribution probes, evidence) is assistant work and is listed at the end. Verified against the provider documentation on 2026-09-09; console labels may drift, the intent does not.
+Owner-side steps for Bootstrap Plan WP-1 (§8.1 to §8.9). Every item here is a browser action only the owner can take. Everything after it (key placement on the Spark, rulesets, attribution probes, evidence) is assistant work and is listed at the end. Verified against the provider documentation on 2026-09-09; console labels may drift, the intent does not.
 
 Rules that apply throughout:
 
@@ -43,7 +43,7 @@ Console: https://platform.openai.com
 4. Optional but useful: an alert threshold at `55` so you hear about it before the cutoff.
 5. **Model allow-listing: do it.** The list is a checkbox set, so this is a few clicks. **Leave only `gpt-5.6-sol` checked** and uncheck everything else, on both projects.
 
-   The reason is cost, not tidiness. A project can call any model on its list, and the design pins exactly one. Models differ in price per token, sometimes by a large multiple, so a harness pointed at the wrong one would empty the cap far faster for identical work and nothing would announce it. Restricting the project makes that a loud failure instead, which is the same reason the spend limit is enforced provider-side rather than trusted to configuration. It also matches NOSTROMO-0001 §31, where changing a model is a deliberate act rather than something that can happen by drift.
+   The reason is cost, not tidiness. A project can call any model on its list, and the design pins exactly one. Models differ in price per token, sometimes by a large multiple, so a harness pointed at the wrong one would empty the cap far faster for identical work and nothing would announce it. Restricting the project makes that a loud failure instead, which is the same reason the spend limit is enforced provider-side rather than trusted to configuration. It also matches Platform Spec §31, where changing a model is a deliberate act rather than something that can happen by drift.
 
    The default checked state on a new project is **not recorded here**, because it has not been observed cleanly. Set the list explicitly rather than assuming any default, in either direction.
 

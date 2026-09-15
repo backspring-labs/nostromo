@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install the Nostromo runtime base on the Spark (NOSTROMO-PLAN-0001 §11.3, §11.10).
+# Install the Nostromo runtime base on the Spark (Bootstrap Plan §11.3, §11.10).
 #
 # Runs ON the Spark, as whichever user the crew runs as, and installs entirely into that user's
 # home. No sudo, nothing system-wide, nothing shared with the owner's SquadOps environment.

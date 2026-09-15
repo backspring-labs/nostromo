@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install or update the Buzz relay on the Jetson from the owner's Mac (NOSTROMO-PLAN-0001 WP-2).
+# Install or update the Buzz relay on the Jetson from the owner's Mac (Bootstrap Plan WP-2).
 # Idempotent: every run re-syncs the repo-managed files and restarts the stack; host-generated secrets are never
 # touched. The Nostromo repo is never cloned on the Jetson, and no GitHub credential is placed there.
 # Usage: infrastructure/jetson/bin/install.sh [ssh-host]   (default: nano)

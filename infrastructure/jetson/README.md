@@ -1,6 +1,6 @@
 # Jetson: Buzz relay appliance
 
-Runbook for WP-2 of NOSTROMO-PLAN-0001. The Jetson Orin Nano Super (`nano`, Tailscale `nano.tailc69e7d.ts.net`, `100.98.252.95`) runs the pinned Buzz production Compose stack and nothing else of Nostromo's. Everything here is driven from the owner's Mac over Tailscale SSH. The Nostromo repo is never cloned on the Jetson and no GitHub credential is placed there (Jetson handoff pack, plan §20).
+Runbook for WP-2 of Bootstrap Plan. The Jetson Orin Nano Super (`nano`, Tailscale `nano.tailc69e7d.ts.net`, `100.98.252.95`) runs the pinned Buzz production Compose stack and nothing else of Nostromo's. Everything here is driven from the owner's Mac over Tailscale SSH. The Nostromo repo is never cloned on the Jetson and no GitHub credential is placed there (Jetson handoff pack, plan §20).
 
 ## What is where
 

@@ -1,7 +1,7 @@
 """Validation of Nostromo's declarative crew configuration.
 
-Implements the automated checks in NOSTROMO-PLAN-0001 §7.10 and §24 against the
-requirements in NOSTROMO-0001. Every test names the requirement it enforces.
+Implements the automated checks in Bootstrap Plan §7.10 and §24 against the
+requirements in Platform Spec. Every test names the requirement it enforces.
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ REQUIRED_AGENT_FIELDS = {
     "nip05",
 }
 
-LIFECYCLE_STATES = [  # NOSTROMO-0001 §14
+LIFECYCLE_STATES = [  # Platform Spec §14
     "IDEA_CREATED",
     "EXPLORING",
     "CONVERGING",
@@ -141,7 +141,7 @@ def test_public_keys_are_hex64_when_set(agents, manifest):
             assert hex64.match(key), f"{name} buzz_pubkey is not a 64-char hex pubkey"
 
 
-# --- NIP-05 handles (NOSTROMO-0001 §20, plan §12.5) ---------------------------------
+# --- NIP-05 handles (Platform Spec §20, plan §12.5) ---------------------------------
 
 NIP05 = re.compile(r"^[a-z0-9._-]+@[a-z0-9.-]+$")
 
@@ -221,7 +221,7 @@ def test_no_agent_runs_on_the_mac(agents):
     """The Mac is a pure cockpit (Operating Model §35.4).
 
     This replaces an earlier test asserting Ash and Lambert run on the Mac, which was
-    NOSTROMO-0001's design. Moving them to the Spark gives one agent host, one supervisor, one
+    Platform Spec's design. Moving them to the Spark gives one agent host, one supervisor, one
     launcher path and one permission model, and lets the Mac close without crew impact. It was
     also enforced the hard way on 2026-09-13, when Buzz Desktop provisioned three agents there
     and they had to be removed.
@@ -345,7 +345,7 @@ def test_hard_limit_profiles_name_their_boundary(budgets, agents):
             assert agents[profile_name]["provider_boundary"] == profile["boundary"]
 
 
-# --- Lifecycle (NOSTROMO-0001 §14) ------------------------------------------------------
+# --- Lifecycle (Platform Spec §14) ------------------------------------------------------
 
 
 def test_lifecycle_states_match_specification(lifecycle):

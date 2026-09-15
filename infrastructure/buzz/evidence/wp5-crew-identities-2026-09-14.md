@@ -1,6 +1,6 @@
 # WP-5 evidence — seven crew Buzz identities
 
-**Date.** 2026-09-14. Covers NOSTROMO-PLAN-0001 §12.1–§12.5 and §12.8.
+**Date.** 2026-09-14. Covers Bootstrap Plan §12.1–§12.5 and §12.8.
 Community `nostromo.backspring.xyz`, owner `508cd1c7…ce5f`.
 
 ## The identities
@@ -86,7 +86,7 @@ are context, never evidence.
 each matching its manifest handle.
 
 It is named for the ship because it is the only channel that is about the ship. Every other channel
-will be about a piece of work and will end with it. NOSTROMO-0001 §17 called for a control channel
+will be about a piece of work and will end with it. Platform Spec §17 called for a control channel
 and then listed it among the work-item channels, muddling its own distinction; that is amended in
 the spec rather than quietly fixed.
 

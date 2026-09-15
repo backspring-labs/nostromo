@@ -1,4 +1,4 @@
-# NOSTROMO-0001: Development Crew Runtime, Collaboration, and Infrastructure Specification
+# Development Crew Runtime, Collaboration, and Infrastructure Specification
 
 **Status:** Draft Design Baseline  
 **Version:** 0.1  
@@ -1362,7 +1362,7 @@ The initial repository SHOULD resemble:
 ```text
 nostromo/
 ├── README.md
-├── NOSTROMO-0001.md
+├── Platform Spec.md
 │
 ├── .plugin/
 │   └── plugin.json
@@ -2742,7 +2742,7 @@ This architecture is intentionally simple enough to deploy with existing tools, 
 
 The next document should be:
 
-**NOSTROMO-PLAN-0001 — Initial Crew and Infrastructure Bootstrap Plan**
+**Bootstrap Plan — Initial Crew and Infrastructure Bootstrap Plan**
 
 That plan should consume this specification as its requirements baseline and translate it into a sequenced implementation with host-by-host setup, commands, verification probes, rollback points, and completion evidence.
 
