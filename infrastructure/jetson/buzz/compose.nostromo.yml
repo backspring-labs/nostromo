@@ -16,6 +16,19 @@ services:
     ports: !override
       - "127.0.0.1:${BUZZ_HTTP_PORT:-3000}:3000"
       - "127.0.0.1:8080:8080"
+  # Device pairing for the Buzz mobile app. A SEPARATE binary in the same pinned image, which the
+  # upstream Compose bundle does not define — so mobile pairing 404s until this exists. Reachable
+  # only through Caddy on the tailnet address, like everything else here.
+  pair:
+    image: ${BUZZ_IMAGE:?set BUZZ_IMAGE in buzz.env}
+    entrypoint: ["/usr/local/bin/buzz-pair-relay"]
+    restart: unless-stopped
+    environment:
+      # 0.0.0.0 inside the container only; nothing is published to the host.
+      BUZZ_PAIR_RELAY_BIND_ADDR: "0.0.0.0:5000"
+    networks:
+      - buzz-net
+
   postgres:
     image: postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
   redis:

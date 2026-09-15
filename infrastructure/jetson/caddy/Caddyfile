@@ -23,10 +23,18 @@
 		resolvers 1.1.1.1 8.8.8.8
 	}
 
-	# The relay binds a community to the Host header, so it must arrive unchanged. Buzz is a
-	# WebSocket service; Caddy upgrades transparently.
-	reverse_proxy relay:3000 {
-		header_up Host {host}
-		header_up X-Forwarded-Proto {scheme}
+	# Device pairing is a separate service. handle_path strips the /pair prefix, so the pairing
+	# relay sees requests at its own root. This must come before the catch-all below.
+	handle_path /pair* {
+		reverse_proxy pair:5000
+	}
+
+	# Everything else is the relay. It binds a community to the Host header, so that must arrive
+	# unchanged. Buzz is a WebSocket service; Caddy upgrades transparently.
+	handle {
+		reverse_proxy relay:3000 {
+			header_up Host {host}
+			header_up X-Forwarded-Proto {scheme}
+		}
 	}
 }
