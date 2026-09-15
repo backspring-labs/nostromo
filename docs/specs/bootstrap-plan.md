@@ -1690,6 +1690,70 @@ Every runtime must use the key created here.
 
 # 13. WP-6 — Spark Local Agents: Mother and Brett
 
+> ## Amendment, 2026-09-15 — systemd supervises; Herdr observes
+>
+> **§11.4, §13.6 and §13.11 assume a Herdr workspace is where an agent lives.** It is not. The
+> session is not the agent; the identity is.
+>
+> Look at what actually persists for a crew member:
+>
+> | Layer | Lifetime |
+> |---|---|
+> | Keypair, in its own account, backed up | durable |
+> | Relay membership and published profile | durable |
+> | Worktree and on-disk state | durable |
+> | ACP session | **ephemeral by design** |
+> | Harness process | **ephemeral** |
+>
+> Buzz asserts this itself. `!rotate` destroys the ACP session and *"the next queued event in that
+> scope starts a fresh session"* — **the agent survives the destruction of its own session**, and
+> presence rather than the session is the status. Treating the Herdr pane as the agent's body binds
+> its existence to the most ephemeral layer in the stack.
+>
+> ### What Herdr-as-supervisor costs
+>
+> A crashed Herdr server takes all seven agents with it. A closed session deletes an agent. Nothing
+> returns after a reboot. A harness that panics stays dead until somebody notices. And there is no
+> memory containment — the record already prices two resident engines on this box at ninety-five
+> minutes of swap thrash and a power cycle (#1177, #1178).
+>
+> ### The division
+>
+> | | Owns | Why |
+> |---|---|---|
+> | **systemd** | existence | restart on failure, start on boot, `MemoryMax`, journald |
+> | **Buzz** | identity and voice | who it is, what it says, how it is addressed and interrupted |
+> | **Herdr** | observation | attaching to look, and the owner's own work in a role's worktree |
+>
+> One unit per role, `nostromo@<role>.service` with `User=<role>`, which also answers a question
+> per-role Unix accounts otherwise raise: **how does the supervisor start a process as `parker`
+> without holding privilege over `parker`?** It does not. systemd does, and start/stop is delegated
+> for those specific units only.
+>
+> ### Why the loss is smaller than it feels
+>
+> **An agent's output surface is `#nostromo`, not a terminal.** To see what Parker is doing you read
+> the channel; a pane shows harness plumbing. So "attach and watch" is worth much less than it
+> sounds, and `journalctl -u nostromo@parker` covers the remainder. Herdr keeps its real value —
+> the owner attaching to a worktree, or running something by hand as a role.
+>
+> ### Consequent changes
+>
+> - **§11.4** — workspaces are an observation convenience, not the supervision model. Keep them; do
+>   not launch agents from them.
+> - **§13.6** — the persistence probe becomes: kill the harness process and confirm systemd restarts
+>   it and the agent answers Buzz again. Detaching a terminal proves nothing about an unattended
+>   service.
+> - **§13.11** — "convert Herdr panes to generic launcher" becomes "install per-role systemd units";
+>   the launcher writes units rather than driving panes.
+> - **New** — `crewctl` on the Spark, run by the supervisor, fronting `systemctl` and the preflight
+>   assertions, with `--json` on every subcommand so an operator UI consumes structured output
+>   rather than scraping text. A UI can wrap a CLI; a CLI cannot wrap a UI.
+>
+> *Raised by the owner, who observed that tying an agent's embodiment to its Herdr session is the
+> less resilient of the two available models.*
+
+
 **Execution surface:** DGX Spark + Buzz  
 **Goal:** prove the complete local runtime chain first.
 
