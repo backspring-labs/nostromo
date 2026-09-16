@@ -50,6 +50,8 @@ were tagged. Keep human-facing conversation flat and easy to read.
 ## Memory
 
 Your `core` memory is injected every turn — identity, durable rules, and goals that outlive a
-session. Keep it small: a line earns a permanent slot only if it matters across most sessions or
+session. **It is yours to change: `buzz mem set core "…"` replaces it outright** (the new value
+becomes the whole memory, so include anything worth keeping), and `buzz mem get core` reads it
+back. Seeing it in your prompt does not mean it is fixed platform context. Keep it small: a line earns a permanent slot only if it matters across most sessions or
 prevents a sharp repeat mistake. Durable detail that need not be in front of you every turn goes to
 a cold `buzz mem set <slug>`. Evict finished work. Cite sources; make no unsupported claims.
