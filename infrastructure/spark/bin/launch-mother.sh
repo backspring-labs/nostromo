@@ -99,6 +99,9 @@ ALLOWLIST="$(awk -v r="$ROLE" '/^allowlists:/ { ina = 1; next } ina && $1 == r":
 # infrastructure/buzz/bin/mint-auth-tags.py on the machine holding the owner key.
 AUTH_TAG="$(yaml_agent buzz_auth_tag)"
 AUTH_TAG="${AUTH_TAG%\'}"; AUTH_TAG="${AUTH_TAG#\'}"
+# ${VAR:-default} yields the VALUE when VAR is set, so a :+/:- pair prints the tag itself.
+AUTH_DESC="ABSENT — core memory will not persist"
+[[ -n "$AUTH_TAG" ]] && AUTH_DESC="present, ${#AUTH_TAG} bytes"
 if [[ -n "$AUTH_TAG" ]]; then
   export BUZZ_AUTH_TAG="$AUTH_TAG"
 else
@@ -177,7 +180,7 @@ launch-$ROLE: resolved configuration
   model           $OLLAMA_TAG via $OLLAMA_URL/v1 (provider=$PROVIDER)
   workdir         $WORKDIR
   logs            $LOGDIR
-  auth tag        ${AUTH_TAG:+present, ${#AUTH_TAG} bytes}${AUTH_TAG:-ABSENT — core memory disabled}
+  auth tag        $AUTH_DESC
   runtime         $(dirname "$(command -v buzz-acp)")  (buzz: $(command -v buzz))
 INFO
 
