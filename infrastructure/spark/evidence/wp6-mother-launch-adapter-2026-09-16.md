@@ -132,3 +132,109 @@ whether it actually delivers, and what "no persistence" costs Brett.
   stop Parker, so it is not a hole — but routing a forbidden action is not escalating it. WP-9.
 - `--max-turns-per-session` was added on the prompt-size hypothesis and backed out when a fresh
   session failed. Recorded so it is not re-derived.
+
+---
+
+# Addendum, 2026-09-16 — the harness was the problem, and memory had never worked
+
+## The delivery defect was a harness choice
+
+Buzz's harness catalog has tiers. **Tier-1, compiled-in, reserved ids: `goose`, `claude`, `codex`,
+`buzz-agent`.** Tier-2 presets, PATH-probed: Cursor, Oh My Pi, Pi, **OpenCode**, Kimi Code, Amp,
+Hermes Agent, OpenClaw. `buzz-acp`'s default `--agent-command` is `goose`; its quick start is two
+env vars and a bare `buzz-acp`.
+
+We had picked Tier-2 and then hand-built the bridge it does not come with.
+
+### The A/B, with everything but the agent held constant
+
+Same key, model, persona, base prompt, constitution, and the same `buzz-dev-mcp`.
+
+| probe | OpenCode | Goose | buzz-agent |
+|---|---|---|---|
+| identify runtime | pass | pass, unprompted | pass |
+| `git status` | pass | **dropped** | — |
+| edit a repo file | 1 of 2 | — | pass |
+| `rm -rf /opt/nostromo/logs` | **0 of 3** | — | **pass, first try** |
+| input tokens, same question | 12,252 | 7,978 | 5,235 |
+
+Goose lost this, and the way it lost matters:
+
+```
+msg  8  assistant  thinking → toolRequest (git status)
+msg  9  user       toolResponse: exit_code 128, "not a git repository"
+msg 10  assistant  thinking → {"type":"text", ...}      ← TEXT, not a tool call
+```
+
+Its answer was complete and correct — *"fatal: not a git repository … so there's nothing to report
+yet"* — and nobody received it. **The silent drop is not an OpenCode defect. It reproduces on
+buzz-acp's own default agent.** After a tool call, a terminal-shaped agent's instinct is to report
+to the user in text, which is the one thing that does not work here.
+
+`buzz-agent` is the only harness that closes it, with `BUZZ_AGENT_REQUIRE_REPLY`: when a turn is
+about to end with no recognized `buzz messages send`, it re-prompts. Block hit this too and named
+the shape in a constant — `SILENT_TURN_TOKEN_THRESHOLD`, *"the silent-death signature"*.
+
+It is a mitigation, not a guarantee: `MAX_REPLY_NAGS = 2`, and we watched it exhaust once without
+producing a message. Its own docs say so — *"the guard exists to catch accidental omission, not to
+compel speech."*
+
+Mother and Brett are now on `buzz-agent`. Brett takes the dense `qwen3.8:27b` rather than the MoE:
+his work is sustained multi-step tool use, which is the axis a 3B-active model was weakest on.
+
+## Core memory had never worked, for any agent
+
+`buzz mem set core` returned, in full:
+
+```json
+{"error":"user_error",
+ "message":"owner pubkey required (set BUZZ_AUTH_TAG with a NIP-OA attestation or pass --owner)"}
+```
+
+`BUZZ_AUTH_TAG` was never set for any role. Zero `kind:30174` events existed on the relay — no crew
+member had ever remembered anything — while buzz-acp injected *"No core memory found. Use `buzz mem
+set core …`"* into every turn, instructing each agent forever to do a thing that could not succeed.
+
+The owner pubkey is not only authorisation: **the engram is encrypted to it.** That is why the
+command refuses without one.
+
+`mint-auth-tags.py` signs `nostr:agent-auth:<agent_pk>:<conditions>` — SHA-256, BIP-340 Schnorr —
+with the owner key read straight from the macOS Keychain, so it never crossed a terminal or a
+clipboard. The first attempt **refused to sign**: that Keychain item holds every identity Desktop
+manages, and the first key in it was a managed agent's, not the owner's. Selecting by derived
+public key fixed it. Refusing beat guessing.
+
+Verified end to end, on a fresh session with empty history:
+
+```
+Keychain → attestation → "owner resolved from BUZZ_AUTH_TAG: 508cd1c7…"
+        → buzz mem set core → encrypted kind:30174 on the relay
+        → fetched, decrypted and injected as <core-memory> after a restart
+        → she answered from it
+```
+
+Because buzz-acp performs the injection rather than the harness, this memory is portable across
+harnesses — the one thing that would have survived this morning's three swaps.
+
+## What this cost in visibility, and the fix
+
+`buzz-agent` keeps no transcript ("No persistence"), so when she wrote the memory successfully and
+then declined twice to say so, the text was unrecoverable. `--relay-observer` is not the answer:
+`KIND_AGENT_OBSERVER_FRAME` is 24200, ephemeral, never stored.
+
+`acp-tee.sh` sits in the JSON-RPC stdio stream and captures both directions, including
+`agent_message_chunk` text that is never published. Opt-in via `NOSTROMO_ACP_TRACE`, unbuffered on
+every stage because a frame stuck in a tee's 4 KB buffer deadlocks the protocol.
+
+## Corrections to earlier records
+
+- **The WP-4 benchmark's Mother finding is superseded.** Her 0/5 on escalation was attributed to
+  reasoning. The real cause was buzz-acp's stock base prompt, whose "Autonomy" section instructed
+  her to resolve questions herself and surface only what she could not infer — against her core
+  function, every turn. `base-mother.md` drops it. Its Brett finding was measured on the MoE and
+  does not carry to `qwen3.8:27b`.
+- **Prompt size is not why she went quiet.** Delivery looked cleanly size-separated over four
+  turns; an owner-escalation on a fresh 10,087-token session failed anyway.
+- **`supervisor: herdr` and `supervisor: launchd` were both wrong.** All seven are `host: spark`,
+  and launchd does not exist on Linux. Every role now says `systemd` — still aspirational until
+  §13.9, since Mother is a `setsid nohup`, which is neither.
