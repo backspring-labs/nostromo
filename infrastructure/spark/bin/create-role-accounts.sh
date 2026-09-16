@@ -54,6 +54,14 @@ for role in "${ROLES[@]}"; do
   done
   chown -R "$role:$role" "/home/$role/.config/nostromo"
 
+  # Harness and agent state, outside the 700 home so the supervisor can read it without sudo.
+  # Owner is the ROLE and there is no group write: every role is in group `nostromo`, so a
+  # group-writable log directory would let any role empty any other role's record — and a role
+  # with a shell tool would be able to destroy the evidence of what it did. Group `nostromo` gets
+  # read only. Superseded by journald once nostromo@<role>.service exists (WP-6 amendment).
+  install -d -m 755 -o nostromo -g nostromo /opt/nostromo/logs
+  install -d -m 2750 -o "$role" -g nostromo "/opt/nostromo/logs/$role"
+
   # Refuse to leave a role holding an escalation.
   for forbidden in sudo docker adm; do
     if id -nG "$role" | tr ' ' '\n' | grep -qx "$forbidden"; then

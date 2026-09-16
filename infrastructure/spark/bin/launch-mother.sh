@@ -187,6 +187,17 @@ cd "$WORKDIR"
 # group-readable location under /opt/nostromo so the supervisor account can read it directly.
 # Contents are prompts and channel text, both of which already exist in the relay; no key is
 # written here (buzz-acp logs the PUBLIC key only).
+# Logs a role can delete are not evidence. On 2026-09-16 this directory was created group-writable
+# under group `nostromo`, which every role is a member of — so any role could have destroyed any
+# other role's record, and Mother had a shell. The repo hit the same class of bug in a89dc91.
+# Provisioned by root (create-role-accounts.sh); asserted here so a mis-provisioned role fails
+# loudly at launch rather than logging into a directory its siblings can empty.
+[[ -d "$LOGDIR" ]] || die "$LOGDIR does not exist — provision it as root, owner $ROLE, group nostromo, mode 2750"
+LOGDIR_OWNER="$(stat -c '%U' "$LOGDIR")"
+LOGDIR_MODE="$(stat -c '%a' "$LOGDIR")"
+[[ "$LOGDIR_OWNER" == "$ROLE" ]] || die "$LOGDIR is owned by $LOGDIR_OWNER, must be $ROLE"
+[[ "$LOGDIR_MODE" == "2750" ]] || die "$LOGDIR is mode $LOGDIR_MODE, must be 2750 (no group write)"
+
 export XDG_DATA_HOME="$LOGDIR/xdg"
 umask 007
 install -d -m 2770 "$XDG_DATA_HOME" 2>/dev/null || true
