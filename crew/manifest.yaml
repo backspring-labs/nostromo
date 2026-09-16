@@ -156,8 +156,12 @@ agents:
     supervisor: systemd
     harness: buzz-agent
     provider: ollama
-    model: qwen3.6-35b-a3b
-    ollama_tag: qwen3.6:35b-a3b
+    # Dense, not the MoE Mother runs. Brett's work is sustained multi-step tool use — run the
+    # suite, read output, edit, re-run — which is the adherence-under-load axis where a 3B-active
+    # MoE was weakest on 2026-09-15. It is also already resident for other work on this box, so
+    # it costs no additional VRAM beside Mother's model.
+    model: qwen3.8-27b
+    ollama_tag: qwen3.8:27b
     budget_profile: local
     workspace_profile: verification
     respond_to: allowlist
