@@ -265,7 +265,11 @@ if [[ -n "${NOSTROMO_ACP_TRACE:-}" ]]; then
   TEE="$REPO/infrastructure/spark/bin/acp-tee.sh"
   [[ -x "$TEE" ]] || die "NOSTROMO_ACP_TRACE set but $TEE is not executable"
   AGENT_CMD="$TEE"
-  AGENT_ARGS=(--agent-args "$LOGDIR $HARNESS${HARNESS_ARGS:+ $HARNESS_ARGS}")
+  # One value per --agent-args flag: buzz-acp collects them into a Vec, it does not split on
+  # whitespace. Passing "$LOGDIR $HARNESS" as one value handed the tee a single argument and no
+  # agent command at all.
+  AGENT_ARGS=(--agent-args "$LOGDIR" --agent-args "$HARNESS")
+  [[ -n "$HARNESS_ARGS" ]] && AGENT_ARGS+=(--agent-args "$HARNESS_ARGS")
   echo "launch-$ROLE: ACP tracing ON — stdio captured to $LOGDIR/acp/" >&2
 fi
 
