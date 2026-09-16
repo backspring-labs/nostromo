@@ -62,9 +62,19 @@ for role in "${roles[@]}"; do
     pkill -u "$role" -x buzz-acp || true
     sleep 2
   fi
-  systemctl enable --now "nostromo@$role"
-  sleep 3
-  printf '  %s: %s\n' "$role" "$(systemctl is-active "nostromo@$role")"
+  systemctl enable "nostromo@$role"
+  # `enable --now` does not restart an already-running unit, so a changed ExecStart or MemoryMax
+  # would silently not take effect until the next reboot — the exact failure this installer exists
+  # to prevent.
+  if systemctl is-active --quiet "nostromo@$role"; then
+    echo "  $role: already active, restarting to pick up the unit"
+    systemctl restart "nostromo@$role"
+  else
+    systemctl start "nostromo@$role"
+  fi
+  sleep 4
+  printf '  %s: %s  (pid %s)\n' "$role" "$(systemctl is-active "nostromo@$role")" \
+    "$(systemctl show "nostromo@$role" -p MainPID --value)"
 done
 
 echo
