@@ -24,6 +24,7 @@ agents:
     harness: opencode-acp
     provider: ollama
     model: qwen3.6-35b-a3b
+    ollama_tag: qwen3.6:35b-a3b
     budget_profile: local
     workspace_profile: control
     respond_to: allowlist
@@ -152,6 +153,7 @@ agents:
     harness: opencode-acp
     provider: ollama
     model: qwen3.6-35b-a3b
+    ollama_tag: qwen3.6:35b-a3b
     budget_profile: local
     workspace_profile: verification
     respond_to: allowlist

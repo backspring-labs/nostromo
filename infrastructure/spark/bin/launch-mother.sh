@@ -20,7 +20,6 @@ MANIFEST="$REPO/crew/manifest.yaml"
 ALLOWFILE="$REPO/crew/allowlist.yaml"
 PERSONA="$REPO/crew/personas/$ROLE.md"
 INSTRUCTIONS="$REPO/instructions.md"
-OPENCODE_SRC="$REPO/crew/opencode/$ROLE.json"
 BASE_PROMPT="$REPO/crew/prompts/base-$ROLE.md"
 
 die() { echo "launch-$ROLE: $*" >&2; exit 1; }
@@ -31,15 +30,15 @@ die() { echo "launch-$ROLE: $*" >&2; exit 1; }
 # The runtime is not on a login shell's PATH. Source the file install-base.sh wrote rather than
 # re-deriving it here, so there is one definition of where the runtime lives.
 #
-# This matters twice over: buzz-acp spawns `opencode` by name, AND the agent speaks by running
-# `buzz` — both live here. A missing PATH fails loudly for the first and SILENTLY for the second,
+# This matters twice over: buzz-acp spawns `buzz-agent` by name, AND the agent speaks by running
+# `buzz` through its MCP shell tool — both live here. A missing PATH fails loudly for the first and SILENTLY for the second,
 # which is a mute agent with a healthy-looking process. Hand-launching hid this by inheriting an
 # interactive shell's PATH.
 ENV_SH="${NOSTROMO_ENV:-/opt/nostromo/runtime/env.sh}"
 [[ -r "$ENV_SH" ]] || die "missing $ENV_SH — was install-base.sh run on this host?"
 # shellcheck source=/dev/null
 source "$ENV_SH"
-for b in buzz-acp opencode buzz; do
+for b in buzz-acp buzz-agent buzz-dev-mcp buzz; do
   command -v "$b" >/dev/null 2>&1 || die "$b is not on PATH after sourcing $ENV_SH"
 done
 
@@ -58,7 +57,7 @@ yaml_agent() {  # yaml_agent <key>   (under agents: <ROLE>:)
     ina && role == r && $1 == k":" { print $2; exit }' "$MANIFEST"
 }
 
-for f in "$MANIFEST" "$ALLOWFILE" "$PERSONA" "$INSTRUCTIONS" "$OPENCODE_SRC" "$BASE_PROMPT"; do
+for f in "$MANIFEST" "$ALLOWFILE" "$PERSONA" "$INSTRUCTIONS" "$BASE_PROMPT"; do
   [[ -r "$f" ]] || die "missing or unreadable: $f  (run push-repo.sh from the Mac)"
 done
 
@@ -88,24 +87,19 @@ ALLOWLIST="$(awk -v r="$ROLE" '/^allowlists:/ { ina = 1; next } ina && $1 == r":
 [[ -n "$ALLOWLIST"  ]] || die "no allowlist for $ROLE in $ALLOWFILE"
 [[ -n "$RESPOND_TO" ]] || die "no respond_to for $ROLE in the manifest"
 
-# ---- §13.2.10 OpenCode → local Ollama/Qwen --------------------------------------------------
-# Mother is local-inference-only (crew constitution, "Budget and blocked state"). That is a claim
-# about a config file, so assert it rather than trust it: on 2026-09-15 this script installed a
-# profile with no provider block at all, OpenCode silently fell back to its own default, and a
-# turn was served by a hosted model with no error anywhere. Fail closed instead.
-PINNED_MODEL="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("model",""))' "$OPENCODE_SRC")"
-case "$PINNED_MODEL" in
-  ollama/*) ;;
-  "")  die "$OPENCODE_SRC pins no model — OpenCode would pick its own default provider" ;;
-  *)   die "$OPENCODE_SRC pins '$PINNED_MODEL'; $ROLE is local-inference-only and needs an ollama/* model" ;;
-esac
-python3 -c 'import json,sys; c=json.load(open(sys.argv[1])); sys.exit(0 if "ollama" in c.get("provider",{}) else 1)' "$OPENCODE_SRC" \
-  || die "$OPENCODE_SRC has no provider.ollama block"
+# ---- §13.2.10 buzz-agent → local Ollama/Qwen ------------------------------------------------
+# Mother is local-inference-only (crew constitution, "Budget and blocked state"). buzz-agent takes
+# its provider from the environment, so assert it here rather than trusting it: on 2026-09-15 an
+# OpenCode profile with no provider block silently served a turn from a hosted model, with no error
+# and nothing in Ollama's journal. Fail closed instead.
+OLLAMA_TAG="$(yaml_agent ollama_tag)"
+PROVIDER="$(yaml_agent provider)"
+[[ "$PROVIDER" == "ollama" ]] || die "manifest says provider=$PROVIDER; $ROLE is local-inference-only"
+[[ -n "$OLLAMA_TAG" ]] || die "no ollama_tag for $ROLE in the manifest"
 
-# The model must actually be present locally, or the first turn fails inside a live channel.
-OLLAMA_TAG="${PINNED_MODEL#ollama/}"
-curl -sf --max-time 5 http://localhost:11434/api/tags -o /tmp/.nostromo-tags.$$ \
-  || die "Ollama is not answering on localhost:11434"
+OLLAMA_URL="http://localhost:11434"
+curl -sf --max-time 5 "$OLLAMA_URL/api/tags" -o /tmp/.nostromo-tags.$$ \
+  || die "Ollama is not answering on $OLLAMA_URL"
 python3 -c 'import json,sys; ms=[m["name"] for m in json.load(open(sys.argv[1]))["models"]]; sys.exit(0 if sys.argv[2] in ms else 1)' \
   /tmp/.nostromo-tags.$$ "$OLLAMA_TAG" || { rm -f /tmp/.nostromo-tags.$$; die "Ollama has no model tagged $OLLAMA_TAG"; }
 rm -f /tmp/.nostromo-tags.$$
@@ -133,6 +127,12 @@ rm -f /tmp/.nostromo-tags.$$
 #                        Never --no-base-prompt: that drops the CLI contract entirely and makes
 #                        her mute, which is how she failed on 2026-09-15.
 #
+#                        NOTE: buzz-agent's reply guard (BUZZ_AGENT_REQUIRE_REPLY below) documents
+#                        that it deliberately tolerates silence because the stock base prompt says
+#                        "publishing is optional and silence is usually correct". base-mother.md
+#                        removes that line on purpose — she only ever runs when mentioned — so the
+#                        guard and the prompt point the same way rather than against each other.
+#
 # Session size is NOT why she goes quiet. Delivery looked size-separated over four turns, but an
 # owner-escalation on a fresh 10,087-token session failed too. The real split is who she is
 # addressing: crew routing delivered 4/5, owner escalation 0/3. See the persona's escalation block.
@@ -153,17 +153,14 @@ launch-$ROLE: resolved configuration
   base prompt     $BASE_PROMPT ($(wc -c <"$BASE_PROMPT") bytes, vs 18239 compiled-in)
   persona         $PERSONA
   instructions    $INSTRUCTIONS ($(wc -c <"$INSTRUCTIONS") bytes)
-  opencode        $HOME/.config/opencode/opencode.json
-  model           $(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("model","NONE PINNED"))' "$OPENCODE_SRC")
+  agent           buzz-agent + buzz-dev-mcp (shell, read_file, str_replace, todo, view_image)
+  model           $OLLAMA_TAG via $OLLAMA_URL/v1 (provider=$PROVIDER)
   workdir         $WORKDIR
   logs            $LOGDIR
   runtime         $(dirname "$(command -v buzz-acp)")  (buzz: $(command -v buzz))
 INFO
 
 [[ "${1:-}" == "--print" ]] && exit 0
-
-install -d -m 700 "$HOME/.config/opencode"
-install -m 600 "$OPENCODE_SRC" "$HOME/.config/opencode/opencode.json"
 
 # ---- §13.2.11 non-destructive working directory ---------------------------------------------
 # Not $HOME: OpenCode warns that a home directory is too broad ("Can not run certain FFF features
@@ -194,13 +191,26 @@ export XDG_DATA_HOME="$LOGDIR/xdg"
 umask 007
 install -d -m 2770 "$XDG_DATA_HOME" 2>/dev/null || true
 
+# buzz-agent's provider, from the manifest rather than from whatever is in the environment.
+# OPENAI_COMPAT_* is the OpenAI-compatible path; buzz-agent's own docs name Ollama as a target.
+# The API key is required by the provider contract and ignored by Ollama — it is not a secret.
+export BUZZ_AGENT_PROVIDER=openai
+export OPENAI_COMPAT_BASE_URL="$OLLAMA_URL/v1"
+export OPENAI_COMPAT_MODEL="$OLLAMA_TAG"
+export OPENAI_COMPAT_API_KEY=ollama-local-no-auth
+
+# The reason for this harness. buzz-agent reminds the model when a turn is about to end with no
+# recognized `buzz messages send`, which is the exact failure that lost a third of Mother's
+# answers under OpenCode. Advisory: at most two reminders, then the turn ends regardless.
+export BUZZ_AGENT_REQUIRE_REPLY=1
+
 export BUZZ_PRIVATE_KEY="$(cat "$KEYFILE")"
 export BUZZ_RELAY_URL="$RELAY_URL"
 
 # exec, so the process this script starts is the process a supervisor will later watch and signal.
 exec buzz-acp \
-  --agent-command opencode \
-  --agent-args acp \
+  --agent-command buzz-agent \
+  --mcp-command buzz-dev-mcp \
   --agent-owner "$OWNER_PUB" \
   --respond-to "$RESPOND_TO" \
   --respond-to-allowlist "$ALLOWLIST" \
