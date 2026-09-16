@@ -7,9 +7,13 @@ relay:
   owner_pubkey: 508cd1c7dbcddcc93b8168923cac49ef28bb02f0e60de549e44b01000d2bce5f
 owner:
   display_name: Jason
+  # How Buzz actually renders him, and how an agent must @mention him. Drifted from display_name
+  # above, which cost Mother every escalation she tried on 2026-09-15: she hunted for "owner" and
+  # "Jason", found "jladd", and gave up mid-turn.
+  buzz_display_name: jladd
   github_login: jasonLadd
   nip05: jason@nano.tailc69e7d.ts.net
-  buzz_pubkey: null
+  buzz_pubkey: 508cd1c7dbcddcc93b8168923cac49ef28bb02f0e60de549e44b01000d2bce5f
 agents:
   mother:
     display_name: Mother
