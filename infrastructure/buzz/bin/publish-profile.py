@@ -25,7 +25,7 @@ import urllib.request
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import nostr_keys as nk  # noqa: E402
 
-MANIFEST = os.environ.get("NOSTROMO_MANIFEST", "/opt/nostromo/nostromo/crew/manifest.yaml")
+MANIFEST = os.environ.get("NOSTROMO_MANIFEST", "/opt/nostromo/nostromo-src/crew/manifest.yaml")
 KEY = pathlib.Path.home() / ".config/nostromo/secrets/buzz.key"
 DRY = "--dry-run" in sys.argv
 

@@ -11,7 +11,7 @@
 set -euo pipefail
 
 ROLE=mother
-REPO="${NOSTROMO_REPO:-/opt/nostromo/nostromo}"
+REPO="${NOSTROMO_REPO:-/opt/nostromo/nostromo-src}"
 RUNTIME_BIN="${NOSTROMO_RUNTIME_BIN:-/opt/nostromo/runtime/bin}"
 SECRETS="$HOME/.config/nostromo/secrets"
 WORKDIR="$HOME/workspace"          # §13.2.11

@@ -20,8 +20,8 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
   git status --short >&2
   exit 1
 fi
-BARE=/opt/nostromo/nostromo.git
-WORK=/opt/nostromo/nostromo
+BARE=/opt/nostromo/nostromo-src.git
+WORK=/opt/nostromo/nostromo-src
 
 ssh "$TARGET" "test -d $BARE || { git init --quiet --bare $BARE && \
   git --git-dir=$BARE symbolic-ref HEAD refs/heads/main; }"

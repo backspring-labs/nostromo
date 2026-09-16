@@ -108,7 +108,7 @@ cat > "$ROOT/env.sh" <<EOF
 export NOSTROMO_RUNTIME="$ROOT"
 export PATH="$BIN:\$PATH"
 export npm_config_prefix="$ROOT/npm"
-# The shared repo at /opt/nostromo/nostromo is read-only configuration every role reads. Without
+# The shared repo at /opt/nostromo/nostromo-src is read-only configuration every role reads. Without
 # this, running a script from it leaves a __pycache__ owned by whichever role ran first — which is
 # how that tree was found to be group-writable at all.
 export PYTHONDONTWRITEBYTECODE=1

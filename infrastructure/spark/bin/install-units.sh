@@ -5,7 +5,7 @@
 #         install-units.sh --dry-run [role ...]
 set -euo pipefail
 
-REPO="${NOSTROMO_REPO:-/opt/nostromo/nostromo}"
+REPO="${NOSTROMO_REPO:-/opt/nostromo/nostromo-src}"
 UNIT_SRC="$REPO/infrastructure/spark/systemd/nostromo@.service"
 UNIT_DST=/etc/systemd/system/nostromo@.service
 
