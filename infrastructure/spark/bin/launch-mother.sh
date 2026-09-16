@@ -15,6 +15,7 @@ REPO="${NOSTROMO_REPO:-/opt/nostromo/nostromo}"
 RUNTIME_BIN="${NOSTROMO_RUNTIME_BIN:-/opt/nostromo/runtime/bin}"
 SECRETS="$HOME/.config/nostromo/secrets"
 WORKDIR="$HOME/workspace"          # §13.2.11
+LOGDIR="${NOSTROMO_LOGDIR:-/opt/nostromo/logs/$ROLE}"
 MANIFEST="$REPO/crew/manifest.yaml"
 ALLOWFILE="$REPO/crew/allowlist.yaml"
 PERSONA="$REPO/crew/personas/$ROLE.md"
@@ -131,6 +132,7 @@ launch-$ROLE: resolved configuration
   opencode        $HOME/.config/opencode/opencode.json
   model           $(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("model","NONE PINNED"))' "$OPENCODE_SRC")
   workdir         $WORKDIR
+  logs            $LOGDIR
   runtime         $(dirname "$(command -v buzz-acp)")  (buzz: $(command -v buzz))
 INFO
 
@@ -158,6 +160,16 @@ if pgrep -u "$ROLE" -x buzz-acp >/dev/null 2>&1; then
 fi
 
 cd "$WORKDIR"
+
+# An agent whose logs live in a 700 home costs the operator a sudo round trip per question, which
+# on 2026-09-15 is most of what diagnosing this role cost. Point OpenCode's data dir at a
+# group-readable location under /opt/nostromo so the supervisor account can read it directly.
+# Contents are prompts and channel text, both of which already exist in the relay; no key is
+# written here (buzz-acp logs the PUBLIC key only).
+export XDG_DATA_HOME="$LOGDIR/xdg"
+umask 007
+install -d -m 2770 "$XDG_DATA_HOME" 2>/dev/null || true
+
 export BUZZ_PRIVATE_KEY="$(cat "$KEYFILE")"
 export BUZZ_RELAY_URL="$RELAY_URL"
 
