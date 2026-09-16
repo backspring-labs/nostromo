@@ -119,6 +119,12 @@ rm -f /tmp/.nostromo-tags.$$
 #                        and make her mute, which is how she failed on 2026-09-15.
 #   <agent-instructions> --system-prompt-file, the persona
 #   <team-instructions>  --team-instructions, the crew constitution
+#
+# --no-memory: NIP-AE core memory is on by default, and on 2026-09-15 Mother used it to write
+# herself a roster with the names mangled ("rippy/rippler->ripley"), which would then have been
+# injected into every later prompt. A self-authored store that silently steers routing is a second
+# source of truth competing with crew/manifest.yaml, and the constitution puts durable state in
+# external storage. Drop the flag to re-enable once there is a reason to.
 TEAM_INSTRUCTIONS="$(cat "$INSTRUCTIONS")"
 
 cat <<INFO
@@ -183,4 +189,5 @@ exec buzz-acp \
   --allowed-respond-to owner-only,allowlist \
   --system-prompt-file "$PERSONA" \
   --team-instructions "$TEAM_INSTRUCTIONS" \
-  --session-title "$ROLE"
+  --session-title "$ROLE" \
+  --no-memory
