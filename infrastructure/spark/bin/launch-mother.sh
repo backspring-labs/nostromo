@@ -132,6 +132,14 @@ rm -f /tmp/.nostromo-tags.$$
 #
 #                        Never --no-base-prompt: that drops the CLI contract entirely and makes
 #                        her mute, which is how she failed on 2026-09-15.
+#
+# --max-turns-per-session 3: the trim bought ~3,300 tokens and conversation history put them back
+# within two turns. Measured on 2026-09-15, delivery separates cleanly by prompt size — 8,980 and
+# 10,133 delivered, 12,252 and 12,596 did not — so a session that grows unbounded goes quiet on a
+# schedule. Rotating at 3 keeps the peak near 11.4K. The cost is conversational continuity, which
+# for a router answering discrete questions is small, and the base prompt tells her to rebuild
+# state with `buzz messages get`. Raise it if delivery holds; this number is a measurement, not a
+# belief.
 #   <agent-instructions> --system-prompt-file, the persona
 #   <team-instructions>  --team-instructions, the crew constitution
 #
@@ -204,4 +212,5 @@ exec buzz-acp \
   --base-prompt-file "$BASE_PROMPT" \
   --system-prompt-file "$PERSONA" \
   --team-instructions "$TEAM_INSTRUCTIONS" \
-  --session-title "$ROLE"
+  --session-title "$ROLE" \
+  --max-turns-per-session 3
