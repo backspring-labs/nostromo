@@ -120,11 +120,9 @@ rm -f /tmp/.nostromo-tags.$$
 #   <agent-instructions> --system-prompt-file, the persona
 #   <team-instructions>  --team-instructions, the crew constitution
 #
-# --no-memory: NIP-AE core memory is on by default, and on 2026-09-15 Mother used it to write
-# herself a roster with the names mangled ("rippy/rippler->ripley"), which would then have been
-# injected into every later prompt. A self-authored store that silently steers routing is a second
-# source of truth competing with crew/manifest.yaml, and the constitution puts durable state in
-# external storage. Drop the flag to re-enable once there is a reason to.
+# NIP-AE core memory stays ON (buzz-acp's default). It is a signed kind:30174 on the relay — the
+# same durable external storage the constitution asks for — and what Mother writes there is
+# readable under $LOGDIR, so it can be judged on evidence rather than assumed to be a risk.
 TEAM_INSTRUCTIONS="$(cat "$INSTRUCTIONS")"
 
 cat <<INFO
@@ -189,5 +187,4 @@ exec buzz-acp \
   --allowed-respond-to owner-only,allowlist \
   --system-prompt-file "$PERSONA" \
   --team-instructions "$TEAM_INSTRUCTIONS" \
-  --session-title "$ROLE" \
-  --no-memory
+  --session-title "$ROLE"
