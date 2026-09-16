@@ -72,9 +72,17 @@ if [[ "${NOSTROMO_SKIP_VENV:-}" == "" ]]; then
     echo "provision-clone: creating .venv (python 3.12)"
     uv venv --python 3.12 --quiet .venv || die "venv creation failed"
   fi
-  echo "provision-clone: installing the package against ci-constraints.txt"
-  VIRTUAL_ENV="$PWD/.venv" uv pip install --quiet -e . -c ci-constraints.txt \
-    || die "package install failed"
+  echo "provision-clone: installing the package and pinned test requirements"
+  export VIRTUAL_ENV="$PWD/.venv"
+  # Two installs, checked separately. `if ! A && B` only runs B when A succeeds, which is how an
+  # earlier version of validate-worktrees.sh skipped the test requirements entirely and then
+  # blamed the gate for not finding ruff.
+  uv pip install --quiet -e . -c ci-constraints.txt || die "package install failed"
+  uv pip install --quiet -r tests/requirements.txt -c ci-constraints.txt \
+    || die "test requirements install failed"
+  for tool in ruff pytest; do
+    [[ -x ".venv/bin/$tool" ]] || die "$tool missing after install — the checkout cannot verify anything"
+  done
 fi
 
 cat <<INFO
