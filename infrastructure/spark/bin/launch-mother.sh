@@ -92,6 +92,21 @@ ALLOWLIST="$(awk -v r="$ROLE" '/^allowlists:/ { ina = 1; next } ina && $1 == r":
 [[ -n "$ALLOWLIST"  ]] || die "no allowlist for $ROLE in $ALLOWFILE"
 [[ -n "$RESPOND_TO" ]] || die "no respond_to for $ROLE in the manifest"
 
+# NIP-OA owner attestation. Without it `buzz mem set` fails with "owner pubkey required", so the
+# agent cannot write core memory — and buzz-acp injects an onboarding nudge every turn telling it
+# to do exactly that, which it then cannot do. The tag is public (it proves owner->agent binding;
+# acting as the agent still needs the agent's key), so it lives in the manifest. Mint it with
+# infrastructure/buzz/bin/mint-auth-tags.py on the machine holding the owner key.
+AUTH_TAG="$(yaml_agent buzz_auth_tag)"
+AUTH_TAG="${AUTH_TAG%\'}"; AUTH_TAG="${AUTH_TAG#\'}"
+if [[ -n "$AUTH_TAG" ]]; then
+  export BUZZ_AUTH_TAG="$AUTH_TAG"
+else
+  echo "launch-$ROLE: WARNING no buzz_auth_tag in the manifest — core memory will not persist," >&2
+  echo "launch-$ROLE:         and the harness nudges for one every turn. See mint-auth-tags.py." >&2
+fi
+
+
 # ---- §13.2.10 buzz-agent → local Ollama/Qwen ------------------------------------------------
 # Mother is local-inference-only (crew constitution, "Budget and blocked state"). buzz-agent takes
 # its provider from the environment, so assert it here rather than trusting it: on 2026-09-15 an
@@ -162,6 +177,7 @@ launch-$ROLE: resolved configuration
   model           $OLLAMA_TAG via $OLLAMA_URL/v1 (provider=$PROVIDER)
   workdir         $WORKDIR
   logs            $LOGDIR
+  auth tag        ${AUTH_TAG:+present, ${#AUTH_TAG} bytes}${AUTH_TAG:-ABSENT — core memory disabled}
   runtime         $(dirname "$(command -v buzz-acp)")  (buzz: $(command -v buzz))
 INFO
 
