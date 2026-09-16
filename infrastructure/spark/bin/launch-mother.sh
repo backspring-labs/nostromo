@@ -40,13 +40,6 @@ ENV_SH="${NOSTROMO_ENV:-/opt/nostromo/runtime/env.sh}"
 [[ -r "$ENV_SH" ]] || die "missing $ENV_SH — was install-base.sh run on this host?"
 # shellcheck source=/dev/null
 source "$ENV_SH"
-[[ -n "$HARNESS" ]] || HARNESS="$(yaml_agent harness)"
-case "$HARNESS" in buzz-agent|goose) ;; *) die "unsupported harness '$HARNESS' — expected buzz-agent or goose" ;; esac
-
-for b in buzz-acp "$HARNESS" buzz-dev-mcp buzz; do
-  command -v "$b" >/dev/null 2>&1 || die "$b is not on PATH after sourcing $ENV_SH"
-done
-
 # ---- small YAML readers -------------------------------------------------------------------
 # The manifest is deliberately flat. Parsing it with awk keeps this script dependency-free on a
 # box where a missing python module at launch time would read as "the agent is down".
@@ -64,6 +57,13 @@ yaml_agent() {  # yaml_agent <key>   (under agents: <ROLE>:)
 
 for f in "$MANIFEST" "$ALLOWFILE" "$PERSONA" "$INSTRUCTIONS" "$BASE_PROMPT"; do
   [[ -r "$f" ]] || die "missing or unreadable: $f  (run push-repo.sh from the Mac)"
+done
+
+[[ -n "$HARNESS" ]] || HARNESS="$(yaml_agent harness)"
+case "$HARNESS" in buzz-agent|goose) ;; *) die "unsupported harness '$HARNESS' — expected buzz-agent or goose" ;; esac
+
+for b in buzz-acp "$HARNESS" buzz-dev-mcp buzz; do
+  command -v "$b" >/dev/null 2>&1 || die "$b is not on PATH after sourcing $ENV_SH"
 done
 
 # ---- §13.2.4 stable key, §13.2.3 secret file ------------------------------------------------
