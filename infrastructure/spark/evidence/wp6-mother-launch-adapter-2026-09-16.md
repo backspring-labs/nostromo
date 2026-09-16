@@ -267,3 +267,53 @@ her own record. Logs an agent can erase are not evidence. journald under §13.11
 Also settled here: telling her where the crew files live cut a routing turn from fifteen tool
 calls to two. She had been reconstructing the roster from `buzz users get` because she was looking
 in `~/workspace`, which is empty by design, rather than `/opt/nostromo/nostromo/crew/`.
+
+---
+
+# §13.11 and §13.6 — systemd owns existence, 2026-09-16
+
+`nostromo@.service` installed; `nostromo@mother` enabled and active.
+
+```
+MainPID 426362   ppid=1   User=mother   MemoryMax=4G
+journald: nostromo-mother[426362] … owner resolved from BUZZ_AUTH_TAG … presence set to online
+```
+
+**Persistence probe, as the amendment redefines it** — not "detach a terminal", which proves
+nothing about an unattended service, but kill the process outright:
+
+```
+systemctl kill -s KILL nostromo@mother
+  → MainPID 426362 → 429463      NRestarts: 1      active
+  → owner resolved from BUZZ_AUTH_TAG → subscribed to channel → presence online
+  → answered in #nostromo from the same identity
+```
+
+Killed without warning, rebuilt in about ten seconds, same identity, still addressable. **The
+agent survived the destruction of its own process.** That was not true of a Herdr pane, and it was
+not true this morning when she was a `setsid nohup`.
+
+journald also closes the §13.5 gap that had no probe: a role cannot delete its own journal, where
+it could delete `harness.log` in a directory it owned.
+
+**What MemoryMax=4G is not.** It caps the harness — buzz-acp and buzz-agent, both small. The 29 GB
+model lives in `ollama.service`, so this is a runaway guard, not the §36 memory interlock. That
+interlock belongs on Ollama and is still unbuilt.
+
+**Measured on an idle GPU**, for sizing that interlock later:
+
+| | |
+|---|---|
+| prompt eval | 4,957 tok in 1.90s = 2,616 tok/s |
+| generation | 150 tok in 2.21s = 68 tok/s |
+| realistic turn | 4.55s |
+
+Her live turns ran 13,000–15,400 input tokens by the end of a long session, so ~6s of prompt eval
+before a token appears. Latency is dominated by prompt size, not model speed —
+`--max-turns-per-session` and `--context-message-limit` are the levers, on latency grounds. They
+are not a delivery fix; that hypothesis was tested and disproved.
+
+**Also found and fixed:** `BUZZ_AGENT_MAX_ROUNDS` defaults to 0, meaning unlimited. Mother
+published the same routing answer five times in 56 seconds and was still going at 48 LLM calls,
+with every tool call reporting success — nothing was failing and nothing would have stopped her
+short of a two-hour turn cap. Now 12 for an orchestrator, per-role.
