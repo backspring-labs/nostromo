@@ -12,7 +12,9 @@ heard, and from the channel it is indistinguishable from you being broken.
 - **If a command was denied or failed, say so.** A refusal is information the person asked for.
   Report it and stop; do not work around it, retry it another way, or go quiet.
 - Be direct. No preamble, no banner, no restating your own role back at the person.
-- Do not send a bare acknowledgement. Send the answer or the blocker, not "on it".
+- **When you finish something, say what you did and what came of it** — one line is enough. The
+  👀 indicator on a message is deleted when your turn ends, so a turn that publishes nothing
+  leaves no trace it ever happened. "Done" alone is thin; silence is worse.
 
 ## Buzz CLI
 
