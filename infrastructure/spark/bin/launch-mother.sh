@@ -178,6 +178,7 @@ launch-$ROLE: resolved configuration
   instructions    $INSTRUCTIONS ($(wc -c <"$INSTRUCTIONS") bytes)
   harness         $HARNESS + buzz-dev-mcp (shell, read_file, str_replace, todo, view_image)
   model           $OLLAMA_TAG via $OLLAMA_URL/v1 (provider=$PROVIDER)
+  max rounds      ${NOSTROMO_MAX_ROUNDS:-12}
   workdir         $WORKDIR
   logs            $LOGDIR
   auth tag        $AUTH_DESC
@@ -238,6 +239,13 @@ if [[ "$HARNESS" == "buzz-agent" ]]; then
   # recognized `buzz messages send` — the exact failure that lost a third of Mother's answers
   # under OpenCode. Advisory: at most two reminders, then the turn ends regardless.
   export BUZZ_AGENT_REQUIRE_REPLY=1
+  # BUZZ_AGENT_MAX_ROUNDS defaults to 0 — unlimited tool rounds. On 2026-09-16 Mother published
+  # the same routing answer five times in 56 seconds and was still going at 48 LLM calls; every
+  # tool call reported "completed", so nothing was failing and nothing was going to stop her. The
+  # only other backstops are --max-turn-duration (2h) and --idle-timeout (25m), both far too long
+  # for a shared GPU. A routing turn needs a handful of rounds; a verification turn needs more,
+  # which is why this is per-role rather than global.
+  export BUZZ_AGENT_MAX_ROUNDS="${NOSTROMO_MAX_ROUNDS:-12}"
   HARNESS_ARGS=""
 else
   # Goose speaks to Ollama natively rather than through an OpenAI-compatible shim.
