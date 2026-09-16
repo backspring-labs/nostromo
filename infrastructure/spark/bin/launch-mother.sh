@@ -21,6 +21,7 @@ ALLOWFILE="$REPO/crew/allowlist.yaml"
 PERSONA="$REPO/crew/personas/$ROLE.md"
 INSTRUCTIONS="$REPO/instructions.md"
 OPENCODE_SRC="$REPO/crew/opencode/$ROLE.json"
+BASE_PROMPT="$REPO/crew/prompts/base-$ROLE.md"
 
 die() { echo "launch-$ROLE: $*" >&2; exit 1; }
 
@@ -57,7 +58,7 @@ yaml_agent() {  # yaml_agent <key>   (under agents: <ROLE>:)
     ina && role == r && $1 == k":" { print $2; exit }' "$MANIFEST"
 }
 
-for f in "$MANIFEST" "$ALLOWFILE" "$PERSONA" "$INSTRUCTIONS" "$OPENCODE_SRC"; do
+for f in "$MANIFEST" "$ALLOWFILE" "$PERSONA" "$INSTRUCTIONS" "$OPENCODE_SRC" "$BASE_PROMPT"; do
   [[ -r "$f" ]] || die "missing or unreadable: $f  (run push-repo.sh from the Mac)"
 done
 
@@ -114,9 +115,23 @@ rm -f /tmp/.nostromo-tags.$$
 # wiring it here would hand Mother the file-editing tools her permission profile denies.
 #
 # Prompt layering, from `buzz-acp --help`:
-#   <base>               compiled-in Buzz orientation — states that an agent speaks by running
-#                        the `buzz` CLI. NOT overridden here; --no-base-prompt would remove it
-#                        and make her mute, which is how she failed on 2026-09-15.
+#   <base>               --base-prompt-file. buzz-acp's compiled-in default is 18,239 characters
+#                        of coding-agent brief — worktrees, AGENTS.md, git trailers, committing —
+#                        for a role with edit/write denied and no repo. The delivery contract it
+#                        does carry ("you MUST publish", "you MUST reply") sits ~80 lines deep,
+#                        and Mother honoured it about half the time. base-mother.md keeps that
+#                        contract, puts it first, and drops the rest: 2.7 KB instead of 18 KB.
+#
+#                        Two removals are deliberate, not just trimming:
+#                        - "Autonomy" told her to resolve questions herself and pick the safest
+#                          option rather than surface them. Her job is escalating what is not
+#                          hers to decide; that section argued against it every turn.
+#                        - "publishing is optional and silence is usually correct" is true for an
+#                          agent watching a busy channel. Mother only ever runs because she was
+#                          mentioned, so for her, silence is never the right answer.
+#
+#                        Never --no-base-prompt: that drops the CLI contract entirely and makes
+#                        her mute, which is how she failed on 2026-09-15.
 #   <agent-instructions> --system-prompt-file, the persona
 #   <team-instructions>  --team-instructions, the crew constitution
 #
@@ -131,6 +146,7 @@ launch-$ROLE: resolved configuration
   identity        $MANIFEST_PUB
   relay           $RELAY_URL
   respond-to      $RESPOND_TO ($(awk -F, '{print NF}' <<<"$ALLOWLIST") allowlisted + owner)
+  base prompt     $BASE_PROMPT ($(wc -c <"$BASE_PROMPT") bytes, vs 18239 compiled-in)
   persona         $PERSONA
   instructions    $INSTRUCTIONS ($(wc -c <"$INSTRUCTIONS") bytes)
   opencode        $HOME/.config/opencode/opencode.json
@@ -185,6 +201,7 @@ exec buzz-acp \
   --respond-to "$RESPOND_TO" \
   --respond-to-allowlist "$ALLOWLIST" \
   --allowed-respond-to owner-only,allowlist \
+  --base-prompt-file "$BASE_PROMPT" \
   --system-prompt-file "$PERSONA" \
   --team-instructions "$TEAM_INSTRUCTIONS" \
   --session-title "$ROLE"
