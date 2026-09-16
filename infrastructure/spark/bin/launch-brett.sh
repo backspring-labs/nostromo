@@ -281,6 +281,13 @@ if [[ -n "${NOSTROMO_ACP_TRACE:-}" ]]; then
   echo "launch-$ROLE: ACP tracing ON — stdio captured to $LOGDIR/acp/" >&2
 fi
 
+# SquadOps materialises run roots under /tmp/squadops unless told otherwise. That path is shared
+# by every Unix user on this box and is already owned by the owner's account from their own runs,
+# so a role cannot write it: 109 tests failed on a PermissionError that surfaced as "coroutine
+# raised StopIteration" (wp4-worktrees evidence). A root per role also stops two roles colliding.
+export SQUADOPS_RUN_ROOT="${SQUADOPS_RUN_ROOT:-$HOME/.cache/squadops/runs}"
+mkdir -p "$SQUADOPS_RUN_ROOT"
+
 export BUZZ_PRIVATE_KEY="$(cat "$KEYFILE")"
 export BUZZ_RELAY_URL="$RELAY_URL"
 

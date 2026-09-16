@@ -19,6 +19,9 @@ MANIFEST="$REPO/crew/manifest.yaml"
 UPSTREAM="${SQUADOPS_URL:-https://github.com/backspring-labs/squad-ops.git}"
 DEST="${SQUADOPS_DEST:-$HOME/src/squad-ops}"
 
+# uv lives in the Nostromo runtime, not on a login shell PATH.
+source /opt/nostromo/runtime/env.sh
+
 die() { echo "provision-clone: $*" >&2; exit 1; }
 [[ -r "$MANIFEST" ]] || die "missing $MANIFEST — run push-repo.sh from the Mac"
 
@@ -61,6 +64,19 @@ git config user.email "${BOT_UID}+${BOT_LOGIN}@users.noreply.github.com"
 # No stored credential. mint-token.sh issues a short-lived App token at push time.
 git config credential.helper ""
 
+# A clone without tooling is a checkout the role cannot verify anything in — Brett's first lint
+# run had to fall back to `uvx ruff` because no venv existed, which he correctly flagged as a
+# provenance risk: an unpinned ruff is not the one CI runs.
+if [[ "${NOSTROMO_SKIP_VENV:-}" == "" ]]; then
+  if [[ ! -x .venv/bin/python ]]; then
+    echo "provision-clone: creating .venv (python 3.12)"
+    uv venv --python 3.12 --quiet .venv || die "venv creation failed"
+  fi
+  echo "provision-clone: installing the package against ci-constraints.txt"
+  VIRTUAL_ENV="$PWD/.venv" uv pip install --quiet -e . -c ci-constraints.txt \
+    || die "package install failed"
+fi
+
 cat <<INFO
 
 provision-clone: $ROLE
@@ -68,6 +84,7 @@ provision-clone: $ROLE
   origin      $(git remote get-url origin)
   branch      $(git rev-parse --abbrev-ref HEAD) @ $(git log --oneline -1)
   commits as  $(git config user.name) <$(git config user.email)>
+  python      $([[ -x .venv/bin/python ]] && .venv/bin/python --version || echo "no venv")
   size        $(du -sh "$DEST" | cut -f1)
 
 INFO
