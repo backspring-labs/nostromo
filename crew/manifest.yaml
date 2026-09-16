@@ -20,7 +20,11 @@ agents:
     nip05: mother@nostromo.backspring.xyz
     capability: orchestration
     host: spark
-    supervisor: herdr
+    # systemd owns existence (WP-6 amendment). herdr here was the pre-amendment model; launchd
+    # on ash/lambert dated from WP-8 planning them as Mac agents, which the no-crew-on-the-Mac
+    # decision retired — every role is host: spark. Units are nostromo@<role>.service, §13.9,
+    # still unbuilt: today Mother and Brett are a setsid nohup, which is neither.
+    supervisor: systemd
     harness: buzz-agent
     provider: ollama
     model: qwen3.6-35b-a3b
@@ -36,7 +40,7 @@ agents:
     nip05: ash@nostromo.backspring.xyz
     capability: ideation_research
     host: spark
-    supervisor: launchd
+    supervisor: systemd
     harness: codex-acp
     provider: chatgpt
     model: subscription-backed
@@ -51,7 +55,7 @@ agents:
     nip05: ripley@nostromo.backspring.xyz
     capability: architecture
     host: spark
-    supervisor: herdr
+    supervisor: systemd
     harness: codex-acp
     provider: openai
     model: gpt-5.6-sol
@@ -84,7 +88,7 @@ agents:
     nip05: dallas@nostromo.backspring.xyz
     capability: adversarial_review
     host: spark
-    supervisor: herdr
+    supervisor: systemd
     harness: claude-agent-acp
     provider: anthropic
     model_family: opus
@@ -117,7 +121,7 @@ agents:
     nip05: parker@nostromo.backspring.xyz
     capability: implementation
     host: spark
-    supervisor: herdr
+    supervisor: systemd
     harness: codex-acp
     provider: openai
     model: gpt-5.6-sol
@@ -149,7 +153,7 @@ agents:
     nip05: brett@nostromo.backspring.xyz
     capability: verification
     host: spark
-    supervisor: herdr
+    supervisor: systemd
     harness: buzz-agent
     provider: ollama
     model: qwen3.6-35b-a3b
@@ -181,7 +185,7 @@ agents:
     nip05: lambert@nostromo.backspring.xyz
     capability: navigation
     host: spark
-    supervisor: launchd
+    supervisor: systemd
     harness: gemini-acp
     provider: gemini
     model: subscription-backed
