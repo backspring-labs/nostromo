@@ -16,6 +16,8 @@ RUNTIME_BIN="${NOSTROMO_RUNTIME_BIN:-/opt/nostromo/runtime/bin}"
 SECRETS="$HOME/.config/nostromo/secrets"
 WORKDIR="$HOME/workspace"          # §13.2.11
 LOGDIR="${NOSTROMO_LOGDIR:-/opt/nostromo/logs/$ROLE}"
+# Manifest picks the harness; NOSTROMO_HARNESS overrides it for an A/B run without a commit.
+HARNESS="${NOSTROMO_HARNESS:-}"
 MANIFEST="$REPO/crew/manifest.yaml"
 ALLOWFILE="$REPO/crew/allowlist.yaml"
 PERSONA="$REPO/crew/personas/$ROLE.md"
@@ -38,7 +40,10 @@ ENV_SH="${NOSTROMO_ENV:-/opt/nostromo/runtime/env.sh}"
 [[ -r "$ENV_SH" ]] || die "missing $ENV_SH — was install-base.sh run on this host?"
 # shellcheck source=/dev/null
 source "$ENV_SH"
-for b in buzz-acp buzz-agent buzz-dev-mcp buzz; do
+[[ -n "$HARNESS" ]] || HARNESS="$(yaml_agent harness)"
+case "$HARNESS" in buzz-agent|goose) ;; *) die "unsupported harness '$HARNESS' — expected buzz-agent or goose" ;; esac
+
+for b in buzz-acp "$HARNESS" buzz-dev-mcp buzz; do
   command -v "$b" >/dev/null 2>&1 || die "$b is not on PATH after sourcing $ENV_SH"
 done
 
@@ -153,7 +158,7 @@ launch-$ROLE: resolved configuration
   base prompt     $BASE_PROMPT ($(wc -c <"$BASE_PROMPT") bytes, vs 18239 compiled-in)
   persona         $PERSONA
   instructions    $INSTRUCTIONS ($(wc -c <"$INSTRUCTIONS") bytes)
-  agent           buzz-agent + buzz-dev-mcp (shell, read_file, str_replace, todo, view_image)
+  harness         $HARNESS + buzz-dev-mcp (shell, read_file, str_replace, todo, view_image)
   model           $OLLAMA_TAG via $OLLAMA_URL/v1 (provider=$PROVIDER)
   workdir         $WORKDIR
   logs            $LOGDIR
@@ -205,22 +210,37 @@ install -d -m 2770 "$XDG_DATA_HOME" 2>/dev/null || true
 # buzz-agent's provider, from the manifest rather than from whatever is in the environment.
 # OPENAI_COMPAT_* is the OpenAI-compatible path; buzz-agent's own docs name Ollama as a target.
 # The API key is required by the provider contract and ignored by Ollama — it is not a secret.
-export BUZZ_AGENT_PROVIDER=openai
-export OPENAI_COMPAT_BASE_URL="$OLLAMA_URL/v1"
-export OPENAI_COMPAT_MODEL="$OLLAMA_TAG"
-export OPENAI_COMPAT_API_KEY=ollama-local-no-auth
-
-# The reason for this harness. buzz-agent reminds the model when a turn is about to end with no
-# recognized `buzz messages send`, which is the exact failure that lost a third of Mother's
-# answers under OpenCode. Advisory: at most two reminders, then the turn ends regardless.
-export BUZZ_AGENT_REQUIRE_REPLY=1
+if [[ "$HARNESS" == "buzz-agent" ]]; then
+  export BUZZ_AGENT_PROVIDER=openai
+  export OPENAI_COMPAT_BASE_URL="$OLLAMA_URL/v1"
+  export OPENAI_COMPAT_MODEL="$OLLAMA_TAG"
+  export OPENAI_COMPAT_API_KEY=ollama-local-no-auth
+  # The reason for this harness. buzz-agent reminds the model when a turn is about to end with no
+  # recognized `buzz messages send` — the exact failure that lost a third of Mother's answers
+  # under OpenCode. Advisory: at most two reminders, then the turn ends regardless.
+  export BUZZ_AGENT_REQUIRE_REPLY=1
+  AGENT_ARGS=()
+else
+  # Goose speaks to Ollama natively rather than through an OpenAI-compatible shim.
+  export GOOSE_PROVIDER=ollama
+  export GOOSE_MODEL="$OLLAMA_TAG"
+  export OLLAMA_HOST="$OLLAMA_URL"
+  # Unattended: Goose's permission flow is interactive (AllowOnce/DenyOnce/AlwaysDeny), and an
+  # agent nobody is watching cannot answer a prompt. What Mother can do is therefore decided by
+  # which MCP servers are wired below, not by this mode.
+  export GOOSE_MODE=auto
+  # NOTE: Goose has no equivalent of BUZZ_AGENT_REQUIRE_REPLY. It knows nothing about Buzz, so a
+  # turn that ends without `buzz messages send` is silently lost, exactly as under OpenCode.
+  # Whether that matters is what this A/B measures.
+  AGENT_ARGS=(--agent-args acp)
+fi
 
 export BUZZ_PRIVATE_KEY="$(cat "$KEYFILE")"
 export BUZZ_RELAY_URL="$RELAY_URL"
 
 # exec, so the process this script starts is the process a supervisor will later watch and signal.
 exec buzz-acp \
-  --agent-command buzz-agent \
+  --agent-command "$HARNESS" ${AGENT_ARGS[@]+"${AGENT_ARGS[@]}"} \
   --mcp-command buzz-dev-mcp \
   --agent-owner "$OWNER_PUB" \
   --respond-to "$RESPOND_TO" \
