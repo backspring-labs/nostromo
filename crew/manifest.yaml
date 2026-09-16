@@ -33,6 +33,7 @@ agents:
     workspace_profile: control
     respond_to: allowlist
     buzz_pubkey: 0fe13d87cb0051685da767d8de393a2d8fff155fbcf1feeb0b1ca4f877a5b063
+    buzz_auth_tag: '["auth","508cd1c7dbcddcc93b8168923cac49ef28bb02f0e60de549e44b01000d2bce5f","","8703238bd390f3c28e674f5afce86ab0f00de705c6cbd3c3bf207aa8182a9b26d444d72bb3bbed8ed58beef6f42f3fb6af362a33a979611b45cb1e8757992688"]'
     buzz_private_key: spark:~mother/.config/nostromo/secrets/buzz.key
     unix_account: mother
   ash:
@@ -48,6 +49,7 @@ agents:
     workspace_profile: research
     respond_to: allowlist
     buzz_pubkey: e5a173a7e5ce83c5c228398711659f49262b1b768cea33832e78435709317697
+    buzz_auth_tag: '["auth","508cd1c7dbcddcc93b8168923cac49ef28bb02f0e60de549e44b01000d2bce5f","","0c5f6eff4782e55ddd197435064956aa600e1c1d42049928aa5ccf90eee19c63a82c7f0faaca15ce5121cfdd0aa00b78ea043c4ad7c2bd6323c7b3d089226f80"]'
     buzz_private_key: spark:~ash/.config/nostromo/secrets/buzz.key
     unix_account: ash
   ripley:
@@ -80,6 +82,7 @@ agents:
     workspace_profile: architecture
     respond_to: allowlist
     buzz_pubkey: 5dd000d70cfb4316de6a81b7ea30a0eef59302522a9544add0cfc9cacae9ec44
+    buzz_auth_tag: '["auth","508cd1c7dbcddcc93b8168923cac49ef28bb02f0e60de549e44b01000d2bce5f","","4cf4e85d86657932e799d6c06b052f4d2a8c2049852acc6362c1b09f78220eaa58b7503b5f75c20a63c1bd019848a9bb7a9449403de563f78181427650e8e473"]'
     buzz_private_key: spark:~ripley/.config/nostromo/secrets/buzz.key
     unix_account: ripley
     capability_note: architecture, plan authoring, sequencing, and the roadmap
@@ -97,6 +100,7 @@ agents:
     workspace_profile: review
     respond_to: allowlist
     buzz_pubkey: bfdf455488c1bddbb9a61f287c32ec7d940da566e96f6d262f60409b5b6c55a2
+    buzz_auth_tag: '["auth","508cd1c7dbcddcc93b8168923cac49ef28bb02f0e60de549e44b01000d2bce5f","","b45791c01b70209643c9a29e46f1be402a01362b0b42c8821ff2d0a2d4cf8e89b73f927f61ff723e1d38c1ee5455d3851ef24fd3258742d202b67e9ec77c1942"]'
     buzz_private_key: spark:~dallas/.config/nostromo/secrets/buzz.key
     unix_account: dallas
     github:
@@ -146,6 +150,7 @@ agents:
     workspace_profile: implementation
     respond_to: allowlist
     buzz_pubkey: 1a4e1fbefce7f6e0b63123fd86e4dce63a538614eecf443712377b5e557fee47
+    buzz_auth_tag: '["auth","508cd1c7dbcddcc93b8168923cac49ef28bb02f0e60de549e44b01000d2bce5f","","cea8a330dd0d7f1a826a1941113f2168dc365f192ef87cf999b72e04dcd4c9118be49bcc9d8d36d5b43aa7168d5bff5207d7c565ad650fac0dba45987a7bfd5c"]'
     buzz_private_key: spark:~parker/.config/nostromo/secrets/buzz.key
     unix_account: parker
   brett:
@@ -166,6 +171,7 @@ agents:
     workspace_profile: verification
     respond_to: allowlist
     buzz_pubkey: 3b7b029c96843910fc4660d7d22c514d69804f174fff43c74eaaa389b3fef14d
+    buzz_auth_tag: '["auth","508cd1c7dbcddcc93b8168923cac49ef28bb02f0e60de549e44b01000d2bce5f","","794a8ba0bc46f5d5b723196ba4e42bb929d0640225c0dbe4face5c3905eb25d08b0dcfd2bba1e792bee9ee21a9aaeea35cd3d943272eaf1ec0f09cc0ff7eb9e8"]'
     buzz_private_key: spark:~brett/.config/nostromo/secrets/buzz.key
     unix_account: brett
     github:
@@ -197,6 +203,7 @@ agents:
     workspace_profile: knowledge
     respond_to: allowlist
     buzz_pubkey: d17abac99a72f16b48e4548eb1f9220f6de040125e4c1cf05672fafc766085b7
+    buzz_auth_tag: '["auth","508cd1c7dbcddcc93b8168923cac49ef28bb02f0e60de549e44b01000d2bce5f","","3a1161c714371e08634d5757f4e17ee7abd4a9de4999c985ff0881d42146e513268c3127c3ad5611e327f23c36540cfa1897b87a1b16913215bf8f35fa201015"]'
     buzz_private_key: spark:~lambert/.config/nostromo/secrets/buzz.key
     unix_account: lambert
     capability_note: "the release cut sequence (steps 1-4 and 7, never 5, and 6 only on the owner's go),\

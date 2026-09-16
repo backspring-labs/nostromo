@@ -19,10 +19,15 @@ alongside the pubkeys they authorise.
 The OWNER'S KEY IS. It is read from a no-echo prompt, used to sign, and never stored, printed,
 logged, or written anywhere. Run this on the machine that holds it.
 
-Usage:  mint-auth-tags.py [--conditions <str>] [--dry-run]
+Usage:  mint-auth-tags.py [--keychain] [--conditions <str>] [--dry-run]
+
+  --keychain  read the owner key from the macOS Keychain (service "buzz-desktop", account
+              "secrets"), where Buzz Desktop stores it. Avoids the key passing through a
+              terminal, a clipboard or scrollback. macOS will prompt once for access.
 """
 import getpass
 import hashlib
+import subprocess
 import json
 import re
 import sys
@@ -104,7 +109,55 @@ def main() -> int:
     print(f"Minting {len(agents)} attestations from {MANIFEST.relative_to(REPO)}")
     print(f"  conditions: {conditions!r}" + ("  (unscoped)" if not conditions else ""))
     print("\nThe owner key is used to sign and is never stored or displayed.")
-    secret = getpass.getpass("Owner nsec or hex seckey: ").strip()
+    if "--keychain" in args:
+        try:
+            blob = subprocess.run(
+                ["security", "find-generic-password", "-s", "buzz-desktop", "-a", "secrets", "-w"],
+                capture_output=True, text=True, check=True,
+            ).stdout
+        except FileNotFoundError:
+            die("`security` not found — --keychain is macOS only")
+        except subprocess.CalledProcessError:
+            die("Keychain read failed or was denied. Unlock the login keychain and allow access, "
+                "or omit --keychain and paste the key at the prompt.")
+        # The Keychain item holds every identity Buzz Desktop manages, not just the owner's — the
+        # first key in it was a Desktop-managed agent. So collect every candidate and select the
+        # one that derives the manifest's owner pubkey. Selection is by PUBLIC key; no candidate
+        # is ever printed, and non-matching ones are discarded.
+        cands = re.findall(r"nsec1[02-9ac-hj-np-z]{50,}", blob)
+        cands += re.findall(r"(?<![0-9a-f])[0-9a-f]{64}(?![0-9a-f])", blob)
+        del blob
+        if not cands:
+            die("no nsec or 64-hex key found in the Keychain item — omit --keychain and paste it")
+        if not expected_owner:
+            die("the manifest has no owner.buzz_pubkey, so the right key cannot be identified "
+                "among the candidates — omit --keychain and paste it")
+        secret = ""
+        seen = set()
+        for c in cands:
+            if c in seen:
+                continue
+            seen.add(c)
+            h = c
+            if h.startswith("nsec1"):
+                try:
+                    _, h = nk.bech32_decode(h)
+                except Exception:
+                    continue
+            if not re.fullmatch(r"[0-9a-f]{64}", h):
+                continue
+            try:
+                if nk.xonly_pubkey(h) == expected_owner:
+                    secret = h
+                    break
+            except Exception:
+                continue
+        if not secret:
+            die(f"none of the {len(seen)} keys in the Keychain derive the manifest's owner "
+                f"{expected_owner[:16]}… — omit --keychain and paste the owner key instead")
+        print(f"Read owner key from the Keychain ({len(seen)} identities present, matched 1).")
+    else:
+        secret = getpass.getpass("Owner nsec or hex seckey: ").strip()
     if not secret:
         die("no key entered")
     if secret.startswith("nsec1"):
