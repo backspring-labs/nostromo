@@ -238,7 +238,7 @@ if [[ "$HARNESS" == "buzz-agent" ]]; then
   # recognized `buzz messages send` — the exact failure that lost a third of Mother's answers
   # under OpenCode. Advisory: at most two reminders, then the turn ends regardless.
   export BUZZ_AGENT_REQUIRE_REPLY=1
-  AGENT_ARGS=()
+  HARNESS_ARGS=""
 else
   # Goose speaks to Ollama natively rather than through an OpenAI-compatible shim.
   export GOOSE_PROVIDER=ollama
@@ -251,7 +251,22 @@ else
   # NOTE: Goose has no equivalent of BUZZ_AGENT_REQUIRE_REPLY. It knows nothing about Buzz, so a
   # turn that ends without `buzz messages send` is silently lost, exactly as under OpenCode.
   # Whether that matters is what this A/B measures.
-  AGENT_ARGS=(--agent-args acp)
+  HARNESS_ARGS="acp"
+fi
+
+# NOSTROMO_ACP_TRACE=1 routes the agent's stdio through acp-tee.sh, capturing the full JSON-RPC
+# stream — including assistant text that is never published. Off by default: it inserts two
+# processes into the protocol's critical path, and an agent that works is worth more than one we
+# can fully read. Turn it on to diagnose a turn, off again afterwards.
+AGENT_CMD="$HARNESS"
+AGENT_ARGS=()
+[[ -n "$HARNESS_ARGS" ]] && AGENT_ARGS=(--agent-args "$HARNESS_ARGS")
+if [[ -n "${NOSTROMO_ACP_TRACE:-}" ]]; then
+  TEE="$REPO/infrastructure/spark/bin/acp-tee.sh"
+  [[ -x "$TEE" ]] || die "NOSTROMO_ACP_TRACE set but $TEE is not executable"
+  AGENT_CMD="$TEE"
+  AGENT_ARGS=(--agent-args "$LOGDIR $HARNESS${HARNESS_ARGS:+ $HARNESS_ARGS}")
+  echo "launch-$ROLE: ACP tracing ON — stdio captured to $LOGDIR/acp/" >&2
 fi
 
 export BUZZ_PRIVATE_KEY="$(cat "$KEYFILE")"
@@ -259,7 +274,7 @@ export BUZZ_RELAY_URL="$RELAY_URL"
 
 # exec, so the process this script starts is the process a supervisor will later watch and signal.
 exec buzz-acp \
-  --agent-command "$HARNESS" ${AGENT_ARGS[@]+"${AGENT_ARGS[@]}"} \
+  --agent-command "$AGENT_CMD" ${AGENT_ARGS[@]+"${AGENT_ARGS[@]}"} \
   --mcp-command buzz-dev-mcp \
   --agent-owner "$OWNER_PUB" \
   --respond-to "$RESPOND_TO" \
