@@ -57,7 +57,11 @@ echo
 for role in "${roles[@]}"; do
   # A role already running by hand would make the adapter's own single-instance guard fail the
   # unit. Stop the hand-launched one first; it is exactly what the unit replaces.
-  if pgrep -u "$role" -x buzz-acp >/dev/null 2>&1; then
+  #
+  # Only when the unit is NOT already running it: pgrep cannot tell a hand-launched harness from
+  # one systemd owns, and killing a managed process here means systemd restarts it, then this
+  # script restarts it again. Two restarts to change an ExecStart.
+  if ! systemctl is-active --quiet "nostromo@$role" && pgrep -u "$role" -x buzz-acp >/dev/null 2>&1; then
     echo "  $role: stopping hand-launched buzz-acp (pid $(pgrep -u "$role" -x buzz-acp | tr '\n' ' '))"
     pkill -u "$role" -x buzz-acp || true
     sleep 2
