@@ -1,0 +1,64 @@
+# Nostromo crew member, one instance per role: nostromo@mother, nostromo@brett, …
+#
+# WP-6 amendment: systemd owns existence, Buzz owns identity and voice, Herdr owns observation.
+# Before this, roles ran as a `setsid nohup` typed at a prompt — no restart on failure, nothing
+# after a reboot, and a log file the role itself could delete.
+#
+# User=%i is the answer to the question the amendment raised: how does the supervisor start a
+# process as `parker` without holding privilege over `parker`? It does not. systemd does, and
+# start/stop can be delegated for these units alone via polkit.
+#
+# Install:  infrastructure/spark/bin/install-units.sh   (as root)
+# Use:      systemctl enable --now nostromo@mother
+#           systemctl status nostromo@mother
+#           journalctl -u nostromo@mother -f
+
+[Unit]
+Description=Nostromo crew member %i
+Documentation=https://github.com/backspring-labs/nostromo
+# The relay is reached over Tailscale, so the network has to be genuinely up rather than merely
+# configured. Ollama is a hard requirement for the local-inference roles and harmless for others:
+# the adapter refuses to start if the pinned model is not resident.
+After=network-online.target ollama.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=%i
+# Each role's adapter is explicit today. §13.9 replaces these with one generic launcher, and the
+# plan is deliberate that this happens only after Mother AND Brett both work — a launcher
+# abstracted from a single instance bakes in that instance's shape.
+ExecStart=/opt/nostromo/nostromo/infrastructure/spark/bin/launch-%i.sh
+
+# The relay may be unreachable at boot (tailnet, or the Jetson still coming up). Fail and retry
+# rather than requiring a human. RestartSec keeps that from becoming a hot loop; the burst limit
+# stops a genuinely broken role from restarting forever.
+Restart=always
+RestartSec=10s
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+# journald replaces the flat harness.log, which lived in a directory the role owned and could
+# therefore erase. A role cannot touch its own journal.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=nostromo-%i
+
+# This caps the HARNESS, not the model. buzz-agent and buzz-acp are small; the 29 GB lives in
+# ollama.service, so this is a runaway guard rather than the §36 memory interlock. That interlock
+# belongs on Ollama (OLLAMA_MAX_LOADED_MODELS / keep-alive) and is still unbuilt.
+MemoryMax=4G
+
+# Defence in depth behind the uid. None of these replace the account boundary; they narrow what a
+# compromised harness could reach beyond it.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/home/%i /opt/nostromo/logs/%i
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+
+[Install]
+WantedBy=multi-user.target
