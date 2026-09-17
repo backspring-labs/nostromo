@@ -25,10 +25,10 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=%i
-# Each role's adapter is explicit today. §13.9 replaces these with one generic launcher, and the
-# plan is deliberate that this happens only after Mother AND Brett both work — a launcher
-# abstracted from a single instance bakes in that instance's shape.
-ExecStart=/opt/nostromo/nostromo-src/infrastructure/spark/bin/launch-%i.sh
+# One launcher for every role (§13.9). What differs between roles — working directory, round
+# budget, whether a clone is required, harness, model — is read from crew/manifest.yaml, so
+# adding a role is a manifest entry and a persona rather than another unit or another script.
+ExecStart=/opt/nostromo/nostromo-src/infrastructure/spark/bin/launch-role.sh %i
 
 # The relay may be unreachable at boot (tailnet, or the Jetson still coming up). Fail and retry
 # rather than requiring a human. RestartSec keeps that from becoming a hot loop; the burst limit

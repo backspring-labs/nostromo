@@ -15,17 +15,18 @@ die() { echo "install-units: $*" >&2; exit 1; }
 
 DRY=""; [[ "${1:-}" == "--dry-run" ]] && { DRY=1; shift; }
 
-# A role is installable when it has an adapter. Today those are explicit per role; §13.9 replaces
-# them with one generic launcher, deliberately only after Mother and Brett both work.
+# A role is installable when it has a persona and a base prompt. Globbing launch-*.sh used to
+# answer this and cannot any more: §13.9 replaced the per-role adapters with launch-role.sh, so
+# the glob would have discovered a role named "role".
+LAUNCHER="$REPO/infrastructure/spark/bin/launch-role.sh"
+[[ -x "$LAUNCHER" ]] || die "missing $LAUNCHER"
 roles=("$@")
 if [[ ${#roles[@]} -eq 0 ]]; then
-  for f in "$REPO"/infrastructure/spark/bin/launch-*.sh; do
-    [[ -e "$f" ]] || continue
-    r="$(basename "$f")"; r="${r#launch-}"; r="${r%.sh}"
-    roles+=("$r")
-  done
+  while read -r r; do
+    [[ -r "$REPO/crew/personas/$r.md" && -r "$REPO/crew/prompts/base-$r.md" ]] && roles+=("$r")
+  done < <(awk '/^agents:/{a=1;next} a&&/^[a-z_]+:/{exit} a&&/^  [a-z]+:$/{r=$1;sub(":","",r);print r}' "$REPO/crew/manifest.yaml")
 fi
-[[ ${#roles[@]} -gt 0 ]] || die "no launch-<role>.sh adapters found in $REPO"
+[[ ${#roles[@]} -gt 0 ]] || die "no role in the manifest has both a persona and a base prompt"
 
 echo "unit:  $UNIT_SRC"
 echo "roles: ${roles[*]}"
@@ -33,14 +34,14 @@ echo
 
 for role in "${roles[@]}"; do
   id -u "$role" >/dev/null 2>&1 || die "no such user: $role (run create-role-accounts.sh first)"
-  [[ -x "$REPO/infrastructure/spark/bin/launch-$role.sh" ]] \
-    || die "no adapter for $role at $REPO/infrastructure/spark/bin/launch-$role.sh"
+  [[ -r "$REPO/crew/personas/$role.md" ]] || die "$role has no persona"
+  [[ -r "$REPO/crew/prompts/base-$role.md" ]] || die "$role has no base prompt"
   # Asserted by the adapter too, but a unit that fails at boot is worse than a refusal now.
   [[ -r "/home/$role/.config/nostromo/secrets/buzz.key" ]] \
     || die "$role has no key at /home/$role/.config/nostromo/secrets/buzz.key"
   install -d -m 755 -o nostromo -g nostromo /opt/nostromo/logs
   install -d -m 2750 -o "$role" -g nostromo "/opt/nostromo/logs/$role"
-  echo "  $role: user ok, adapter ok, key ok, log dir ok"
+  echo "  $role: user ok, persona ok, base prompt ok, key ok, log dir ok"
 done
 echo
 
