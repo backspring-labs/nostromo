@@ -32,6 +32,9 @@ agents:
     budget_profile: local
     workspace_profile: control
     respond_to: allowlist
+    workdir: ~/workspace
+    requires_clone: false
+    max_rounds: 12
     buzz_pubkey: 0fe13d87cb0051685da767d8de393a2d8fff155fbcf1feeb0b1ca4f877a5b063
     buzz_auth_tag: '["auth","508cd1c7dbcddcc93b8168923cac49ef28bb02f0e60de549e44b01000d2bce5f","","8703238bd390f3c28e674f5afce86ab0f00de705c6cbd3c3bf207aa8182a9b26d444d72bb3bbed8ed58beef6f42f3fb6af362a33a979611b45cb1e8757992688"]'
     buzz_private_key: spark:~mother/.config/nostromo/secrets/buzz.key
@@ -170,6 +173,9 @@ agents:
     budget_profile: local
     workspace_profile: verification
     respond_to: allowlist
+    workdir: ~/src/squad-ops
+    requires_clone: true
+    max_rounds: 60
     buzz_pubkey: 3b7b029c96843910fc4660d7d22c514d69804f174fff43c74eaaa389b3fef14d
     buzz_auth_tag: '["auth","508cd1c7dbcddcc93b8168923cac49ef28bb02f0e60de549e44b01000d2bce5f","","794a8ba0bc46f5d5b723196ba4e42bb929d0640225c0dbe4face5c3905eb25d08b0dcfd2bba1e792bee9ee21a9aaeea35cd3d943272eaf1ec0f09cc0ff7eb9e8"]'
     buzz_private_key: spark:~brett/.config/nostromo/secrets/buzz.key
