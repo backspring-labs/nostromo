@@ -1,0 +1,322 @@
+#!/usr/bin/env python3
+"""crewctl — operate the Nostromo crew on the Spark.
+
+Fronts systemctl and the preflight assertions, per the WP-6 amendment: "crewctl on the Spark, run
+by the supervisor, fronting systemctl and the preflight assertions, with --json on every subcommand
+so an operator UI consumes structured output rather than scraping text. A UI can wrap a CLI; a CLI
+cannot wrap a UI."
+
+  crewctl status [role]        unit state for the crew, or one role
+  crewctl describe <role>      effective configuration (public values only, §13.10)
+  crewctl check [role]         preflight: would this role start?
+  crewctl start|stop|restart <role>
+  crewctl logs [role] [-f] [-n N]
+
+  --json                       machine-readable output, on every subcommand
+
+Never prints a secret. `describe` reports where a key lives, never what it holds — §13.10 says
+"secret_source=<path, not contents>".
+
+Unit control needs privilege. Install the polkit rule in infrastructure/spark/systemd/ and it needs
+no sudo for nostromo@* units specifically; without it, run these under sudo.
+"""
+import argparse
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import urllib.request
+from pathlib import Path
+
+REPO = Path(os.environ.get("NOSTROMO_REPO", "/opt/nostromo/nostromo-src"))
+MANIFEST = REPO / "crew" / "manifest.yaml"
+BIN = REPO / "infrastructure" / "spark" / "bin"
+LOGROOT = Path("/opt/nostromo/logs")
+OLLAMA = os.environ.get("OLLAMA_URL", "http://localhost:11434")
+
+
+def die(msg, as_json=False):
+    if as_json:
+        print(json.dumps({"error": msg}))
+    else:
+        print(f"crewctl: {msg}", file=sys.stderr)
+    sys.exit(1)
+
+
+# ---- manifest -------------------------------------------------------------------------------
+def manifest_text():
+    if not os.access(MANIFEST, os.R_OK):
+        die(f"cannot read {MANIFEST} — run push-repo.sh from the Mac")
+    return MANIFEST.read_text()
+
+
+def agents():
+    """{role: {key: value}} for every agent, in manifest order. Deliberately a flat reader:
+    the manifest is flat by design and a YAML dependency here would be one more thing to install
+    on a box where this tool needs to work when other things are broken."""
+    out, role, in_agents, in_github = {}, None, False, False
+    for line in manifest_text().splitlines():
+        if re.match(r"^agents:\s*$", line):
+            in_agents = True
+            continue
+        if in_agents and re.match(r"^[a-z_]+:", line):
+            break
+        if not in_agents:
+            continue
+        m = re.match(r"^  ([a-z]+):\s*$", line)
+        if m:
+            role = m.group(1)
+            out[role] = {}
+            in_github = False
+            continue
+        if role is None:
+            continue
+        if re.match(r"^    github:\s*$", line):
+            in_github = True
+            continue
+        m = re.match(r"^    ([a-z_]+):\s*(.*?)\s*$", line)
+        if m and not in_github:
+            out[role][m.group(1)] = m.group(2).strip("'\"")
+        m = re.match(r"^      ([a-z_]+):\s*(.*?)\s*$", line)
+        if m and in_github:
+            out[role].setdefault("github", {})[m.group(1)] = m.group(2).strip("'\"")
+    return out
+
+
+def owner_pubkey():
+    m = re.search(r"^owner:$.*?^  buzz_pubkey:\s*([0-9a-f]{64})", manifest_text(), re.M | re.S)
+    return m.group(1) if m else ""
+
+
+# ---- systemd --------------------------------------------------------------------------------
+def unit(role):
+    return f"nostromo@{role}"
+
+
+def systemctl(*args, check=False):
+    r = subprocess.run(["systemctl", *args], capture_output=True, text=True)
+    if check and r.returncode != 0:
+        die((r.stderr or r.stdout).strip() or f"systemctl {' '.join(args)} failed")
+    return r
+
+
+def unit_state(role):
+    props = ["LoadState", "ActiveState", "SubState", "MainPID", "NRestarts",
+             "ActiveEnterTimestamp", "MemoryCurrent", "MemoryMax"]
+    r = systemctl("show", unit(role), *[f"-p{p}" for p in props])
+    kv = dict(l.split("=", 1) for l in r.stdout.splitlines() if "=" in l)
+    enabled = systemctl("is-enabled", unit(role)).stdout.strip() or "unknown"
+    active = systemctl("is-active", unit(role)).stdout.strip() or "unknown"
+    def num(v):
+        try:
+            n = int(v)
+            return None if n in (0, 2 ** 64 - 1) else n
+        except (TypeError, ValueError):
+            return None
+    return {
+        "unit": unit(role) + ".service",
+        "installed": kv.get("LoadState") == "loaded",
+        "enabled": enabled,
+        "active": active,
+        "sub": kv.get("SubState"),
+        "pid": num(kv.get("MainPID")),
+        "restarts": num(kv.get("NRestarts")) or 0,
+        "since": kv.get("ActiveEnterTimestamp") or None,
+        "memory_bytes": num(kv.get("MemoryCurrent")),
+        "memory_max_bytes": num(kv.get("MemoryMax")),
+    }
+
+
+# ---- checks ---------------------------------------------------------------------------------
+def ollama_tags():
+    try:
+        with urllib.request.urlopen(f"{OLLAMA}/api/tags", timeout=5) as r:
+            return [m["name"] for m in json.load(r)["models"]]
+    except Exception:
+        return None
+
+
+def check_role(role, cfg, tags_cache):
+    """Every check the supervisor can make without entering a role's 700 home.
+
+    Anything inside that home — the key, its mode, the clone — is deliberately unreadable here.
+    The adapter asserts those at launch and refuses to start without them, which is the right
+    place: a check that needs privilege to run is a check that gets skipped."""
+    checks = []
+
+    def add(name, ok, detail=""):
+        checks.append({"check": name, "ok": bool(ok), "detail": detail})
+
+    import pwd
+    try:
+        pwd.getpwnam(role)
+        add("account exists", True, role)
+    except KeyError:
+        add("account exists", False, f"no unix user '{role}'")
+
+    adapter = BIN / f"launch-{role}.sh"
+    add("adapter present", os.access(adapter, os.X_OK), str(adapter))
+
+    for field in ("buzz_pubkey", "harness", "provider", "respond_to"):
+        add(f"manifest {field}", bool(cfg.get(field)), cfg.get(field, "missing"))
+
+    tag = cfg.get("ollama_tag")
+    if cfg.get("provider") == "ollama":
+        add("manifest ollama_tag", bool(tag), tag or "missing")
+        if tags_cache is None:
+            add("ollama reachable", False, f"no answer from {OLLAMA}")
+        else:
+            add("ollama reachable", True, OLLAMA)
+            if tag:
+                add("model resident", tag in tags_cache, tag)
+
+    add("owner attestation", bool(cfg.get("buzz_auth_tag")),
+        "present" if cfg.get("buzz_auth_tag") else "absent — core memory will not persist")
+
+    d = LOGROOT / role
+    if d.is_dir():
+        st = d.stat()
+        import pwd as _p
+        owner = _p.getpwuid(st.st_uid).pw_name
+        mode = oct(st.st_mode & 0o7777)[-4:]
+        add("log dir owner", owner == role, f"{owner} (want {role})")
+        add("log dir mode", mode == "2750", f"{mode} (want 2750, no group write)")
+    else:
+        add("log dir", False, f"{d} missing")
+
+    for b in ("buzz-acp", "buzz", cfg.get("harness", "")):
+        if b:
+            add(f"{b} on PATH", shutil.which(b) is not None, shutil.which(b) or "not found")
+
+    return checks
+
+
+# ---- commands -------------------------------------------------------------------------------
+def cmd_status(args, roles):
+    want = [args.role] if args.role else list(roles)
+    rows = [{"role": r, **unit_state(r)} for r in want]
+    if args.json:
+        print(json.dumps({"crew": rows}, indent=2))
+        return 0
+    print(f"{'ROLE':<9}{'ACTIVE':<10}{'ENABLED':<10}{'PID':>8}{'RESTARTS':>10}  SINCE")
+    for r in rows:
+        print(f"{r['role']:<9}{r['active']:<10}{r['enabled']:<10}"
+              f"{(r['pid'] or '-'):>8}{r['restarts']:>10}  {(r['since'] or '-')[:24]}")
+    return 0
+
+
+def cmd_describe(args, roles):
+    cfg = roles[args.role]
+    gh = cfg.get("github", {})
+    out = {
+        "agent": args.role,
+        "buzz_pubkey": cfg.get("buzz_pubkey"),
+        "nip05": cfg.get("nip05"),
+        "host": cfg.get("host"),
+        "supervisor": cfg.get("supervisor"),
+        "harness": cfg.get("harness"),
+        "provider": cfg.get("provider"),
+        "model": cfg.get("ollama_tag") or cfg.get("model"),
+        "respond_to": cfg.get("respond_to"),
+        "capability": cfg.get("capability"),
+        # §13.10: the PATH a secret lives at, never its contents.
+        "secret_source": f"/home/{args.role}/.config/nostromo/secrets/buzz.key",
+        "owner_attestation": "present" if cfg.get("buzz_auth_tag") else "absent",
+        "github_app": gh.get("app_slug"),
+        "github_bot": gh.get("bot_login"),
+        "adapter": str(BIN / f"launch-{args.role}.sh"),
+        "logs": str(LOGROOT / args.role),
+        "unit": unit(args.role) + ".service",
+    }
+    if args.json:
+        print(json.dumps(out, indent=2))
+    else:
+        for k, v in out.items():
+            print(f"{k:<20}{v if v is not None else '-'}")
+    return 0
+
+
+def cmd_check(args, roles):
+    want = [args.role] if args.role else list(roles)
+    tags = ollama_tags()
+    results, ok_all = [], True
+    for r in want:
+        checks = check_role(r, roles[r], tags)
+        ok = all(c["ok"] for c in checks)
+        ok_all &= ok
+        results.append({"role": r, "ok": ok, "checks": checks})
+    if args.json:
+        print(json.dumps({"results": results}, indent=2))
+    else:
+        for res in results:
+            print(f"\n{res['role']}  {'OK' if res['ok'] else 'PROBLEMS'}")
+            for c in res["checks"]:
+                print(f"  [{'ok' if c['ok'] else '--'}] {c['check']:<22}{c['detail']}")
+        print("\nChecks inside a role's 700 home (key, mode, clone) are asserted by the adapter at")
+        print("launch, not here — a check needing privilege is a check that gets skipped.")
+    return 0 if ok_all else 1
+
+
+def cmd_unitop(args, roles):
+    op = args.command
+    r = systemctl(op, unit(args.role))
+    if r.returncode != 0:
+        msg = (r.stderr or r.stdout).strip()
+        if "interactive authentication required" in msg.lower():
+            msg += ("\n\nInstall the polkit rule (infrastructure/spark/systemd/) to control "
+                    "nostromo@* without sudo, or re-run this under sudo.")
+        die(msg, args.json)
+    state = unit_state(args.role)
+    if args.json:
+        print(json.dumps({"role": args.role, "op": op, **state}, indent=2))
+    else:
+        print(f"{args.role}: {op} -> {state['active']} (pid {state['pid'] or '-'}, "
+              f"{state['restarts']} restarts)")
+    return 0
+
+
+def cmd_logs(args, roles):
+    unit_args = [f"-u{unit(args.role)}"] if args.role else ["-u", "nostromo@*"]
+    cmd = ["journalctl", *unit_args, "-n", str(args.lines)]
+    if args.follow:
+        cmd.append("-f")
+    if args.json:
+        cmd += ["-o", "json"]
+    os.execvp("journalctl", cmd)
+
+
+# ---- main -----------------------------------------------------------------------------------
+def main():
+    p = argparse.ArgumentParser(prog="crewctl", description="Operate the Nostromo crew.")
+    p.add_argument("--json", action="store_true", help="machine-readable output")
+    sub = p.add_subparsers(dest="command", required=True)
+
+    s = sub.add_parser("status", help="unit state for the crew, or one role")
+    s.add_argument("role", nargs="?")
+    d = sub.add_parser("describe", help="effective configuration (public values only)")
+    d.add_argument("role")
+    c = sub.add_parser("check", help="preflight: would this role start?")
+    c.add_argument("role", nargs="?")
+    for op in ("start", "stop", "restart"):
+        o = sub.add_parser(op, help=f"{op} a role's unit")
+        o.add_argument("role")
+    lg = sub.add_parser("logs", help="journal for a role, or the whole crew")
+    lg.add_argument("role", nargs="?")
+    lg.add_argument("-f", "--follow", action="store_true")
+    lg.add_argument("-n", "--lines", type=int, default=40)
+
+    args = p.parse_args()
+    roles = agents()
+    if getattr(args, "role", None) and args.role not in roles and args.command != "logs":
+        die(f"unknown role '{args.role}' — manifest has: {', '.join(roles)}", args.json)
+
+    return {
+        "status": cmd_status, "describe": cmd_describe, "check": cmd_check,
+        "start": cmd_unitop, "stop": cmd_unitop, "restart": cmd_unitop, "logs": cmd_logs,
+    }[args.command](args, roles)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

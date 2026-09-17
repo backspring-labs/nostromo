@@ -1,0 +1,31 @@
+// Let the owner and the supervisor control crew units without a password — and nothing else.
+//
+// Install:  sudo install -m 644 49-nostromo-crewctl.rules /etc/polkit-1/rules.d/
+//
+// Without this, every `crewctl restart brett` is an `ssh -t spark 'sudo systemctl …'` and a
+// password prompt. The WP-6 amendment anticipated it: "start/stop is delegated for those specific
+// units only."
+//
+// NOT granted by group. Every role is a member of group `nostromo`, so `isInGroup("nostromo")`
+// would let Brett restart Dallas — or restart himself to escape a state he disliked. The whole
+// point of one account per role is that a role cannot act on another; a convenience rule must not
+// quietly undo it. Two named users only.
+//
+// Scoped to nostromo@* units. Nothing here grants control over ollama, docker, sshd or anything
+// else on the box.
+
+polkit.addRule(function(action, subject) {
+    if (action.id !== "org.freedesktop.systemd1.manage-units") {
+        return polkit.Result.NOT_HANDLED;
+    }
+    var unit = action.lookup("unit");
+    if (!unit || unit.indexOf("nostromo@") !== 0) {
+        return polkit.Result.NOT_HANDLED;
+    }
+    if (subject.user === "jladd" || subject.user === "nostromo") {
+        polkit.log("crewctl: " + subject.user + " -> " +
+                   action.lookup("verb") + " " + unit);
+        return polkit.Result.YES;
+    }
+    return polkit.Result.NOT_HANDLED;
+});
