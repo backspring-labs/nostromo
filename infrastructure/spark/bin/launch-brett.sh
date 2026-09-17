@@ -179,7 +179,7 @@ launch-$ROLE: resolved configuration
   instructions    $INSTRUCTIONS ($(wc -c <"$INSTRUCTIONS") bytes)
   harness         $HARNESS + buzz-dev-mcp (shell, read_file, str_replace, todo, view_image)
   model           $OLLAMA_TAG via $OLLAMA_URL/v1 (provider=$PROVIDER)
-  max rounds      ${NOSTROMO_MAX_ROUNDS:-40}
+  max rounds      ${NOSTROMO_MAX_ROUNDS:-60}
   workdir         $WORKDIR
   logs            $LOGDIR
   auth tag        $AUTH_DESC
@@ -244,8 +244,11 @@ if [[ "$HARNESS" == "buzz-agent" ]]; then
   # BUZZ_AGENT_MAX_ROUNDS defaults to 0 — unlimited. Mother ran to 48 rounds republishing the
   # same answer before that was capped. 40 here rather than her 12: a verification turn is read
   # the failure, edit a test, re-run the suite, read again, which is legitimately many rounds.
-  # Too low and he dies mid-verification with the evidence unreported.
-  export BUZZ_AGENT_MAX_ROUNDS="${NOSTROMO_MAX_ROUNDS:-40}"
+  # 40 was not enough: a suite run plus a dependency detour hit the ceiling at 23 minutes and
+  # ended the turn silently — buzz-agent returns StopReason::MaxTurnRequests and publishes
+  # nothing. The bootstrap detour is fixed in provision-clone.sh, and his persona now tells him
+  # to leave evidence on disk as he goes, so a future cut-off is recoverable rather than lost.
+  export BUZZ_AGENT_MAX_ROUNDS="${NOSTROMO_MAX_ROUNDS:-60}"
   HARNESS_ARGS=""
 else
   # Goose speaks to Ollama natively rather than through an OpenAI-compatible shim.

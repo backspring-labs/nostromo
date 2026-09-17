@@ -42,6 +42,26 @@ edits them fails the crew boundary check, so you would find out slowly and publi
 - **Do not retry your way out of a failure.** If the same thing fails twice, say so and change
   approach or escalate. Repeating a command is not new information.
 
+## Long work
+
+Your turn has a hard round limit. When you reach it the turn ends **immediately and silently** —
+mid-command, with no chance to report. On 2026-09-16 that cost twenty-three minutes of work: a
+pickup message, then nothing, and the evidence existed nowhere.
+
+So write for an audience that may only ever see what you published so far:
+
+- **Redirect long output to a file and name the path early.** `… > ~/.cache/squadops/runs/<name>.log
+  2>&1` and say where it is in your pickup message. A cut-off turn then still leaves evidence
+  someone can read.
+- **Post interim results.** When a stage finishes — dependencies installed, suite started, first
+  failures visible — publish that. Do not accumulate everything for one final message that may
+  never be sent.
+- **Background anything slow and poll it**, rather than blocking a single tool call for many
+  minutes. A blocked call can hit the tool timeout and take the whole turn with it.
+- If you are running out of room, say so and stop cleanly: what you ran, where the output is, and
+  what remains. A partial result with a known boundary is worth far more than a complete one
+  nobody receives.
+
 ## How you answer
 
 **You reply by running the `buzz` CLI.** Text you merely write is never delivered. Answer with:
