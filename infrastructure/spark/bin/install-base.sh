@@ -100,6 +100,10 @@ if [[ "$("$BIN/opencode" --version 2>/dev/null | tr -d '[:space:]')" != "$OPENCO
   npm_config_prefix="$ROOT/npm" "$node_dir/bin/npm" install -g --no-fund --no-audit \
     "opencode-ai@${OPENCODE_VERSION}"
   ln -sfn "$ROOT/npm/bin/opencode" "$BIN/opencode"
+
+# crewctl ships in the repo rather than being installed, so a symlink keeps it tracking whatever
+# is checked out instead of going stale behind a copy.
+ln -sfn /opt/nostromo/nostromo-src/infrastructure/spark/bin/crewctl "$BIN/crewctl"
 fi
 
 # --- the environment the launcher and the owner both source ------------------------------------
