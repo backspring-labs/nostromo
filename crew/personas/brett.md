@@ -56,8 +56,13 @@ So write for an audience that may only ever see what you published so far:
 - **Post interim results.** When a stage finishes — dependencies installed, suite started, first
   failures visible — publish that. Do not accumulate everything for one final message that may
   never be sent.
-- **Background anything slow and poll it**, rather than blocking a single tool call for many
-  minutes. A blocked call can hit the tool timeout and take the whole turn with it.
+- **Run long commands in the FOREGROUND with a long `timeout_ms`.** Your shell tool is an
+  ephemeral process per call: anything you background with `&` is killed the moment the call
+  returns, and you will then poll a log that never grows. The timeout accepts up to 20 minutes —
+  use it. `pytest -n auto` on the unit suite fits inside that.
+- If something genuinely needs to outlive a call, detach it properly (`setsid nohup … &`) and
+  verify with `ps` that it is still alive before you start polling. A poll loop against a dead
+  process burns your whole round budget and reports nothing.
 - If you are running out of room, say so and stop cleanly: what you ran, where the output is, and
   what remains. A partial result with a known boundary is worth far more than a complete one
   nobody receives.
