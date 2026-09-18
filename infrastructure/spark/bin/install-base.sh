@@ -14,10 +14,15 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOCK="$HERE/versions.lock"
-ROOT="${NOSTROMO_RUNTIME:-$HOME/.local/nostromo}"
+# Default to the real deployment root rather than $HOME. Run once without NOSTROMO_RUNTIME set,
+# the old default quietly built a complete second runtime — node, uv, herdr, opencode, 720 MB —
+# under the invoking user's home, reported success, and left /opt/nostromo/runtime untouched. The
+# harness it was asked to install was installed, in a place nothing looks.
+ROOT="${NOSTROMO_RUNTIME:-/opt/nostromo/runtime}"
 BIN="$ROOT/bin"
 CHECK_ONLY=0
 [[ "${1:-}" == "--check" ]] && CHECK_ONLY=1
+echo "install-base: runtime root $ROOT" >&2
 
 # shellcheck disable=SC1090
 source "$LOCK"
