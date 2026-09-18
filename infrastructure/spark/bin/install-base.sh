@@ -119,6 +119,17 @@ if [[ "$("$BIN/claude-agent-acp" --version 2>/dev/null | tr -d '[:space:]')" != 
   ln -sfn "$ROOT/npm/bin/claude-agent-acp" "$BIN/claude-agent-acp"
 fi
 
+# --- codex-acp --------------------------------------------------------------------------------
+# Ripley's and Parker's harness, pinned for the same reason as the rest: an ACP adapter changing
+# underneath an implementation role changes what "the accepted design was built" means.
+if [[ "$("$BIN/codex-acp" --version 2>/dev/null | tr -d '[:space:]')" != "$CODEX_ACP_VERSION" ]]; then
+  [[ $CHECK_ONLY == 1 ]] && { echo "MISSING codex-acp ${CODEX_ACP_VERSION}"; exit 1; }
+  say "installing codex-acp ${CODEX_ACP_VERSION}"
+  npm_config_prefix="$ROOT/npm" "$node_dir/bin/npm" install -g --no-fund --no-audit \
+    "@agentclientprotocol/codex-acp@${CODEX_ACP_VERSION}"
+  ln -sfn "$ROOT/npm/bin/codex-acp" "$BIN/codex-acp"
+fi
+
 # --- crewctl ----------------------------------------------------------------------------------
 # Ships in the repo rather than being installed, so a symlink keeps it tracking whatever is
 # checked out instead of going stale behind a copy. Unconditional: it has no version to compare.
