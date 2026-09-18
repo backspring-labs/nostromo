@@ -309,14 +309,37 @@ case "$HARNESS" in
       export DEFAULT_AUTH_REQUEST='{"methodId":"api-key"}'
       # Nothing here has a browser, and a role must never be waiting on an interactive login.
       export NO_BROWSER=1
-      # codex-acp has its own permission layer on top of everything else. Its default mode denied
-      # the shell outright: Ripley composed a correct `buzz messages send`, the adapter returned
-      # status "denied" then "failed", and she reported "message was published" having never
-      # published anything. Nothing reached the journal — the ACP capture was the only way to see
-      # it. `agent` permits tool use; `agent-full-access` removes the sandbox, which this role does
-      # not need. What a role may actually do is still decided by its uid, its App scope and its
-      # path boundary, not by this.
+      # Pin the mode rather than inherit it. `agent` is already codex-acp's built-in default, so
+      # this changes no behaviour today; it states the choice, and an unrecognised value silently
+      # falls back to the default rather than failing, so the value is asserted below instead.
+      #   read-only          workspace-write sandbox, every approval goes to a human
+      #   agent              workspace-write sandbox, an automated reviewer approves
+      #   agent-full-access  no sandbox at all
       export INITIAL_AGENT_MODE="${NOSTROMO_AGENT_MODE:-agent}"
+      case "$INITIAL_AGENT_MODE" in
+        read-only|agent|agent-full-access) ;;
+        *) die "INITIAL_AGENT_MODE='$INITIAL_AGENT_MODE' is not a codex-acp mode id; it would be" \
+               "silently ignored and the default used instead" ;;
+      esac
+
+      # The first two modes build their sandbox with bubblewrap. On Ubuntu 24.04 that fails outright
+      # unless bwrap has an AppArmor profile (infrastructure/spark/apparmor/usr.bin.bwrap), and it
+      # fails in the worst possible way: the adapter marks the tool call "denied" then "failed",
+      # tells the agent nothing it can act on, and the agent finishes the turn believing the command
+      # ran. Ripley composed a correct `buzz messages send`, published nothing, and reported success
+      # to herself. Nothing reached the journal; only the ACP capture showed it.
+      #
+      # So assert it here, before a single token is spent. A role that cannot run a command is not
+      # degraded, it is broken, and it should say so where someone will see it.
+      if [[ "$INITIAL_AGENT_MODE" != "agent-full-access" ]]; then
+        command -v bwrap >/dev/null \
+          || die "$HARNESS needs bubblewrap for its '$INITIAL_AGENT_MODE' sandbox; bwrap is not on PATH"
+        bwrap --ro-bind / / --unshare-user /bin/true 2>/dev/null \
+          || die "bubblewrap cannot build a sandbox as $ROLE, so every shell command this role runs" \
+                 "would be refused before it starts. Install the AppArmor profile:" \
+                 "sudo install -m 644 $REPO/infrastructure/spark/apparmor/usr.bin.bwrap" \
+                 "/etc/apparmor.d/usr.bin.bwrap && sudo apparmor_parser -r /etc/apparmor.d/usr.bin.bwrap"
+      fi
     fi
     # These agents take the model through buzz-acp rather than an env var of their own.
     HARNESS_ARGS=""

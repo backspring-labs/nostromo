@@ -1,0 +1,35 @@
+# Let bubblewrap build a sandbox again on Ubuntu 24.04.
+#
+# Ubuntu 24.04 sets kernel.apparmor_restrict_unprivileged_userns=1. An unconfined process that
+# creates an unprivileged user namespace is transitioned into the stock `unprivileged_userns`
+# profile, which carries `audit deny capability`. The namespace is created; everything that needs a
+# capability inside it is then refused. bubblewrap dies either at "setting up uid map: Permission
+# denied" or at "loopback: Failed RTM_NEWADDR: Operation not permitted", depending on which step it
+# reaches first.
+#
+# Codex builds its `read-only` and `workspace-write` sandboxes with bubblewrap, so on this host
+# every shell command from a codex-acp role failed before it ran. It did not fail loudly: the
+# adapter reported the tool call "denied" then "failed", said nothing on the ACP stream the agent
+# could act on, and Ripley finished her turn believing she had published a message she had not.
+# `danger-full-access` skips bubblewrap entirely and was the only mode that worked — which is the
+# wrong reason to run without a sandbox.
+#
+# This is the same shape as Ubuntu's own /etc/apparmor.d/ch-run: name the binary so it stops being
+# "unconfined", and allow it the one thing it exists to do. It does not confine what runs inside
+# the sandbox — bubblewrap's own policy does that — and it grants nothing to anything else.
+#
+# Install (as root, on the Spark):
+#   install -m 644 usr.bin.bwrap /etc/apparmor.d/usr.bin.bwrap
+#   apparmor_parser -r /etc/apparmor.d/usr.bin.bwrap
+# Verify as any user:
+#   bwrap --ro-bind / / --unshare-user /bin/true && echo sandbox ok
+
+abi <abi/4.0>,
+include <tunables/global>
+
+profile bwrap /usr/bin/bwrap flags=(unconfined) {
+  userns,
+
+  # Site-specific additions and overrides. See local/README for details.
+  include if exists <local/usr.bin.bwrap>
+}
