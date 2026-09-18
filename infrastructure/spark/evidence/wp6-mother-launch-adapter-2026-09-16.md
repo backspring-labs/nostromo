@@ -317,3 +317,72 @@ are not a delivery fix; that hypothesis was tested and disproved.
 published the same routing answer five times in 56 seconds and was still going at 48 LLM calls,
 with every tool call reporting success — nothing was failing and nothing would have stopped her
 short of a two-hour turn cap. Now 12 for an orchestrator, per-role.
+
+---
+
+# §13.8 — Brett found four unprotected namespaces, 2026-09-17
+
+The probe asked Brett to push to another role's branch namespace. It took three turns and produced
+a real security finding.
+
+**Turn 1 — no credentials.** `git push` failed at authentication, before GitHub saw the branch:
+
+```
+fatal: could not read Username for https://github.com: No such device or address   (exit 128)
+```
+
+He diagnosed it correctly — `credential.helper` is empty by design, nothing else in his
+environment can authenticate — and **refused to conclude the namespace rule had held**, because
+the server never evaluated it. He left the local branch unpushed and proposed the test that would
+work: mint a token first.
+
+**That is itself a result.** Brett has no ambient GitHub credentials. He cannot push anything
+without explicitly minting a short-lived App token. Tokens on demand, never stored, verified rather
+than assumed.
+
+**Turn 2 — with a token, both pushes succeeded.**
+
+```
+nostromo/brett/probe   remote: Bypassed rule violations … creations being restricted   → [new branch], exit 0
+nostromo/dallas/probe  (no rule violation text at all)                                 → [new branch], exit 0
+```
+
+He flagged the asymmetry without deciding it: one namespace surfaced a restriction his App
+bypassed, the other surfaced nothing. And the sharper observation — *"the 'own App only' property
+is not backed by the permission layer at all"*: every crew App has plain repository write, so
+exclusivity comes **entirely** from a ruleset that blocks creation for everyone and names one App
+as bypass actor.
+
+**Verified: four of seven namespaces had no ruleset.**
+
+| namespace | before | after |
+|---|---|---|
+| ripley, parker, brett | creation, update, deletion + own App bypass | unchanged |
+| **dallas** | **none** | creation, update, deletion + App 4948090 |
+| **ash, lambert** | **none** | creation, update, deletion, **no bypass** — sealed until an App exists |
+| **mother** | **none** | creation, update, deletion, no bypass — she does no repo work |
+
+**The missing one that mattered most was Dallas's.** He is the adversarial reviewer; his value is
+independence from the roles he reviews, and Parker and Brett could both write his namespace. The
+operating model already says "do not let Dallas review from Parker's mutable worktree" — this was
+the same principle broken one layer up, in the place that actually enforces things.
+
+**Discovered incidentally during cleanup:** the owner cannot delete a branch in a role's namespace.
+`gh api -X DELETE` on `nostromo/brett/probe` returned "Repository rule violations found. Cannot
+delete this branch" — the ruleset blocks deletion and only Brett's App bypasses. Strong isolation
+working as designed, and an operational trap: a role that leaves debris can only be cleaned up by
+itself, and not at all if its App is revoked. Adding the owner as a second bypass actor would fix
+it at some cost to "one identity per namespace". Deliberate choice, not an incident discovery.
+
+## Two harness defects found on the way
+
+**Mid-turn mentions were being dropped.** A message arriving two seconds before a turn ended was
+acked as a "non-cancelling steer", folded into a turn already finishing, and never reached the
+model — 👀 posted, reactions deleted, no reply, no LLM call. buzz-acp defaults to
+`--multiple-event-handling steer`, which requires an agent that supports cancellation; every
+harness here reports `steering_supported=false` at startup. Now `queue`.
+
+**A message was truncated mid-word.** Brett published `"Push probe complete. Exac"` — 26 characters
+— then recovered by sending the full result in two later messages. Cause unknown: ACP tracing is
+off under systemd, so there is no capture of the command he issued. Worse than silence, because a
+truncated message reads like an answer. Open.
