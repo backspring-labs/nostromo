@@ -130,6 +130,16 @@ TURN_DURATION="${NOSTROMO_TURN_DURATION:-$(yaml_agent max_turn_duration)}"
 IDLE_TIMEOUT="${NOSTROMO_IDLE_TIMEOUT:-$(yaml_agent idle_timeout)}"
 : "${IDLE_TIMEOUT:=600}"
 
+# Session rotation. buzz-acp defaults to 0 — never rotate, only on MaxTokens/MaxTurnRequests — so an
+# ACP session accumulates its whole transcript and re-sends it every turn. The 12-message channel
+# context cap does not touch that: it bounds what is injected, not what the session has already
+# said. On a metered role the cost of a turn therefore grows with how long the process has been up,
+# and the only thing that ever reset Dallas's was me restarting him. Rotating drops accumulated
+# context, which is the point; durable things belong in core memory, not in a session that outlives
+# its usefulness.
+TURNS_PER_SESSION="${NOSTROMO_TURNS_PER_SESSION:-$(yaml_agent max_turns_per_session)}"
+: "${TURNS_PER_SESSION:=0}"
+
 
 # ---- §13.2.5 relay, §13.2.6/7 inbound gate --------------------------------------------------
 RELAY_URL="$(yaml_top relay url)"
@@ -164,6 +174,14 @@ fi
 # OpenCode profile with no provider block silently served a turn from a hosted model, with no
 # error anywhere and nothing in Ollama's journal. Fail closed instead.
 PROVIDER="$(yaml_agent provider)"
+
+# A role nobody can count is a role nobody can budget. buzz-acp logs turn dispatch and completion at
+# debug and nothing at info, so at the default level a metered role's activity is invisible — which
+# is how a day's spend becomes a surprise. Metered roles default to debug; local roles cost nothing
+# per turn and stay quiet.
+if [[ -z "${NOSTROMO_LOG_LEVEL:-}" && "$PROVIDER" != "ollama" ]]; then
+  NOSTROMO_LOG_LEVEL=debug
+fi
 [[ -n "$PROVIDER" ]] || die "no provider for $ROLE in the manifest"
 OLLAMA_URL="http://localhost:11434"
 OLLAMA_TAG="$(yaml_agent ollama_tag)"
@@ -254,6 +272,7 @@ launch-$ROLE: resolved configuration
   provider        $PROVIDER${PROVIDER_KEY:+  (key: $PROVIDER_KEY, contents never shown)}
   model           ${PINNED:-$OLLAMA_TAG}${OLLAMA_TAG:+  via $OLLAMA_URL/v1}
   turn limits     $([[ "$HARNESS" == "buzz-agent" ]] && echo "${NOSTROMO_MAX_ROUNDS:-$MAX_ROUNDS} rounds, " )${TURN_DURATION}s wall clock, ${IDLE_TIMEOUT}s idle
+  session         $([[ "$TURNS_PER_SESSION" == 0 ]] && echo "never rotates" || echo "rotates every $TURNS_PER_SESSION turns")
   mid-turn events $EVENT_HANDLING
   workdir         $WORKDIR
   logs            $LOGDIR
@@ -481,4 +500,5 @@ exec buzz-acp \
   --session-title "$ROLE" \
   --multiple-event-handling "$EVENT_HANDLING" \
   --max-turn-duration "$TURN_DURATION" \
-  --idle-timeout "$IDLE_TIMEOUT"
+  --idle-timeout "$IDLE_TIMEOUT" \
+  --max-turns-per-session "$TURNS_PER_SESSION"

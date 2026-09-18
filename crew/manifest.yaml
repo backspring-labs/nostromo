@@ -90,6 +90,10 @@ agents:
     # Design work: read widely, write a document. Not an edit/test/re-run loop, and
     # metered — every round is money against a $25 envelope.
     max_rounds: 30
+    # Metered. The ACP session transcript is re-sent every turn and never rotated by
+    # default, so a long-lived session gets more expensive the longer it lives.
+    max_turns_per_session: 20
+    max_turn_duration: 3600
     buzz_pubkey: 5dd000d70cfb4316de6a81b7ea30a0eef59302522a9544add0cfc9cacae9ec44
     buzz_auth_tag: '["auth","508cd1c7dbcddcc93b8168923cac49ef28bb02f0e60de549e44b01000d2bce5f","","4cf4e85d86657932e799d6c06b052f4d2a8c2049852acc6362c1b09f78220eaa58b7503b5f75c20a63c1bd019848a9bb7a9449403de563f78181427650e8e473"]'
     buzz_private_key: spark:~ripley/.config/nostromo/secrets/buzz.key
@@ -119,6 +123,10 @@ agents:
     # Lower than Brett's 60: a review is read, think, write, not an edit/test/re-run loop.
     # It is also a metered role — every round is money, unlike the local pair.
     max_rounds: 25
+    # Metered. The ACP session transcript is re-sent every turn and never rotated by
+    # default, so a long-lived session gets more expensive the longer it lives.
+    max_turns_per_session: 15
+    max_turn_duration: 3600
     buzz_pubkey: bfdf455488c1bddbb9a61f287c32ec7d940da566e96f6d262f60409b5b6c55a2
     buzz_auth_tag: '["auth","508cd1c7dbcddcc93b8168923cac49ef28bb02f0e60de549e44b01000d2bce5f","","b45791c01b70209643c9a29e46f1be402a01362b0b42c8821ff2d0a2d4cf8e89b73f927f61ff723e1d38c1ee5455d3851ef24fd3258742d202b67e9ec77c1942"]'
     buzz_private_key: spark:~dallas/.config/nostromo/secrets/buzz.key
@@ -175,6 +183,10 @@ agents:
     # Implementation: read, edit, run the suite, read again. The longest loop in the
     # crew, against the largest envelope ($70).
     max_rounds: 50
+    # Metered. The ACP session transcript is re-sent every turn and never rotated by
+    # default, so a long-lived session gets more expensive the longer it lives.
+    max_turns_per_session: 25
+    max_turn_duration: 5400
     buzz_pubkey: 1a4e1fbefce7f6e0b63123fd86e4dce63a538614eecf443712377b5e557fee47
     buzz_auth_tag: '["auth","508cd1c7dbcddcc93b8168923cac49ef28bb02f0e60de549e44b01000d2bce5f","","cea8a330dd0d7f1a826a1941113f2168dc365f192ef87cf999b72e04dcd4c9118be49bcc9d8d36d5b43aa7168d5bff5207d7c565ad650fac0dba45987a7bfd5c"]'
     buzz_private_key: spark:~parker/.config/nostromo/secrets/buzz.key
