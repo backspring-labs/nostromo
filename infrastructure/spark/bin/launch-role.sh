@@ -247,6 +247,7 @@ launch-$ROLE: resolved configuration
   relay           $RELAY_URL
   respond-to      $RESPOND_TO ($(awk -F, '{print NF}' <<<"$ALLOWLIST") allowlisted + owner)
   base prompt     $BASE_PROMPT ($(wc -c <"$BASE_PROMPT") bytes, vs 18239 compiled-in)
+                  + resolved paths appended at launch -> $LOGDIR/base-prompt.resolved.md
   persona         $PERSONA
   instructions    $INSTRUCTIONS ($(wc -c <"$INSTRUCTIONS") bytes)
   harness         $HARNESS + buzz-dev-mcp (shell, read_file, str_replace, todo, view_image)
@@ -427,6 +428,43 @@ mkdir -p "$SQUADOPS_RUN_ROOT"
 export BUZZ_PRIVATE_KEY="$(cat "$KEYFILE")"
 export BUZZ_RELAY_URL="$RELAY_URL"
 
+# Start in the working directory. systemd sets no WorkingDirectory for these units, so without this
+# the role begins at / and has to reconstruct its own checkout path from a prompt. Ripley did
+# exactly that, expanded `~` to /root, hit EACCES, and correctly refused to work around a denied
+# command — turning a wrong guess into a blocked review. The launcher already knows this path and
+# asserted a .git in it twenty lines ago; there is no reason for the agent to guess.
+cd "$WORKDIR" || die "cannot enter $WORKDIR"
+
+# The base prompt is a checked-in file plus the handful of facts only the launcher knows. Written to
+# the role's own log directory rather than /tmp: PrivateTmp=yes gives this unit a private /tmp that
+# a debugging human cannot see, and this file is worth reading when a role is confused about where
+# it is. Paths only — never a credential, and never the contents of one.
+RESOLVED_PROMPT="$LOGDIR/base-prompt.resolved.md"
+{
+  cat "$BASE_PROMPT"
+  cat <<RESOLVED
+
+## Where you are, resolved at launch
+
+Do not infer these. They were resolved by the launcher from \`crew/manifest.yaml\` and asserted
+before you started; they are correct, and a path you derive yourself is not.
+
+| | |
+|---|---|
+| Your role | \`$ROLE\` |
+| Your Unix account | \`$ROLE\` — you are not root, and \`~\` is \`$HOME\` |
+| Your working directory | \`$WORKDIR\` — your shell already starts here |
+| Crew configuration (read-only) | \`$REPO/crew/\` |
+| The constitution | \`$REPO/instructions.md\` |
+| Your log directory | \`$LOGDIR\` |
+
+A path that does not exist, or that you cannot read, is a mistake in the path — not a policy
+denial and not a reason to stop. Run \`pwd\` and \`git rev-parse --show-toplevel\` and try again
+before you report BLOCKED. Report BLOCKED when something you were *permitted* to do failed, or
+when you need a decision only the owner can make.
+RESOLVED
+} > "$RESOLVED_PROMPT"
+
 # exec, so the process this script starts is the process a supervisor will later watch and signal.
 exec buzz-acp \
   --agent-command "$AGENT_CMD" ${AGENT_ARGS[@]+"${AGENT_ARGS[@]}"} \
@@ -435,7 +473,7 @@ exec buzz-acp \
   --respond-to "$RESPOND_TO" \
   --respond-to-allowlist "$ALLOWLIST" \
   --allowed-respond-to owner-only,allowlist \
-  --base-prompt-file "$BASE_PROMPT" \
+  --base-prompt-file "$RESOLVED_PROMPT" \
   ${MODEL_ARG[@]+"${MODEL_ARG[@]}"} \
   ${PERMISSION_ARG[@]+"${PERMISSION_ARG[@]}"} \
   --system-prompt-file "$PERSONA" \

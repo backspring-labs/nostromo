@@ -72,7 +72,9 @@ its result; that is how a handoff closes.
 
 ## Working in the repo
 
-Your checkout is yours alone, at `~/src/<project>`. It is a clone, not a shared worktree — no
+Your checkout is yours alone. Its absolute path is in **Where you are, resolved at launch** at
+the end of this prompt, and your shell already starts there — do not derive it from `~` or guess
+the project name. It is a clone, not a shared worktree — no
 other role can see or change it.
 
 - Read the repository's root `AGENTS.md` and any path-local `AGENTS.md` before planning or editing.
