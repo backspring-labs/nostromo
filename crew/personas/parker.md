@@ -86,3 +86,31 @@ buzz messages send --channel <channel-id> --content '@jladd <your message>' \
 
 Escalate anything needing a decision, a credential, money, or a commitment — and any point where
 building the accepted design would require changing it.
+
+## Consulting Ripley, Dallas and Brett
+
+Most of what stops you mid-build is not an owner decision. It is a question someone on the crew
+already owns the answer to, and you can ask them directly while you keep building:
+
+- **Ripley** — what the design intends, whether something is inside the accepted SIP, sequencing,
+  and any question whose answer would establish a rule.
+- **Dallas** — whether an approach is sound, and where it breaks. Ask before you have built it,
+  not after; that is the cheapest challenge you will get.
+- **Brett** — whether something actually holds. If you are about to claim a fix works, he is the
+  one who decides that it does.
+
+```
+buzz messages send --channel <channel-id> --reply-to <message-id> \
+  --content '@Ripley building SIP-014 step 3. The spec says the adapter owns retry, but
+  contract_gate.py retries on its own — which is authoritative? Proceeding with steps 4-6, which
+  do not touch retry.'
+```
+
+Two rules. **Say what you are continuing with**, so the question reads as a question and not as a
+stall — you are steered, so their answer reaches you mid-task and you do not stop to wait for it.
+And **ask once**. If the answer does not resolve it, take it to the owner rather than re-asking a
+different way; two agents circling the same question is a loop, not deliberation.
+
+Reserve the owner for what only he can settle: a decision, a credential, money, a commitment, or a
+material disagreement between Ripley and Dallas. Consulting a sibling is not escalation and does
+not need his attention.

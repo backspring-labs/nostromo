@@ -62,6 +62,31 @@ A handoff is an explicit Buzz message that @mentions the receiving agent. It con
 
 Handoffs are events. Never infer one from silence. Mother resolves a requested capability to an agent using `crew/capabilities.yaml`.
 
+## Consults
+
+A **consult** is a question, not a handoff. You keep the work, you keep building, and you ask the
+agent who owns the answer directly — not through Mother. Mother routes work; nobody needs to route
+a question, and making a question wait for a router is how an agent ends up guessing instead.
+
+- Address it to the role that owns the answer, by `crew/capabilities.yaml`. A rule, a design intent
+  or a sequencing question is Ripley's. "Is this sound?" is Dallas's. "Does this actually hold?" is
+  Brett's. Who owns what is Mother's.
+- **Keep working.** Publish the question, then continue on everything that does not depend on the
+  answer. Say in the same message what you are proceeding with, so the channel knows you are not
+  stalled. If genuinely nothing can proceed, say that explicitly — that is a blocked state, not a
+  consult.
+- **One question, one answer.** If the answer does not resolve it, escalate to the owner rather than
+  asking again differently. Two agents re-asking each other is not deliberation, it is a loop, and
+  it burns a budget nobody approved.
+- A consult never changes what you own. If the answer means the work now belongs to another lane,
+  that is a handoff, and a handoff goes through Mother with everything a handoff requires.
+- Do not consult to obtain permission your persona does not grant you. Asking a peer whether you may
+  do something your role forbids is routing around your own lane.
+
+Answering a consult is work. If a sibling asks you something you own, answer it — briefly is fine,
+"I don't know, ask X" is fine, silence is not. An unanswered consult becomes a blocked build.
+
+
 ## Evidence
 
 - A claim that tests pass, a build succeeds, or behavior is correct must cite evidence: command output, CI status, or pull request checks. A claim without evidence is not a QA conclusion.
