@@ -309,6 +309,14 @@ case "$HARNESS" in
       export DEFAULT_AUTH_REQUEST='{"methodId":"api-key"}'
       # Nothing here has a browser, and a role must never be waiting on an interactive login.
       export NO_BROWSER=1
+      # codex-acp has its own permission layer on top of everything else. Its default mode denied
+      # the shell outright: Ripley composed a correct `buzz messages send`, the adapter returned
+      # status "denied" then "failed", and she reported "message was published" having never
+      # published anything. Nothing reached the journal — the ACP capture was the only way to see
+      # it. `agent` permits tool use; `agent-full-access` removes the sandbox, which this role does
+      # not need. What a role may actually do is still decided by its uid, its App scope and its
+      # path boundary, not by this.
+      export INITIAL_AGENT_MODE="${NOSTROMO_AGENT_MODE:-agent}"
     fi
     # These agents take the model through buzz-acp rather than an env var of their own.
     HARNESS_ARGS=""
