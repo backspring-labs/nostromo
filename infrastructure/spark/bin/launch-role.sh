@@ -363,6 +363,16 @@ PERMISSION_ARG=()
 PERM="$(yaml_agent permission_mode)"
 [[ -n "$PERM" ]] && PERMISSION_ARG=(--permission-mode "$PERM")
 
+# buzz-acp logs nothing per-turn at its default buzz_acp=info: startup, then silence, whether it is
+# working or dropping every event on the floor. When a role goes quiet the journal cannot say
+# whether the mention arrived, was gated, or was dispatched and lost — which is the difference
+# between a relay problem, an allowlist problem and a harness problem. Raise it to see the
+# dispatch path. Off by default; debug is noisy and most of it is only interesting when something
+# is wrong.
+export RUST_LOG="${NOSTROMO_LOG_LEVEL:+buzz_acp=$NOSTROMO_LOG_LEVEL}"
+[[ -z "$RUST_LOG" ]] && unset RUST_LOG \
+  || echo "launch-$ROLE: log level $RUST_LOG" >&2
+
 AGENT_CMD="$HARNESS"
 AGENT_ARGS=()
 [[ -n "$HARNESS_ARGS" ]] && AGENT_ARGS=(--agent-args "$HARNESS_ARGS")
