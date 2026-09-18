@@ -21,6 +21,11 @@ Documentation=https://github.com/backspring-labs/nostromo
 # the adapter refuses to start if the pinned model is not resident.
 After=network-online.target ollama.service
 Wants=network-online.target
+# These belong in [Unit], not [Service]. systemd logged "Unknown key name
+# 'StartLimitIntervalSec' in section 'Service', ignoring" on every start, so the restart-loop
+# protection was silently absent on every role since the units were installed.
+StartLimitIntervalSec=300
+StartLimitBurst=10
 
 [Service]
 Type=simple
@@ -35,8 +40,6 @@ ExecStart=/opt/nostromo/nostromo-src/infrastructure/spark/bin/launch-role.sh %i
 # stops a genuinely broken role from restarting forever.
 Restart=always
 RestartSec=10s
-StartLimitIntervalSec=300
-StartLimitBurst=10
 
 # journald replaces the flat harness.log, which lived in a directory the role owned and could
 # therefore erase. A role cannot touch its own journal.

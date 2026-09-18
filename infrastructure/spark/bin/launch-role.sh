@@ -301,6 +301,14 @@ case "$HARNESS" in
       export ANTHROPIC_API_KEY="$(cat "$PROVIDER_KEY")"
     else
       export OPENAI_API_KEY="$(cat "$PROVIDER_KEY")"
+      # codex-acp advertises two ACP auth methods — `api-key` and `chat-gpt` — and the key is only
+      # "the fallback API key used when the API-key auth method is selected". Setting the key alone
+      # leaves the adapter unauthenticated: it answered every prompt with
+      # "Agent reported error (code -32000): Authentication required" and buzz-acp requeued with
+      # backoff forever. DEFAULT_AUTH_REQUEST selects the method without a client round-trip.
+      export DEFAULT_AUTH_REQUEST='{"methodId":"api-key"}'
+      # Nothing here has a browser, and a role must never be waiting on an interactive login.
+      export NO_BROWSER=1
     fi
     # These agents take the model through buzz-acp rather than an env var of their own.
     HARNESS_ARGS=""
