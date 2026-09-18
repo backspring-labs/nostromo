@@ -7,5 +7,10 @@ OPENCODE_VERSION=1.18.30
 CODEX_ACP_VERSION=1.12.0   # Ripley, Parker. npm @agentclientprotocol/codex-acp
 CLAUDE_AGENT_ACP_VERSION=0.79.0   # Dallas. npm @agentclientprotocol/claude-agent-acp
 
+# Ripley, Parker, Dallas and Brett all reach GitHub through this, and it was the one load-bearing
+# tool in the runtime that was not pinned — whatever Ubuntu shipped, which was 2.45.0 from February
+# and has no `baseRefOid` on `pr view --json`. Ripley stopped a PR review on exactly that.
+GH_VERSION=2.101.0
+
 # Recorded on first install, enforced on every install after. Upstream publishes no checksum.
 HERDR_SHA256=9c8db20fb7e7427b138d5367113f1621ffd319f2f65d6f009e2594029115f0d2

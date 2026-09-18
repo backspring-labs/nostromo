@@ -130,6 +130,26 @@ if [[ "$("$BIN/codex-acp" --version 2>/dev/null | tr -d '[:space:]')" != "$CODEX
   ln -sfn "$ROOT/npm/bin/codex-acp" "$BIN/codex-acp"
 fi
 
+# --- gh ----------------------------------------------------------------------------------------
+# Every role that touches GitHub goes through this, so it belongs in the lockfile like everything
+# else. It was the exception: the distro package, unpinned, and old enough that `pr view --json`
+# had no `baseRefOid` — which stopped a review mid-flight. Installed under this root so it also
+# stops depending on what apt happens to hold.
+if [[ "$("$BIN/gh" --version 2>/dev/null | awk 'NR==1{print $3}')" != "$GH_VERSION" ]]; then
+  [[ $CHECK_ONLY == 1 ]] && { echo "MISSING gh ${GH_VERSION}"; exit 1; }
+  say "installing gh ${GH_VERSION}"
+  base="https://github.com/cli/cli/releases/download/v${GH_VERSION}"
+  tar_name="gh_${GH_VERSION}_linux_arm64.tar.gz"
+  curl -fsSL -o "$ROOT/dl/$tar_name" "$base/$tar_name"
+  curl -fsSL -o "$ROOT/dl/gh_checksums.txt" "$base/gh_${GH_VERSION}_checksums.txt"
+  want="$(awk -v n="$tar_name" '$2==n {print $1}' "$ROOT/dl/gh_checksums.txt")"
+  [[ -n "$want" ]] || { echo "no checksum published for $tar_name" >&2; exit 1; }
+  verify_sha "$ROOT/dl/$tar_name" "$want"
+  tar -xzf "$ROOT/dl/$tar_name" -C "$ROOT/dl"
+  install -m 755 "$ROOT/dl/gh_${GH_VERSION}_linux_arm64/bin/gh" "$BIN/gh"
+  rm -rf "$ROOT/dl/$tar_name" "$ROOT/dl/gh_checksums.txt" "$ROOT/dl/gh_${GH_VERSION}_linux_arm64"
+fi
+
 # --- crewctl ----------------------------------------------------------------------------------
 # Ships in the repo rather than being installed, so a symlink keeps it tracking whatever is
 # checked out instead of going stale behind a copy. Unconditional: it has no version to compare.
