@@ -303,4 +303,5 @@ exec buzz-acp \
   --base-prompt-file "$BASE_PROMPT" \
   --system-prompt-file "$PERSONA" \
   --team-instructions "$TEAM_INSTRUCTIONS" \
-  --session-title "$ROLE"
+  --session-title "$ROLE" \
+  --multiple-event-handling queue
