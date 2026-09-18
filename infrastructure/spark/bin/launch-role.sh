@@ -322,6 +322,25 @@ case "$HARNESS" in
                "silently ignored and the default used instead" ;;
       esac
 
+      # codex runs a second reviewer over every exec, on top of the sandbox: "Guardian Review",
+      # the `auto_review` approvals reviewer that the `agent` mode carries. It denied Ripley's
+      # `buzz messages send` outright — a command that ships text to a remote relay is exactly what
+      # it is built to stop, and it cannot know that publishing is the one thing this role exists
+      # to do. The denial reached her as a failed tool call with no usable reason, and she ended
+      # the turn reporting a message published that was never sent.
+      #
+      # `guardian_approval` is a stable feature flag, on by default. Turning it off removes the
+      # reviewer and nothing else — the sandbox, the uid, the App scope and the path boundary all
+      # still stand. The alternative, `agent-full-access`, would drop the reviewer and the sandbox
+      # together, which is a much larger concession for the same outcome.
+      #
+      # network_access is set for the same reason: the workspace-write sandbox resolves no DNS, and
+      # the relay is not on loopback. Whether it takes depends on whether the per-turn sandbox
+      # policy overrides config — if it does not, this is what makes the publish reachable; if it
+      # does, this line costs nothing.
+      CODEX_DEFAULT_CONFIG='{"features": {"guardian_approval": false}, "sandbox_workspace_write": {"network_access": true}}'
+      export CODEX_CONFIG="${NOSTROMO_CODEX_CONFIG:-$CODEX_DEFAULT_CONFIG}"
+
       # The first two modes build their sandbox with bubblewrap. On Ubuntu 24.04 that fails outright
       # unless bwrap has an AppArmor profile (infrastructure/spark/apparmor/usr.bin.bwrap), and it
       # fails in the worst possible way: the adapter marks the tool call "denied" then "failed",
