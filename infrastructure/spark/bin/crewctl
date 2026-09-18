@@ -34,6 +34,7 @@ REPO = Path(os.environ.get("NOSTROMO_REPO", "/opt/nostromo/nostromo-src"))
 MANIFEST = REPO / "crew" / "manifest.yaml"
 BIN = REPO / "infrastructure" / "spark" / "bin"
 LOGROOT = Path("/opt/nostromo/logs")
+RUNTIME_BIN = Path(os.environ.get("NOSTROMO_RUNTIME_BIN", "/opt/nostromo/runtime/bin"))
 OLLAMA = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 
 
@@ -156,8 +157,13 @@ def check_role(role, cfg, tags_cache):
     except KeyError:
         add("account exists", False, f"no unix user '{role}'")
 
-    adapter = BIN / f"launch-{role}.sh"
-    add("adapter present", os.access(adapter, os.X_OK), str(adapter))
+    # One launcher for every role since §13.9 — checking launch-<role>.sh reported a missing
+    # adapter for a role that needs none.
+    launcher = BIN / "launch-role.sh"
+    add("launcher present", os.access(launcher, os.X_OK), str(launcher))
+    for f, label in ((REPO / "crew" / "personas" / f"{role}.md", "persona"),
+                     (REPO / "crew" / "prompts" / f"base-{role}.md", "base prompt")):
+        add(label, os.access(f, os.R_OK), str(f))
 
     for field in ("buzz_pubkey", "harness", "provider", "respond_to"):
         add(f"manifest {field}", bool(cfg.get(field)), cfg.get(field, "missing"))
@@ -186,9 +192,14 @@ def check_role(role, cfg, tags_cache):
     else:
         add("log dir", False, f"{d} missing")
 
+    # Look in the runtime bin explicitly as well as PATH: crewctl is usually invoked by absolute
+    # path or through /usr/local/bin, neither of which puts the Nostromo runtime on PATH, and a
+    # PATH-only check reported every binary missing while they were all installed.
     for b in ("buzz-acp", "buzz", cfg.get("harness", "")):
-        if b:
-            add(f"{b} on PATH", shutil.which(b) is not None, shutil.which(b) or "not found")
+        if not b:
+            continue
+        found = shutil.which(b) or (str(RUNTIME_BIN / b) if os.access(RUNTIME_BIN / b, os.X_OK) else None)
+        add(f"{b} installed", found is not None, found or "not found")
 
     return checks
 

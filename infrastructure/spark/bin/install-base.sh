@@ -100,19 +100,24 @@ if [[ "$("$BIN/opencode" --version 2>/dev/null | tr -d '[:space:]')" != "$OPENCO
   npm_config_prefix="$ROOT/npm" "$node_dir/bin/npm" install -g --no-fund --no-audit \
     "opencode-ai@${OPENCODE_VERSION}"
   ln -sfn "$ROOT/npm/bin/opencode" "$BIN/opencode"
-
-# claude-agent-acp — Dallas's harness. Pinned like everything else: an ACP adapter changing
-# underneath a review role is a change to what review means.
-if [[ "$CHECK_ONLY" == 0 ]]; then
-  npm_config_prefix="$ROOT/npm" "$BIN/npm" install -g --silent \
-    "@agentclientprotocol/claude-agent-acp@$CLAUDE_AGENT_ACP_VERSION"
 fi
-ln -sfn "$ROOT/npm/bin/claude-agent-acp" "$BIN/claude-agent-acp"
 
-# crewctl ships in the repo rather than being installed, so a symlink keeps it tracking whatever
-# is checked out instead of going stale behind a copy.
+# --- claude-agent-acp -------------------------------------------------------------------------
+# Dallas's harness. Pinned like everything else: an ACP adapter changing underneath a review role
+# is a change to what review means. Version-checked separately from OpenCode — nesting it inside
+# OpenCode's block meant it silently never installed once OpenCode was already current.
+if [[ "$("$BIN/claude-agent-acp" --version 2>/dev/null | tr -d '[:space:]')" != "$CLAUDE_AGENT_ACP_VERSION" ]]; then
+  [[ $CHECK_ONLY == 1 ]] && { echo "MISSING claude-agent-acp ${CLAUDE_AGENT_ACP_VERSION}"; exit 1; }
+  say "installing claude-agent-acp ${CLAUDE_AGENT_ACP_VERSION}"
+  npm_config_prefix="$ROOT/npm" "$node_dir/bin/npm" install -g --no-fund --no-audit \
+    "@agentclientprotocol/claude-agent-acp@${CLAUDE_AGENT_ACP_VERSION}"
+  ln -sfn "$ROOT/npm/bin/claude-agent-acp" "$BIN/claude-agent-acp"
+fi
+
+# --- crewctl ----------------------------------------------------------------------------------
+# Ships in the repo rather than being installed, so a symlink keeps it tracking whatever is
+# checked out instead of going stale behind a copy. Unconditional: it has no version to compare.
 ln -sfn /opt/nostromo/nostromo-src/infrastructure/spark/bin/crewctl "$BIN/crewctl"
-fi
 
 # --- the environment the launcher and the owner both source ------------------------------------
 cat > "$ROOT/env.sh" <<EOF
