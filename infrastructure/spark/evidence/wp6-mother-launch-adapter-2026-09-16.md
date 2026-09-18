@@ -404,3 +404,71 @@ crew's namespaces, which trades a recoverable inconvenience for an unrecoverable
 
 **What it does not change.** A role still cannot write another role's namespace — that was the
 finding, and it is fixed. The bypass added here is the owner's, not a role's.
+
+## codex-acp roles could not speak, 2026-09-18
+
+Ripley and Parker ran for two days looking healthy and published nothing. Both answer now. The
+cause was three walls stacked in the same path, and the reason it took so long is that every
+instrument we had reported success.
+
+**Wall 1 — bubblewrap could not build a sandbox.** Ubuntu 24.04 sets
+`kernel.apparmor_restrict_unprivileged_userns=1`, so bwrap transitions into the stock
+`unprivileged_userns` profile and loses the capabilities it needs to finish setup. Measured with
+codex's own sandbox runner, no model involved:
+
+```
+codex sandbox -c sandbox_mode="read-only"           -- /bin/echo hello   ->  bwrap: Operation not permitted
+codex sandbox -c sandbox_mode="workspace-write"     -- /bin/echo hello   ->  bwrap: Operation not permitted
+codex sandbox -c sandbox_mode="danger-full-access"  -- /bin/echo hello   ->  hello
+```
+
+Every shell command either role ran had been failing before it started. Fixed with
+`infrastructure/spark/apparmor/usr.bin.bwrap`, the same shape as Ubuntu's own `ch-run` profile.
+`read-only` and `workspace-write` both work now, so the fix stands whether or not the roles use them.
+
+**Wall 2 — Guardian Review denied the publish.** codex runs an automated approvals reviewer over
+every exec, carried by the `agent` mode. The capture:
+
+```
+x [in_progress -> failed]  Guardian Review
+    Status: Denied  Action: exec /bin/bash -lc "buzz messages send --channel ... --content '@jladd I'm Ripley...'"
+```
+
+Correct behaviour on its part — a command shipping text to a remote host is what it watches for. It
+cannot know that publishing to the crew's own relay is the only way the role is heard.
+
+**Wall 3 — the `agent` sandbox has `networkAccess: false`**, and the relay is not on loopback.
+Measured: `curl https://api.github.com` inside workspace-write could not resolve; with
+`sandbox_workspace_write.network_access=true` it returned 200, as did the relay.
+
+**What did not work, measured rather than assumed.** `INITIAL_AGENT_MODE=agent` is a no-op —
+`agent` is already codex-acp's `DEFAULT_AGENT_MODE`. `features.guardian_approval=false` through
+`CODEX_CONFIG` did not reach the feature layer; neither did writing it to the role's own
+`~/.codex/config.toml`. The flag is real — `codex features list -c features.guardian_approval=false`
+flips the effective state — but nothing we could set from outside reached it.
+
+**Resolution.** `agent_mode: agent-full-access` in `crew/manifest.yaml` for both roles, which sets
+the approvals reviewer to never/user and the sandbox to dangerFullAccess. Recorded in the manifest
+rather than a systemd drop-in so it sits with the rest of each role's boundary. DEV-010 records the
+cost: no harness-level filesystem sandbox on these two roles, with containment resting on the
+dedicated uid, the 700 home, the App scoped to `nostromo/<role>/*`, no sudo and no polkit rights.
+
+**What this cost us in instrumentation, which is the part worth keeping.** The failure was invisible
+from every vantage point we had: buzz-acp logged `outcome="ok"`, the journal showed a clean
+29-second turn with two tool calls, presence stayed online, and Ripley reported to herself that the
+message was published. Five places to look, none of them true. Three things came out of that:
+
+- `NOSTROMO_LOG_LEVEL` on the launcher. buzz-acp logs startup at `buzz_acp=info` and then nothing
+  for the life of the process, so "no eyes" could not be distinguished from "mention never arrived"
+  or "arrived and was gated". At debug it prints `admitted event`, `agent_claimed`,
+  `dispatch_pending`, `tool call started` and `agent_returned`.
+- `acp-last-turn.sh`, which reads the ACP capture — the only witness — and prints the prompt, every
+  tool call with its status flow, any error and the stop reason. Its first version reported
+  "TOOL CALLS none in this turn" for a turn with two, because it concatenated both capture
+  directions and sliced from the last `session/prompt`, which discarded the stream the tool calls
+  live in. It now slices each direction separately and prints what it read.
+- A bubblewrap preflight in the launcher. A codex-acp role on a sandboxed mode now refuses to start
+  if bwrap cannot build a sandbox, naming the fix, rather than running and denying everything.
+
+**Still open.** Ash is the third codex-acp role in the manifest and will hit Wall 2 on its first
+turn. Nothing about this was specific to Ripley.
