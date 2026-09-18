@@ -386,3 +386,21 @@ harness here reports `steering_supported=false` at startup. Now `queue`.
 — then recovered by sending the full result in two later messages. Cause unknown: ACP tracing is
 off under systemd, so there is no capture of the command he issued. Worse than silence, because a
 truncated message reads like an answer. Open.
+
+## Owner bypass, decided 2026-09-17
+
+Cleaning up after the probe exposed that the owner could not delete a branch in a role's namespace:
+the ruleset denies everyone and exempted only that role's App. Correct isolation, and an
+operational trap — a role's debris would be removable only by that role, and not at all once its
+App is revoked.
+
+All seven rulesets now also list `OrganizationAdmin` (actor_id 1) as a bypass actor. Verified by
+creating and deleting a branch under `nostromo/dallas/**` as the owner.
+
+**What this costs.** GitHub rulesets have no per-user bypass type, so this grants bypass to *any*
+organization admin rather than to one person. Today that set is the owner alone; it widens the
+moment another admin is added, silently. The alternative was leaving the owner locked out of the
+crew's namespaces, which trades a recoverable inconvenience for an unrecoverable one.
+
+**What it does not change.** A role still cannot write another role's namespace — that was the
+finding, and it is fixed. The bypass added here is the owner's, not a role's.
