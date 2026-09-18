@@ -101,6 +101,14 @@ if [[ "$("$BIN/opencode" --version 2>/dev/null | tr -d '[:space:]')" != "$OPENCO
     "opencode-ai@${OPENCODE_VERSION}"
   ln -sfn "$ROOT/npm/bin/opencode" "$BIN/opencode"
 
+# claude-agent-acp — Dallas's harness. Pinned like everything else: an ACP adapter changing
+# underneath a review role is a change to what review means.
+if [[ "$CHECK_ONLY" == 0 ]]; then
+  npm_config_prefix="$ROOT/npm" "$BIN/npm" install -g --silent \
+    "@agentclientprotocol/claude-agent-acp@$CLAUDE_AGENT_ACP_VERSION"
+fi
+ln -sfn "$ROOT/npm/bin/claude-agent-acp" "$BIN/claude-agent-acp"
+
 # crewctl ships in the repo rather than being installed, so a symlink keeps it tracking whatever
 # is checked out instead of going stale behind a copy.
 ln -sfn /opt/nostromo/nostromo-src/infrastructure/spark/bin/crewctl "$BIN/crewctl"
