@@ -9,7 +9,7 @@ cannot wrap a UI."
   crewctl status [role]        unit state for the crew, or one role
   crewctl describe <role>      effective configuration (public values only, §13.10)
   crewctl check [role]         preflight: would this role start?
-  crewctl start|stop|restart <role>
+  crewctl start|stop|restart <role>...   one role or several
   crewctl logs [role] [-f] [-n N]
 
   --json                       machine-readable output, on every subcommand
@@ -237,7 +237,7 @@ def cmd_describe(args, roles):
         "owner_attestation": "present" if cfg.get("buzz_auth_tag") else "absent",
         "github_app": gh.get("app_slug"),
         "github_bot": gh.get("bot_login"),
-        "adapter": str(BIN / f"launch-{args.role}.sh"),
+        "adapter": f"{BIN / 'launch-role.sh'} {args.role}",
         "logs": str(LOGROOT / args.role),
         "unit": unit(args.role) + ".service",
     }
@@ -271,21 +271,35 @@ def cmd_check(args, roles):
 
 
 def cmd_unitop(args, roles):
-    op = args.command
-    r = systemctl(op, unit(args.role))
-    if r.returncode != 0:
-        msg = (r.stderr or r.stdout).strip()
-        if "interactive authentication required" in msg.lower():
-            msg += ("\n\nInstall the polkit rule (infrastructure/spark/systemd/) to control "
-                    "nostromo@* without sudo, or re-run this under sudo.")
-        die(msg, args.json)
-    state = unit_state(args.role)
-    if args.json:
-        print(json.dumps({"role": args.role, "op": op, **state}, indent=2))
-    else:
-        print(f"{args.role}: {op} -> {state['active']} (pid {state['pid'] or '-'}, "
-              f"{state['restarts']} restarts)")
-    return 0
+    """Acts on every named role, and reports each one separately.
+
+    Takes a list because a change to the launcher is a change to every role that shares a branch of
+    it, and restarting them one command at a time is how one gets forgotten. A failure on one role
+    does not abandon the rest — they are independent units — but the exit code is non-zero if any
+    failed, so a script still sees it.
+    """
+    op, failed = args.command, []
+    for role in args.role:
+        r = systemctl(op, unit(role))
+        if r.returncode != 0:
+            msg = (r.stderr or r.stdout).strip()
+            if "interactive authentication required" in msg.lower():
+                msg += ("\n\nInstall the polkit rule (infrastructure/spark/systemd/) to control "
+                        "nostromo@* without sudo, or re-run this under sudo.")
+            failed.append({"role": role, "op": op, "error": msg})
+            continue
+        state = unit_state(role)
+        if args.json:
+            print(json.dumps({"role": role, "op": op, **state}, indent=2))
+        else:
+            print(f"{role}: {op} -> {state['active']} (pid {state['pid'] or '-'}, "
+                  f"{state['restarts']} restarts)")
+    for f in failed:
+        if args.json:
+            print(json.dumps(f, indent=2))
+        else:
+            print(f"{f['role']}: {op} FAILED — {f['error']}", file=sys.stderr)
+    return 1 if failed else 0
 
 
 def cmd_logs(args, roles):
@@ -311,8 +325,8 @@ def main():
     c = sub.add_parser("check", help="preflight: would this role start?")
     c.add_argument("role", nargs="?")
     for op in ("start", "stop", "restart"):
-        o = sub.add_parser(op, help=f"{op} a role's unit")
-        o.add_argument("role")
+        o = sub.add_parser(op, help=f"{op} one or more roles' units")
+        o.add_argument("role", nargs="+", metavar="role")
     lg = sub.add_parser("logs", help="journal for a role, or the whole crew")
     lg.add_argument("role", nargs="?")
     lg.add_argument("-f", "--follow", action="store_true")
@@ -320,8 +334,14 @@ def main():
 
     args = p.parse_args()
     roles = agents()
-    if getattr(args, "role", None) and args.role not in roles and args.command != "logs":
-        die(f"unknown role '{args.role}' — manifest has: {', '.join(roles)}", args.json)
+    # `role` is a list for start/stop/restart and a bare name elsewhere. Validate before acting so
+    # a typo in the third of three roles does not leave the first two already restarted.
+    named = args.role if isinstance(getattr(args, "role", None), list) else \
+        ([args.role] if getattr(args, "role", None) else [])
+    if args.command != "logs":
+        for name in named:
+            if name not in roles:
+                die(f"unknown role '{name}' — manifest has: {', '.join(roles)}", args.json)
 
     return {
         "status": cmd_status, "describe": cmd_describe, "check": cmd_check,
