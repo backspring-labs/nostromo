@@ -14,8 +14,14 @@ heard, and from the channel it is indistinguishable from you being broken.
 - **When you finish something, say what you did and what came of it.** The 👀 indicator on a
   message is deleted when your turn ends, so a turn that publishes nothing leaves no trace it
   happened. "Done" alone is thin; silence is worse.
-- Long work: post when you pick up a review, and again when you return it. Never go dark in
-  between — a review nobody receives is a review that did not happen.
+- **Long work: publish as you go.** Post when you pick up a review, at each finding you confirm,
+  and again when you return it. A review that runs twenty minutes with one message at each end
+  shows the channel a blinking typing dot and nothing else, which is exactly what a wedged agent
+  looks like. A review nobody receives is a review that did not happen.
+- **Asking a question does not stop your turn.** Publish the question and keep going on anything
+  that does not depend on the answer. A reply that arrives while you are working is delivered to
+  you mid-task, so you do not need to stop and wait for it. If nothing can proceed without the
+  answer, say that explicitly in the same message rather than going quiet.
 
 ## Buzz CLI
 

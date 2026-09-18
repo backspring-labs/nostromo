@@ -107,6 +107,30 @@ REQUIRES_CLONE="$(yaml_agent requires_clone)"
 MAX_ROUNDS="$(yaml_agent max_rounds)"
 [[ -n "$MAX_ROUNDS" ]] || die "no max_rounds for $ROLE in the manifest"
 
+# How a mention arriving mid-turn is handled, decided by whether the harness can actually be steered.
+# Measured at initialize, not assumed: buzz-agent reports steering_supported=false, codex-acp and
+# claude-agent-acp both report true. Given false, `steer` degrades to a non-cancelling steer ack and
+# silently drops the mention — which is why every role was pinned to `queue`. But `queue` holds the
+# owner's reply until the current turn ends, so on a harness that can steer, a mid-task answer to
+# the agent's own question waits for the task it was meant to redirect. Per-harness, overridable.
+case "$(yaml_agent event_handling)" in
+  "") case "$HARNESS" in
+        codex-acp|claude-agent-acp) EVENT_HANDLING=steer ;;
+        *)                          EVENT_HANDLING=queue ;;
+      esac ;;
+  *)  EVENT_HANDLING="$(yaml_agent event_handling)" ;;
+esac
+
+# What actually bounds a turn. max_rounds only reaches buzz-agent — for the ACP adapters nothing
+# consumed it, while the startup banner printed it as though it were in force, so those roles were
+# running with no declared bound but a stated one. These are the real limits: an absolute wall-clock
+# cap, and a silence timeout so a wedged turn dies visibly instead of holding the slot for hours.
+TURN_DURATION="${NOSTROMO_TURN_DURATION:-$(yaml_agent max_turn_duration)}"
+: "${TURN_DURATION:=7200}"
+IDLE_TIMEOUT="${NOSTROMO_IDLE_TIMEOUT:-$(yaml_agent idle_timeout)}"
+: "${IDLE_TIMEOUT:=600}"
+
+
 # ---- §13.2.5 relay, §13.2.6/7 inbound gate --------------------------------------------------
 RELAY_URL="$(yaml_top relay url)"
 OWNER_PUB="$(awk '$1 == "owner:" { print $2; exit }' "$ALLOWFILE")"
@@ -228,7 +252,8 @@ launch-$ROLE: resolved configuration
   harness         $HARNESS + buzz-dev-mcp (shell, read_file, str_replace, todo, view_image)
   provider        $PROVIDER${PROVIDER_KEY:+  (key: $PROVIDER_KEY, contents never shown)}
   model           ${PINNED:-$OLLAMA_TAG}${OLLAMA_TAG:+  via $OLLAMA_URL/v1}
-  max rounds      ${NOSTROMO_MAX_ROUNDS:-$MAX_ROUNDS}
+  turn limits     $([[ "$HARNESS" == "buzz-agent" ]] && echo "${NOSTROMO_MAX_ROUNDS:-$MAX_ROUNDS} rounds, " )${TURN_DURATION}s wall clock, ${IDLE_TIMEOUT}s idle
+  mid-turn events $EVENT_HANDLING
   workdir         $WORKDIR
   logs            $LOGDIR
   auth tag        $AUTH_DESC
@@ -416,4 +441,6 @@ exec buzz-acp \
   --system-prompt-file "$PERSONA" \
   --team-instructions "$TEAM_INSTRUCTIONS" \
   --session-title "$ROLE" \
-  --multiple-event-handling queue
+  --multiple-event-handling "$EVENT_HANDLING" \
+  --max-turn-duration "$TURN_DURATION" \
+  --idle-timeout "$IDLE_TIMEOUT"
