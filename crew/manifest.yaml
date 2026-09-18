@@ -62,6 +62,7 @@ agents:
     host: spark
     supervisor: systemd
     harness: codex-acp
+    agent_mode: agent-full-access
     provider: openai
     model: gpt-5.6-sol
     provider_boundary: nostromo-ripley
@@ -146,6 +147,7 @@ agents:
     host: spark
     supervisor: systemd
     harness: codex-acp
+    agent_mode: agent-full-access
     provider: openai
     model: gpt-5.6-sol
     provider_boundary: nostromo-parker

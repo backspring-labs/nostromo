@@ -222,3 +222,43 @@ Owner approval:        Pending.
 Revisit trigger:       A harness that can only take a credential from a file path rather than an
                        environment variable, or any role needing two keys for one provider.
 ```
+
+```
+ID:                    DEV-010
+Date:                  2026-09-18
+Spec/plan reference:   Bootstrap Plan §13.9 (launcher), §8.4 (role containment)
+Expected:              Every role runs inside whatever sandbox its harness provides, with the harness
+                       default kept unless there is a reason to change it.
+Actual tooling constraint: codex-acp's default mode (`agent`) runs a second approvals reviewer over
+                       every exec — "Guardian Review" — and it denied `buzz messages send` on every
+                       attempt across four configurations. From Guardian's side that is a correct
+                       call: the command ships text to a remote host. It cannot know that publishing
+                       to the crew's own relay is the only way the role is heard at all, and there is
+                       no supported way to tell it. Measured, not assumed: setting
+                       features.guardian_approval=false through CODEX_CONFIG did not reach the
+                       feature layer, and neither did writing it to the role's ~/.codex/config.toml,
+                       though `codex features list -c features.guardian_approval=false` flips the
+                       effective state, so the flag itself is real. The `agent` mode's sandbox is
+                       also networkAccess:false, and the relay is not on loopback — so even a
+                       permitted publish had a second wall behind the first.
+Chosen workaround:     `agent_mode: agent-full-access` in crew/manifest.yaml for ripley and parker.
+                       That mode sets approvalsReviewer to never/user and sandbox to dangerFullAccess,
+                       removing both walls. Recorded in the manifest rather than a systemd drop-in so
+                       it sits with the rest of each role's boundary and survives a rebuild.
+Security/cost impact:  Weaker than intended, and worth naming plainly: these two roles run with no
+                       harness-level filesystem sandbox. What still contains them is what always
+                       actually did — a dedicated Unix account with a 700 home, their own clone, a
+                       GitHub App scoped to nostromo/<role>/* with no path to main, no sudo, no
+                       polkit rights over any unit, and MemoryMax. The codex sandbox was a fourth
+                       layer that, on this host, had never once functioned: Ubuntu 24.04's
+                       apparmor_restrict_unprivileged_userns meant bubblewrap could not build a
+                       sandbox at all until infrastructure/spark/apparmor/usr.bin.bwrap was installed.
+                       The layer was nominal before this deviation and is explicit after it.
+Temporary or permanent: Temporary.
+Owner approval:        Granted 2026-09-18 after four measured attempts at the narrower fix.
+Revisit trigger:       codex-acp exposing the approvals reviewer as configuration, an allowlist that
+                       can admit one command, or a session-mode whose sandbox permits network. Any of
+                       those puts ripley and parker back on `agent` by changing one manifest line.
+                       Also revisit before ash is built: ash is the third codex-acp role in the
+                       manifest and will hit the same wall on its first turn.
+```
