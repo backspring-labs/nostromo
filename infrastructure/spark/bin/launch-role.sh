@@ -92,6 +92,17 @@ STORED_PUB="$(tr -d '[:space:]' < "$PUBFILE" 2>/dev/null || true)"
 WORKDIR="$(yaml_agent workdir)"
 WORKDIR="${WORKDIR/#\~/$HOME}"
 [[ -n "$WORKDIR" ]] || die "no workdir for $ROLE in the manifest"
+# A pinned model and the family it is supposed to belong to must agree. Dallas reviews with a
+# different provider/model family from the roles whose work he reviews — that is the design, not a
+# preference — and a pin quietly changed to another family would defeat it while the manifest
+# still claimed otherwise. Documentation that can drift from what runs is documentation that lies.
+MODEL_FAMILY="$(yaml_agent model_family)"
+PINNED="$(yaml_agent model)"
+if [[ -n "$MODEL_FAMILY" && -n "$PINNED" ]]; then
+  [[ "$PINNED" == *"$MODEL_FAMILY"* ]] \
+    || die "manifest says model_family=$MODEL_FAMILY but model=$PINNED — they disagree; change both or neither"
+fi
+
 REQUIRES_CLONE="$(yaml_agent requires_clone)"
 MAX_ROUNDS="$(yaml_agent max_rounds)"
 [[ -n "$MAX_ROUNDS" ]] || die "no max_rounds for $ROLE in the manifest"
