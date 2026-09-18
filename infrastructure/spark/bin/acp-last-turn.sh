@@ -53,28 +53,37 @@ def text_of(block):
         return " ".join(filter(None, (text_of(b) for b in block)))
     return ""
 
-# Every capture stage, newest first, merged in timestamp order where the tee recorded one. The
-# adapter's replies and the client's requests live in separate files; a denial only makes sense
-# next to the call it denied.
-records = []
+# The two directions are separate files: the client's requests (session/prompt) in one, the
+# adapter's replies (session/update, and every tool call) in the other. They are sliced separately
+# and merged after. Concatenating them first and slicing from the last session/prompt cut every
+# tool call out of the result and reported "none in this turn" for a turn with two — the same
+# failure mode as everything else today, an empty answer that looks like a finding.
+TAIL = 400
+records, read = [], []
 for path in files[:4]:
+    parsed = []
     with open(path, errors="replace") as handle:
         for line in handle:
             line = line.strip()
             if not line.startswith("{"):
                 continue
             try:
-                records.append((os.path.basename(path), json.loads(line)))
+                parsed.append(json.loads(line))
             except json.JSONDecodeError:
                 continue
+    starts = [i for i, r in enumerate(parsed) if r.get("method") == "session/prompt"]
+    if starts:
+        kept = parsed[starts[-min(turns, len(starts))]:]
+        where = f"from prompt #{len(starts) - min(turns, len(starts)) + 1}"
+    else:
+        kept = parsed[-TAIL:]
+        where = f"tail {len(kept)}" if kept else "empty"
+    read.append(f"{os.path.basename(path)} ({len(parsed)} records, {where})")
+    records.extend((os.path.basename(path), r) for r in kept)
 
-# A turn is one session/prompt and everything after it.
-starts = [i for i, (_, r) in enumerate(records) if r.get("method") == "session/prompt"]
-if starts:
-    records = records[starts[-min(turns, len(starts))]:]
-else:
-    records = records[-400:]
-    print("(no session/prompt found — showing the tail of the capture)\n")
+print("READ     " + "\n         ".join(read) + "\n")
+if not records:
+    sys.exit("captures are empty — the role may not have taken a turn since the last restart")
 
 calls = {}
 for source, record in records:
