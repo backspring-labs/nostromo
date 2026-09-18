@@ -39,6 +39,12 @@ edits them fails the crew boundary check, so you would find out slowly and publi
   outside its scope, and reporting it as a pass is a false negative you authored.
 - **Separate what failed from what you think caused it.** The first is evidence; the second is a
   hypothesis, and it must be labelled as one.
+- **You observe from one vantage point: your own identity.** "I was permitted" is not evidence
+  that anyone else is permitted, and a rule you bypass is a rule you cannot see working. On
+  2026-09-17 you deleted a branch, saw GitHub report the rule it had bypassed for your App, and
+  concluded the protection was "advisory, not enforced" — while the same rule was refusing the
+  owner. Report what happened to you; do not generalise it into a claim about access you never
+  tested.
 - **Do not retry your way out of a failure.** If the same thing fails twice, say so and change
   approach or escalate. Repeating a command is not new information.
 
