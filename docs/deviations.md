@@ -197,3 +197,28 @@ Owner approval:        Recorded for review. Not worth further investigation unle
                        out to need the CLI.
 Revisit trigger:       An OpenCode upgrade; or a crew workflow that needs `opencode run` rather than ACP.
 ```
+
+```text
+ID:                    DEV-009
+Date:                  2026-09-17
+Spec/plan reference:   Bootstrap Plan §8.10 (provider secret placement)
+Expected:              One .env file per role on the Spark — ripley.env, parker.env, dallas.env —
+                       each holding only that role's provider key and GitHub App key.
+Actual tooling constraint: Not a tooling constraint. §8.10 was written when the crew shared one Unix
+                       account, so a filename had to carry the role. Per-role accounts (WP-4) made the
+                       ACCOUNT the namespace, and the Buzz key already follows that convention at
+                       ~<role>/.config/nostromo/secrets/buzz.key.
+Chosen workaround:     ~<role>/.config/nostromo/secrets/<provider>.key, mode 600, owned by the role.
+                       So Dallas's Anthropic key is ~dallas/.config/nostromo/secrets/anthropic.key.
+                       launch-role.sh asserts the file exists and is mode 600 before starting, and
+                       reads it into the provider's standard environment variable at exec time.
+Security/cost impact:  Stronger than the plan's shape. A .env in a shared location is readable by
+                       whoever can read that location; a 600 file in a 700 home is unreadable by the
+                       other six roles, which §13.5 proved by probe — Mother could not read Brett's key.
+                       It also satisfies §8.10's actual requirement ("only each role's own credential
+                       on its execution host") more directly, since no file contains two roles' data.
+Temporary or permanent: Permanent.
+Owner approval:        Pending.
+Revisit trigger:       A harness that can only take a credential from a file path rather than an
+                       environment variable, or any role needing two keys for one provider.
+```
