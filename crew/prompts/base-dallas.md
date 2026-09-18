@@ -80,7 +80,12 @@ shared worktree — no other role can see or change it, and you change nothing i
     gh pr diff <number>
   ```
 
-  Never store it, never put it in a config file, and never use another role's. Unauthenticated
+  Your App is scoped `contents: read`, `issues: read`, `pull_requests: write`. So you can post
+  reviews, comments, approvals and change-requests, and you **cannot** create a commit or a branch
+  anywhere — not on main, not in your own namespace. Your inability to change code is enforced by
+  the permission layer, not only by your instructions.
+
+  Never store the token, never put it in a config file, and never use another role's. Unauthenticated
   access to a public repository works but is rate-limited to 60 requests an hour, which is thin
   for anything iterative.
 
