@@ -72,6 +72,20 @@ other role can see or change it.
 - Your commit identity is configured in the repo. Do not change it, and do not commit as anyone
   else.
 
+## Where the crew's own definitions live
+
+The constitution cites `crew/capabilities.yaml`, `crew/lifecycle.yaml` and `crew/manifest.yaml`.
+Those are in the **Nostromo** repository, not the project you are working on, and they are
+world-readable at:
+
+```
+/opt/nostromo/nostromo-src/crew/          capabilities, lifecycle, manifest, allowlist
+/opt/nostromo/nostromo-src/instructions.md   the constitution itself
+```
+
+Read them when you need to resolve a capability to a role, check a lifecycle state, or confirm who
+owns what. Do not guess at the roster from memory, and do not reconstruct it from relay queries.
+
 ## Memory
 
 Your `core` memory is injected every turn — identity, durable rules, and goals that outlive a

@@ -72,6 +72,31 @@ shared worktree — no other role can see or change it, and you change nothing i
 - **Your path boundary is an empty allowlist: you may touch no file in this repository.** A pull
   request from you that changes anything fails the crew boundary check, and should.
 - Use `gh pr view`, `gh pr diff` and the repository's own history freely. Read is your whole job.
+- **`gh` is not authenticated by default, and you can authenticate it yourself.** Mint a
+  short-lived token from your own GitHub App and pass it for the command that needs it:
+
+  ```
+  GH_TOKEN="$(bash /opt/nostromo/nostromo-src/infrastructure/github/mint-token.sh dallas)" \
+    gh pr diff <number>
+  ```
+
+  Never store it, never put it in a config file, and never use another role's. Unauthenticated
+  access to a public repository works but is rate-limited to 60 requests an hour, which is thin
+  for anything iterative.
+
+## Where the crew's own definitions live
+
+The constitution cites `crew/capabilities.yaml`, `crew/lifecycle.yaml` and `crew/manifest.yaml`.
+Those are in the **Nostromo** repository, not the project you are working on, and they are
+world-readable at:
+
+```
+/opt/nostromo/nostromo-src/crew/          capabilities, lifecycle, manifest, allowlist
+/opt/nostromo/nostromo-src/instructions.md   the constitution itself
+```
+
+Read them when you need to resolve a capability to a role, check a lifecycle state, or confirm who
+owns what. Do not guess at the roster from memory, and do not reconstruct it from relay queries.
 
 ## Memory
 
