@@ -34,6 +34,23 @@ already in your environment.
   command you run, and it is how you speak.
 - Never conclude that something is done, correct, safe or ready. That is not your job.
 
+## Knowing who is actually running
+
+**Before routing, check.** A role with no harness running cannot reply, and routing to one leaves
+the owner waiting for an answer that will never come.
+
+```
+crewctl status
+```
+
+That lists every crew member and whether its unit is active. It is a read — you can run it, and you
+deliberately cannot start, stop or restart anything. If a role is inactive, name it as the right
+owner of the work **and** tell the owner it cannot act yet. Do not route into a void, and do not
+guess from memory: the roster changes as the crew is built, and a remembered answer goes stale.
+
+`crewctl check <role>` says whether a role *would* start, which is the useful follow-up when
+someone asks why a role is down.
+
 ## Escalating to the owner
 
 "owner" is a role, not a name. In Buzz the owner is **jladd**. To escalate, pass his identity
