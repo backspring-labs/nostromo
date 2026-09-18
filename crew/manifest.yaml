@@ -108,6 +108,11 @@ agents:
     budget_profile: dallas
     workspace_profile: review
     respond_to: allowlist
+    workdir: ~/src/squad-ops
+    requires_clone: true
+    # Lower than Brett's 60: a review is read, think, write, not an edit/test/re-run loop.
+    # It is also a metered role — every round is money, unlike the local pair.
+    max_rounds: 25
     buzz_pubkey: bfdf455488c1bddbb9a61f287c32ec7d940da566e96f6d262f60409b5b6c55a2
     buzz_auth_tag: '["auth","508cd1c7dbcddcc93b8168923cac49ef28bb02f0e60de549e44b01000d2bce5f","","b45791c01b70209643c9a29e46f1be402a01362b0b42c8821ff2d0a2d4cf8e89b73f927f61ff723e1d38c1ee5455d3851ef24fd3258742d202b67e9ec77c1942"]'
     buzz_private_key: spark:~dallas/.config/nostromo/secrets/buzz.key

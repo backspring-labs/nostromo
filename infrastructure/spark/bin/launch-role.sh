@@ -65,7 +65,7 @@ for f in "$MANIFEST" "$ALLOWFILE" "$PERSONA" "$INSTRUCTIONS" "$BASE_PROMPT"; do
 done
 
 [[ -n "$HARNESS" ]] || HARNESS="$(yaml_agent harness)"
-case "$HARNESS" in buzz-agent|goose) ;; *) die "unsupported harness '$HARNESS' — expected buzz-agent or goose" ;; esac
+case "$HARNESS" in buzz-agent|goose|claude-agent-acp|codex-acp) ;; *) die "unsupported harness '$HARNESS'" ;; esac
 
 for b in buzz-acp "$HARNESS" buzz-dev-mcp buzz; do
   command -v "$b" >/dev/null 2>&1 || die "$b is not on PATH after sourcing $ENV_SH"
@@ -135,22 +135,45 @@ else
 fi
 
 
-# ---- §13.2.10 buzz-agent → local Ollama/Qwen ------------------------------------------------
-# Local-inference roles are bound by the crew constitution (crew constitution, "Budget and blocked state"). buzz-agent takes
-# its provider from the environment, so assert it here rather than trusting it: on 2026-09-15 an
-# OpenCode profile with no provider block silently served a turn from a hosted model, with no error
-# and nothing in Ollama's journal. Fail closed instead.
-OLLAMA_TAG="$(yaml_agent ollama_tag)"
+# ---- provider ---------------------------------------------------------------------------------
+# Whatever the manifest says the provider is, assert it rather than trust it. On 2026-09-15 an
+# OpenCode profile with no provider block silently served a turn from a hosted model, with no
+# error anywhere and nothing in Ollama's journal. Fail closed instead.
 PROVIDER="$(yaml_agent provider)"
-[[ "$PROVIDER" == "ollama" ]] || die "manifest says provider=$PROVIDER; $ROLE is local-inference-only"
-[[ -n "$OLLAMA_TAG" ]] || die "no ollama_tag for $ROLE in the manifest"
-
+[[ -n "$PROVIDER" ]] || die "no provider for $ROLE in the manifest"
 OLLAMA_URL="http://localhost:11434"
-curl -sf --max-time 5 "$OLLAMA_URL/api/tags" -o /tmp/.nostromo-tags.$$ \
-  || die "Ollama is not answering on $OLLAMA_URL"
-python3 -c 'import json,sys; ms=[m["name"] for m in json.load(open(sys.argv[1]))["models"]]; sys.exit(0 if sys.argv[2] in ms else 1)' \
-  /tmp/.nostromo-tags.$$ "$OLLAMA_TAG" || { rm -f /tmp/.nostromo-tags.$$; die "Ollama has no model tagged $OLLAMA_TAG"; }
-rm -f /tmp/.nostromo-tags.$$
+OLLAMA_TAG="$(yaml_agent ollama_tag)"
+PROVIDER_KEY=""
+
+case "$PROVIDER" in
+  ollama)
+    # Local inference. The constitution binds Mother and Brett to it: "A slow local model is not a
+    # reason to use a cloud model." Assert the model is actually resident, or the first turn fails
+    # inside a live channel rather than here.
+    [[ -n "$OLLAMA_TAG" ]] || die "no ollama_tag for $ROLE in the manifest"
+    curl -sf --max-time 5 "$OLLAMA_URL/api/tags" -o /tmp/.nostromo-tags.$$ \
+      || die "Ollama is not answering on $OLLAMA_URL"
+    python3 -c 'import json,sys; ms=[m["name"] for m in json.load(open(sys.argv[1]))["models"]]; sys.exit(0 if sys.argv[2] in ms else 1)' \
+      /tmp/.nostromo-tags.$$ "$OLLAMA_TAG" || { rm -f /tmp/.nostromo-tags.$$; die "Ollama has no model tagged $OLLAMA_TAG"; }
+    rm -f /tmp/.nostromo-tags.$$
+    ;;
+  anthropic|openai)
+    # Metered. The key is bytes on disk in the role's own 600 file — the same shape as its Nostr
+    # key, and deliberately not an OAuth session: nothing to refresh, nothing interactive, so a
+    # reboot is a non-event. Never in the repo, never in the environment of another role.
+    #
+    # "Use only your own provider boundary. Never borrow another agent's credential." Each metered
+    # role has its own key and its own budget, so spend is attributable rather than pooled.
+    PROVIDER_KEY="$SECRETS/$PROVIDER.key"
+    [[ -r "$PROVIDER_KEY" ]] || die "no $PROVIDER key at $PROVIDER_KEY"
+    kmode="$(stat -c '%a' "$PROVIDER_KEY")"
+    [[ "$kmode" == "600" ]] || die "$PROVIDER_KEY is mode $kmode, must be 600"
+    [[ -n "$PINNED" ]] || die "no model for $ROLE in the manifest — a metered role must pin one"
+    ;;
+  *)
+    die "unsupported provider '$PROVIDER' for $ROLE"
+    ;;
+esac
 
 # ---- §13.2.1/2 prompt layering, §13.2.9 no MCP ----------------------------------------------
 # §13.2.9: no MCP child tool. buzz-dev-mcp is a developer toolkit (shell, file read, atomic edit);
@@ -203,7 +226,8 @@ launch-$ROLE: resolved configuration
   persona         $PERSONA
   instructions    $INSTRUCTIONS ($(wc -c <"$INSTRUCTIONS") bytes)
   harness         $HARNESS + buzz-dev-mcp (shell, read_file, str_replace, todo, view_image)
-  model           $OLLAMA_TAG via $OLLAMA_URL/v1 (provider=$PROVIDER)
+  provider        $PROVIDER${PROVIDER_KEY:+  (key: $PROVIDER_KEY, contents never shown)}
+  model           ${PINNED:-$OLLAMA_TAG}${OLLAMA_TAG:+  via $OLLAMA_URL/v1}
   max rounds      ${NOSTROMO_MAX_ROUNDS:-$MAX_ROUNDS}
   workdir         $WORKDIR
   logs            $LOGDIR
@@ -241,43 +265,65 @@ install -d -m 2770 "$XDG_DATA_HOME" 2>/dev/null || true
 # buzz-agent's provider, from the manifest rather than from whatever is in the environment.
 # OPENAI_COMPAT_* is the OpenAI-compatible path; buzz-agent's own docs name Ollama as a target.
 # The API key is required by the provider contract and ignored by Ollama — it is not a secret.
-if [[ "$HARNESS" == "buzz-agent" ]]; then
-  export BUZZ_AGENT_PROVIDER=openai
-  export OPENAI_COMPAT_BASE_URL="$OLLAMA_URL/v1"
-  export OPENAI_COMPAT_MODEL="$OLLAMA_TAG"
-  export OPENAI_COMPAT_API_KEY=ollama-local-no-auth
-  # The reason for this harness. buzz-agent reminds the model when a turn is about to end with no
-  # recognized `buzz messages send` — the exact failure that lost a third of Mother's answers
-  # under OpenCode. Advisory: at most two reminders, then the turn ends regardless.
-  export BUZZ_AGENT_REQUIRE_REPLY=1
-  # BUZZ_AGENT_MAX_ROUNDS defaults to 0 — unlimited. Mother ran to 48 rounds republishing the
-  # same answer before that was capped. 40 here rather than her 12: a verification turn is read
-  # the failure, edit a test, re-run the suite, read again, which is legitimately many rounds.
-  # 40 was not enough: a suite run plus a dependency detour hit the ceiling at 23 minutes and
-  # ended the turn silently — buzz-agent returns StopReason::MaxTurnRequests and publishes
-  # nothing. The bootstrap detour is fixed in provision-clone.sh, and his persona now tells him
-  # to leave evidence on disk as he goes, so a future cut-off is recoverable rather than lost.
-  export BUZZ_AGENT_MAX_ROUNDS="${NOSTROMO_MAX_ROUNDS:-$MAX_ROUNDS}"
-  HARNESS_ARGS=""
-else
-  # Goose speaks to Ollama natively rather than through an OpenAI-compatible shim.
-  export GOOSE_PROVIDER=ollama
-  export GOOSE_MODEL="$OLLAMA_TAG"
-  export OLLAMA_HOST="$OLLAMA_URL"
-  # Unattended: Goose's permission flow is interactive (AllowOnce/DenyOnce/AlwaysDeny), and an
-  # agent nobody is watching cannot answer a prompt. What Mother can do is therefore decided by
-  # which MCP servers are wired below, not by this mode.
-  export GOOSE_MODE=auto
-  # NOTE: Goose has no equivalent of BUZZ_AGENT_REQUIRE_REPLY. It knows nothing about Buzz, so a
-  # turn that ends without `buzz messages send` is silently lost, exactly as under OpenCode.
-  # Whether that matters is what this A/B measures.
-  HARNESS_ARGS="acp"
-fi
+case "$HARNESS" in
+  buzz-agent)
+    export BUZZ_AGENT_PROVIDER=openai
+    export OPENAI_COMPAT_BASE_URL="$OLLAMA_URL/v1"
+    export OPENAI_COMPAT_MODEL="$OLLAMA_TAG"
+    export OPENAI_COMPAT_API_KEY=ollama-local-no-auth
+    # The reason for this harness. buzz-agent reminds the model when a turn is about to end with
+    # no recognized `buzz messages send` — the failure that lost a third of Mother's answers under
+    # OpenCode, and that reproduced on Goose. Advisory: two reminders, then the turn ends.
+    export BUZZ_AGENT_REQUIRE_REPLY=1
+    # MAX_ROUNDS defaults to 0, meaning unlimited: Mother reached 48 rounds republishing one
+    # answer before this was capped. The cap is silent when it fires — buzz-agent returns
+    # StopReason::MaxTurnRequests and publishes nothing — so personas are told to leave evidence
+    # on disk as they go.
+    export BUZZ_AGENT_MAX_ROUNDS="${NOSTROMO_MAX_ROUNDS:-$MAX_ROUNDS}"
+    HARNESS_ARGS=""
+    ;;
+  goose)
+    export GOOSE_PROVIDER=ollama
+    export GOOSE_MODEL="$OLLAMA_TAG"
+    export OLLAMA_HOST="$OLLAMA_URL"
+    # Unattended: Goose's permission flow is interactive (AllowOnce/DenyOnce/AlwaysDeny) and an
+    # agent nobody is watching cannot answer a prompt. Capability comes from the wired MCP server.
+    export GOOSE_MODE=auto
+    # Goose has no equivalent of BUZZ_AGENT_REQUIRE_REPLY and cannot: it knows nothing about Buzz.
+    # A turn ending without `buzz messages send` is silently lost — observed, not theorised.
+    HARNESS_ARGS="acp"
+    ;;
+  claude-agent-acp|codex-acp)
+    # Metered harnesses take their credential from the provider's standard variable. Read from the
+    # role's own 600 file at launch and never written anywhere: not into the repo, not into a
+    # config file, not into another role's environment.
+    if [[ "$PROVIDER" == "anthropic" ]]; then
+      export ANTHROPIC_API_KEY="$(cat "$PROVIDER_KEY")"
+    else
+      export OPENAI_API_KEY="$(cat "$PROVIDER_KEY")"
+    fi
+    # These agents take the model through buzz-acp rather than an env var of their own.
+    HARNESS_ARGS=""
+    ;;
+  *)
+    die "unsupported harness '$HARNESS' for $ROLE"
+    ;;
+esac
 
 # NOSTROMO_ACP_TRACE=1 routes the agent's stdio through acp-tee.sh, capturing the full JSON-RPC
 # stream — including assistant text that is never published. Off by default: it inserts two
 # processes into the protocol's critical path, and an agent that works is worth more than one we
 # can fully read. Turn it on to diagnose a turn, off again afterwards.
+# buzz-agent reads its model from the environment; the ACP adapters take it from buzz-acp.
+MODEL_ARG=()
+[[ "$HARNESS" != "buzz-agent" && "$HARNESS" != "goose" && -n "$PINNED" ]] && MODEL_ARG=(--model "$PINNED")
+# Optional, and only meaningful for adapters that implement session/set_config_option. Left unset
+# unless the manifest asks for it, because buzz-acp's own default is bypass-permissions and
+# guessing at an adapter's permission semantics is how a role ends up unable to read anything.
+PERMISSION_ARG=()
+PERM="$(yaml_agent permission_mode)"
+[[ -n "$PERM" ]] && PERMISSION_ARG=(--permission-mode "$PERM")
+
 AGENT_CMD="$HARNESS"
 AGENT_ARGS=()
 [[ -n "$HARNESS_ARGS" ]] && AGENT_ARGS=(--agent-args "$HARNESS_ARGS")
@@ -312,6 +358,8 @@ exec buzz-acp \
   --respond-to-allowlist "$ALLOWLIST" \
   --allowed-respond-to owner-only,allowlist \
   --base-prompt-file "$BASE_PROMPT" \
+  ${MODEL_ARG[@]+"${MODEL_ARG[@]}"} \
+  ${PERMISSION_ARG[@]+"${PERMISSION_ARG[@]}"} \
   --system-prompt-file "$PERSONA" \
   --team-instructions "$TEAM_INSTRUCTIONS" \
   --session-title "$ROLE" \
