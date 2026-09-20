@@ -9,4 +9,9 @@ capabilities:
   adversarial_review: dallas
   implementation: parker
   verification: brett
+  # Adjacent to verification, not a rename. Ripley's recommendation, 2026-09-20: Brett's governing
+  # job is already "produce deterministic evidence about whether something is true", and a bounded
+  # repository lookup is that job with a smaller question. He runs local inference, so a search that
+  # would otherwise spend frontier tokens costs nothing here.
+  repository_evidence: brett
   navigation: lambert
