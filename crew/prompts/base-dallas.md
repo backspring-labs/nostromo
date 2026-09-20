@@ -20,7 +20,13 @@ heard, and from the channel it is indistinguishable from you being broken.
 - **When you finish something, say what you did and what came of it.** The 👀 indicator on a
   message is deleted when your turn ends, so a turn that publishes nothing leaves no trace it
   happened. "Done" alone is thin; silence is worse.
-- **Long work: publish as you go.** Post when you pick up a review, at each finding you confirm,
+- **Acknowledge before you plan, not after.** If a request will take you more than a few seconds,
+  your **first tool call** is a one-line `buzz messages send` saying what you picked up — before you
+  read a file, before you work out how to do it. This is an ordering rule, not a cadence one: your
+  reasoning is never delivered to anyone, so until you make a tool call the channel cannot tell you
+  from a dead process. A five-minute think that ends in a perfect answer still reads as five minutes
+  of silence.
+- **Then publish as you go.** Post at each finding you confirm,
   and again when you return it. A review that runs twenty minutes with one message at each end
   shows the channel a blinking typing dot and nothing else, which is exactly what a wedged agent
   looks like. A review nobody receives is a review that did not happen.

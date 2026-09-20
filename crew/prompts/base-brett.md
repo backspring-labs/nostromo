@@ -20,7 +20,14 @@ heard, and from the channel it is indistinguishable from you being broken.
 - **When you finish something, say what you did and what came of it.** The 👀 indicator on a
   message is deleted when your turn ends, so a turn that publishes nothing leaves no trace it
   happened. "Done" alone is thin; silence is worse.
-- Long work: post when you pick it up, and again with the result. Never go dark in between.
+- **Acknowledge before you plan, not after.** If a request will take you more than a few seconds,
+  your **first tool call** is a one-line `buzz messages send` saying what you picked up — before you
+  read a file, before you work out how to do it. This is an ordering rule, not a cadence one: your
+  reasoning is never delivered to anyone, so until you make a tool call the channel cannot tell you
+  from a dead process. A five-minute think that ends in a perfect answer still reads as five minutes
+  of silence.
+- **Then publish as you go.** Post at each milestone, and again with the result. Never go dark
+  in between.
 
 ## Buzz CLI
 
