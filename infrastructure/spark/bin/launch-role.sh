@@ -140,6 +140,15 @@ IDLE_TIMEOUT="${NOSTROMO_IDLE_TIMEOUT:-$(yaml_agent idle_timeout)}"
 TURNS_PER_SESSION="${NOSTROMO_TURNS_PER_SESSION:-$(yaml_agent max_turns_per_session)}"
 : "${TURNS_PER_SESSION:=0}"
 
+# How hard the model thinks before it acts. Left unset, an adapter uses its own default, and on
+# Opus that default is deep: Dallas produced six times Ripley's CPU per turn while making under half
+# her tool calls, and that CPU is the adapter parsing streamed thinking. Thinking bills as output.
+# Applied via session/set_config_option against the adapter's advertised `thought_level` capability,
+# and silently ignored by an adapter that does not advertise one — so it is safe to set anywhere.
+EFFORT_LEVEL="${NOSTROMO_EFFORT_LEVEL:-$(yaml_agent effort_level)}"
+EFFORT_ARG=()
+[[ -n "$EFFORT_LEVEL" ]] && EFFORT_ARG=(--effort-level "$EFFORT_LEVEL")
+
 
 # ---- §13.2.5 relay, §13.2.6/7 inbound gate --------------------------------------------------
 RELAY_URL="$(yaml_top relay url)"
@@ -273,6 +282,7 @@ launch-$ROLE: resolved configuration
   model           ${PINNED:-$OLLAMA_TAG}${OLLAMA_TAG:+  via $OLLAMA_URL/v1}
   turn limits     $([[ "$HARNESS" == "buzz-agent" ]] && echo "${NOSTROMO_MAX_ROUNDS:-$MAX_ROUNDS} rounds, " )${TURN_DURATION}s wall clock, ${IDLE_TIMEOUT}s idle
   session         $([[ "$TURNS_PER_SESSION" == 0 ]] && echo "never rotates" || echo "rotates every $TURNS_PER_SESSION turns")
+  effort          ${EFFORT_LEVEL:-adapter default}
   mid-turn events $EVENT_HANDLING
   workdir         $WORKDIR
   logs            $LOGDIR
@@ -501,4 +511,5 @@ exec buzz-acp \
   --multiple-event-handling "$EVENT_HANDLING" \
   --max-turn-duration "$TURN_DURATION" \
   --idle-timeout "$IDLE_TIMEOUT" \
-  --max-turns-per-session "$TURNS_PER_SESSION"
+  --max-turns-per-session "$TURNS_PER_SESSION" \
+  ${EFFORT_ARG[@]+"${EFFORT_ARG[@]}"}

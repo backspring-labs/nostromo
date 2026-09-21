@@ -124,9 +124,15 @@ agents:
     # It is also a metered role — every round is money, unlike the local pair.
     max_rounds: 25
     # Metered. The ACP session transcript is re-sent every turn and never rotated by
-    # default, so a long-lived session gets more expensive the longer it lives.
-    max_turns_per_session: 15
+    # default, so a long-lived session gets more expensive the longer it lives. Dallas carried
+    # every turn since a restart 28 hours earlier, each one dragging a full thinking block.
+    max_turns_per_session: 6
     max_turn_duration: 3600
+    # Unset, he runs Opus at its default thinking depth on every turn including trivial ones.
+    # Thinking bills as output. Measured against Ripley over the same window: fewer turns, under
+    # half the tool calls, six times the CPU per turn — all of it parsing streamed thought.
+    # `medium` is claude-agent-acp's own recommended level, not a floor I invented.
+    effort_level: medium
     buzz_pubkey: bfdf455488c1bddbb9a61f287c32ec7d940da566e96f6d262f60409b5b6c55a2
     buzz_auth_tag: '["auth","508cd1c7dbcddcc93b8168923cac49ef28bb02f0e60de549e44b01000d2bce5f","","b45791c01b70209643c9a29e46f1be402a01362b0b42c8821ff2d0a2d4cf8e89b73f927f61ff723e1d38c1ee5455d3851ef24fd3258742d202b67e9ec77c1942"]'
     buzz_private_key: spark:~dallas/.config/nostromo/secrets/buzz.key
