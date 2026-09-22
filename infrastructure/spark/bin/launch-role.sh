@@ -149,6 +149,16 @@ EFFORT_LEVEL="${NOSTROMO_EFFORT_LEVEL:-$(yaml_agent effort_level)}"
 EFFORT_ARG=()
 [[ -n "$EFFORT_LEVEL" ]] && EFFORT_ARG=(--effort-level "$EFFORT_LEVEL")
 
+# How provider sessions are scoped. buzz-acp defaults to `channel`: every topic in a channel shares
+# one session, which accumulates until something rotates it. That is how a yes/no question came to
+# cost four minutes — it paid the input cost of two days of unrelated PR review sitting in the same
+# context. `thread` gives each canonical thread its own session; DMs stay conversation-scoped
+# either way. Upstream ships `channel` so this can be canaried and rolled back without code, so it
+# is per-role rather than a blanket default here.
+SESSION_POLICY="${NOSTROMO_SESSION_POLICY:-$(yaml_agent session_policy)}"
+SESSION_POLICY_ARG=()
+[[ -n "$SESSION_POLICY" ]] && SESSION_POLICY_ARG=(--session-policy "$SESSION_POLICY")
+
 
 # ---- §13.2.5 relay, §13.2.6/7 inbound gate --------------------------------------------------
 RELAY_URL="$(yaml_top relay url)"
@@ -283,6 +293,7 @@ launch-$ROLE: resolved configuration
   turn limits     $([[ "$HARNESS" == "buzz-agent" ]] && echo "${NOSTROMO_MAX_ROUNDS:-$MAX_ROUNDS} rounds, " )${TURN_DURATION}s wall clock, ${IDLE_TIMEOUT}s idle
   session         $([[ "$TURNS_PER_SESSION" == 0 ]] && echo "never rotates" || echo "rotates every $TURNS_PER_SESSION turns")
   effort          ${EFFORT_LEVEL:-adapter default}
+  session scope   ${SESSION_POLICY:-channel (one session for every topic)}
   mid-turn events $EVENT_HANDLING
   workdir         $WORKDIR
   logs            $LOGDIR
@@ -512,4 +523,5 @@ exec buzz-acp \
   --max-turn-duration "$TURN_DURATION" \
   --idle-timeout "$IDLE_TIMEOUT" \
   --max-turns-per-session "$TURNS_PER_SESSION" \
-  ${EFFORT_ARG[@]+"${EFFORT_ARG[@]}"}
+  ${EFFORT_ARG[@]+"${EFFORT_ARG[@]}"} \
+  ${SESSION_POLICY_ARG[@]+"${SESSION_POLICY_ARG[@]}"}
