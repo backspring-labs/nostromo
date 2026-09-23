@@ -15,15 +15,16 @@
 #
 # Usage: purge-desktop-agents.sh [--dry-run]
 set -euo pipefail
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/desktop-common.sh"
 DRY=0
 [[ "${1:-}" == "--dry-run" ]] && DRY=1
 
-APP_DIR="$HOME/Library/Application Support/xyz.block.buzz.app"
+APP_DIR="$BUZZ_SUPPORT"
 AGENTS="$APP_DIR/agents/managed-agents.json"
 [[ -f "$AGENTS" ]] || { echo "no Buzz agent config at $AGENTS"; exit 0; }
 
 # Refuse while the app is running: it owns these files and will write over anything done underneath.
-if pgrep -qx Buzz 2>/dev/null || pgrep -qf "/Applications/Buzz.app/Contents/MacOS/Buzz" 2>/dev/null; then
+if buzz_running; then
   echo "Buzz Desktop is running. Quit it first (Cmd-Q) — it owns these files and will rewrite them." >&2
   exit 1
 fi
