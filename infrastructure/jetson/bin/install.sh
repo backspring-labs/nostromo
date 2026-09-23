@@ -11,6 +11,17 @@ REMOTE_ROOT=/mnt/ssd/buzz
 # shellcheck disable=SC1090
 source "$LOCK"
 
+# install.sh re-syncs config, and a config re-sync must not be an upgrade by accident. With a new pin
+# committed, running this for an unrelated buzz.env change would move the relay across one-way
+# migrations with no backup and no rehearsal. Changing the deployed commit goes through upgrade.sh,
+# which sets NOSTROMO_RELAY_UPGRADE after it has done both. A fresh host has nothing deployed.
+DEPLOYED="$(ssh "$HOST" 'sed -n "s/^BUZZ_COMMIT=//p" /mnt/ssd/buzz/deploy/upstream.lock 2>/dev/null' || true)"
+if [[ -n "$DEPLOYED" && "$DEPLOYED" != "$BUZZ_COMMIT" && "${NOSTROMO_RELAY_UPGRADE:-}" != 1 ]]; then
+  echo "${HOST} runs ${DEPLOYED:0:10} but upstream.lock pins ${BUZZ_COMMIT:0:10}: that is an upgrade. Use bin/upgrade.sh." >&2
+  exit 1
+fi
+[[ "${2:-}" == "--check" ]] && { echo "install.sh would proceed: ${DEPLOYED:0:10} -> ${BUZZ_COMMIT:0:10}"; exit 0; }
+
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 

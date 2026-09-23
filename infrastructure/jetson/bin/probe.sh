@@ -21,6 +21,13 @@ check "containers"      ssh "$HOST" '/mnt/ssd/buzz/deploy/buzzctl status --forma
 check "volumes on NVMe" ssh "$HOST" 'for v in $(docker volume ls -q --filter label=com.buzz.volume); do m=$(docker volume inspect -f "{{.Mountpoint}}" "$v"); case "$m" in /mnt/ssd/*) printf "%s " "$v";; *) echo "NOT on NVMe: $v $m"; exit 1;; esac; done'
 check "migrations"      ssh "$HOST" 'c=$(docker ps -q --filter label=com.docker.compose.service=relay); docker logs "$c" 2>&1 | grep -i -m1 migrat'
 check "secrets mode"    ssh "$HOST" 'stat -c "%a %U" /mnt/ssd/buzz/deploy/secrets.env | grep -q "^600 " && echo 600'
+# The containers must run the image the repo pins. Without this, a stale container after an upgrade,
+# or a pin committed but never installed, passes every other probe.
+PIN="$(sed -n 's/^BUZZ_IMAGE_INDEX_DIGEST=//p' "$HERE/buzz/upstream.lock")"
+check "runs the pinned image" ssh "$HOST" "for s in relay pair; do
+    img=\$(docker inspect -f '{{.Config.Image}}' \$(docker ps -q --filter label=com.docker.compose.service=\$s))
+    case \"\$img\" in *@$PIN) ;; *) echo \"\$s runs \$img, upstream.lock pins $PIN\"; exit 1;; esac
+  done; echo \"relay, pair @${PIN:0:19}\""
 
 # The Cloudflare token is long-lived by necessity and is used once every ~60 days, at renewal. A
 # revoked or expired token is therefore invisible until the certificate is already failing to

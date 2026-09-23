@@ -16,7 +16,10 @@ Repo (`infrastructure/jetson/`):
 | `bin/bootstrap-remote.sh` | Jetson side: generate secrets once, pull, start |
 | `bin/buzzctl` | Jetson side: wrapper for the Compose stack and `buzz-admin` |
 | `bin/backup.sh` | Jetson side: recovery copy of secrets, Postgres, and volumes |
-| `bin/probe.sh` | Mac side: health and boundary probes, prints evidence |
+| `bin/probe.sh` | Mac side: health and boundary probes, including that the relay runs the pinned image; prints evidence |
+| `bin/resolve-pin.sh` | Mac side: resolve an image (`main` or a digest) to the `upstream.lock` it implies |
+| `bin/rehearse-upgrade.sh` | Mac side, Docker: restore a backup set and rehearse the pinned migration on it |
+| `bin/upgrade.sh` | Mac side: backup, off-host copy, rehearsal, install, probe, in that order |
 | `evidence/` | Captured WP-2 evidence (plan §9.10), no secrets |
 
 Jetson (`/mnt/ssd/buzz/`, NVMe, mode 700):
@@ -41,7 +44,35 @@ infrastructure/jetson/bin/probe.sh          # then prove it
 
 `install.sh` is idempotent. It refuses to run if the upstream Compose file no longer matches the hash in `upstream.lock` or if `buzz.env` names a different image than the lock. Re-running syncs the repo-managed files and restarts the stack; `secrets.env` is never rewritten.
 
-To upgrade Buzz: resolve the new image index digest and its source commit, update `upstream.lock`, `buzz.env`, and `docs/source-baseline.md` together, run `backup.sh`, then `install.sh`.
+## Upgrade and rollback
+
+```bash
+infrastructure/jetson/bin/resolve-pin.sh main --write   # pin the image main points at now
+# update the relay rows in docs/source-baseline.md, commit
+infrastructure/jetson/bin/upgrade.sh                    # backup -> off-host copy -> rehearse -> install -> probe
+```
+
+- **`resolve-pin.sh`** reads the commit an image was built from out of its OCI revision label; ghcr publishes no per-commit tags. Track `main`: on 2026-09-23 `latest` pointed at a build from 2026-08-08. Given a digest instead of `main`, it re-verifies an existing pin, and it reproduces the current `upstream.lock` exactly.
+- **`upgrade.sh`** refuses uncommitted changes, backs up on the Jetson, copies the set to `~/.nostromo/backups/jetson/` and checks its hashes, then runs `rehearse-upgrade.sh` on that copy before `install.sh`. Each step gates the next.
+- **`rehearse-upgrade.sh <set>`** runs on the Mac in Docker and never touches the Jetson. It restores the set into the pinned Postgres (a restore test), checks that the old relay accepts it, migrates it with the new image and compares row counts, then asks whether the old relay would start on the result. Run it alone on any set to prove the set restores.
+
+**Migrations are one-way.** A relay refuses to start on a schema with migrations it does not know (sqlx: `migration 45 was previously applied but is missing in the resolved migrations`, measured 2026-09-23). Starting the old relay with `BUZZ_AUTO_MIGRATE=false` gets past that, but it cannot verify audit entries the new relay hashed, so don't. Rolling back means the old pin plus that upgrade's backup, and **anything written after the upgrade is lost**:
+
+```bash
+# Mac: put the old pin back. The rollback set's upstream.lock names the digest.
+infrastructure/jetson/bin/resolve-pin.sh sha256:<old index digest> --write   # then commit
+# Jetson: replace the database with the pre-upgrade dump
+cd /mnt/ssd/buzz/deploy
+./buzzctl stop
+./buzzctl compose up -d --wait postgres
+./buzzctl compose exec -T postgres dropdb -U buzz buzz
+./buzzctl compose exec -T postgres createdb -U buzz buzz
+./buzzctl compose exec -T postgres pg_restore -U buzz -d buzz --exit-on-error < ../backups/<stamp>/postgres.dump
+# Mac
+infrastructure/jetson/bin/install.sh && infrastructure/jetson/bin/probe.sh
+```
+
+The restore itself is what `rehearse-upgrade.sh` exercises. The drop-and-recreate on the Jetson has not been run. Redis, MinIO and git volumes are untouched by relay migrations and stay as they are; media uploaded after the upgrade is left orphaned, not lost.
 
 On the Jetson, `buzzctl` gives `start`, `stop`, `restart`, `status`, `logs`, `config`, `admin <buzz-admin args>`, and `backup`.
 
