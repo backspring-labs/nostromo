@@ -119,7 +119,7 @@ agents:
     # shared with the author does not pass review unnoticed. $25/month hard limit in
     # budgets.yaml, which the operating model treats as load-bearing — he cannot review
     # every PR, so he reviews where the record says rework lives.
-    model: claude-opus-5
+    model: claude-opus-5-5
     model_family: opus
     provider_boundary: nostromo-dallas
     budget_profile: dallas

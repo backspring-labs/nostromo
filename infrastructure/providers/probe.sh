@@ -6,7 +6,7 @@ set -uo pipefail
 SECRETS="${NOSTROMO_SECRETS:-$HOME/.config/nostromo/secrets}"
 OPENAI_MODEL=gpt-5.6-sol
 OPENAI_BLOCKED=gpt-6-astra     # the negative control: must be refused
-ANTHROPIC_MODEL=claude-opus-5
+ANTHROPIC_MODEL=claude-opus-5-5
 fail=0
 say() { printf '%-6s %-8s %-14s %s\n' "$1" "$2" "$3" "$4"; }
 
