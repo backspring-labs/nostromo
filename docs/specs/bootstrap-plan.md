@@ -1,8 +1,8 @@
 # Initial Crew and Infrastructure Bootstrap Plan
 
-**Status:** Draft Execution Plan  
-**Version:** 0.1  
-**Date:** 2026-09-06  
+**Status:** In execution — WP-0 to WP-5 closed; see §5.1  
+**Version:** 0.2  
+**Date:** 2026-09-06; last amended 2026-09-23  
 **Owner:** Jason Ladd  
 **Project:** Nostromo  
 **Primary Product Under Development:** SquadOps  
@@ -213,6 +213,33 @@ Parallelism is possible after WP-0:
                          ▼
                       WP-11
 ```
+
+---
+
+# 5.1 Status, 2026-09-23
+
+The crew went into real use — PR reviews and delegation in `#nostromo` — before the WP-6, WP-7 and
+WP-9 gates were recorded. The plan's order was overtaken by use, not abandoned: what follows says where
+each package stands and what is still owed, so the gates can be closed on evidence rather than
+waived by default.
+
+| WP | State | Evidence | Still owed |
+|---|---|---|---|
+| WP-0 | **closed** | repo, tests | — |
+| WP-1 | **closed** | `infrastructure/providers/evidence/wp1-providers-2026-09-13.md` | Dallas moved to `claude-opus-5-5` on 2026-09-23; the probe asks for it, unconfirmed until the workspace's September limit resets on 2026-10-01 |
+| WP-2 | **closed** | `infrastructure/jetson/evidence/wp2-2026-09-08.md`; relay upgraded to `0cc63fe3` in `relay-upgrade-2026-09-23.md` | — |
+| WP-3 | **closed** | `infrastructure/buzz/evidence/wp3-owner-identity-2026-09-13.md`; Desktop now `0.5.24` | — |
+| WP-4 | **closed** | `infrastructure/spark/evidence/wp4-*.md`; **one Unix account per role** since 2026-09-14 (`role-isolation-2026-09-14.md`), replacing the single crew account §11 describes | moving each role's App key and worktree from the supervisor to the role's own account, noted open on 2026-09-14 and not re-verified since |
+| WP-5 | **closed** | `infrastructure/buzz/evidence/wp5-crew-identities-2026-09-14.md` | — |
+| WP-6 | running, **not closed** | `wp6-first-agent-2026-09-15.md`; `wp6-mother-launch-adapter-2026-09-16.md`, which grew to hold §13.2–§13.6 and §13.11 for Mother (including kill-persistence under systemd) and §13.8 for Brett | Brett's §13.12 items are spread across commits and §13.8 rather than written up against the list — his harness is now `buzz-agent` on `qwen3.8-27b`, and edit-denial is obsolete since he implements (Operating Model §2.1); persistence across a **reboot**, where only a kill has been proven; the §36 Ollama memory interlock |
+| WP-7 | running, **not closed** — Dallas set up 2026-09-17, Ripley and Parker speaking since 2026-09-18 | "codex-acp roles could not speak" in `wp6-mother-launch-adapter-2026-09-16.md`; DEV-009, DEV-010 | §14.10's attribution, git-attribution and credential-removal probes, run from inside the running agents — WP-1's ran from the Mac; see the amendment in §14 |
+| WP-8 | **folded into WP-7** | — | Ash and Lambert on the Spark; see the amendment in §15. This gates WP-10 |
+| WP-9 | partial | `#nostromo`, `crew/allowlist.yaml` | personas for Ash and Lambert (five of seven exist); the §16.7 peer-to-peer allowlist test; both §16.8 synthetic handoffs; role-integrity tests are **red** — five fail on drift between the tests, `crew/capabilities.yaml` and the manifest, which is mid-way through Operating Model §45.1's capability renames |
+| WP-10 | not started | — | blocked on WP-8's Ash. Operating Model §40–§42 proposes replacing this package; that is awaiting owner review |
+| WP-11 | partly done early | pinning in `docs/source-baseline.md`; tested backup and restore for the relay (`infrastructure/jetson/bin/{upgrade,rehearse-upgrade}.sh`) and for Desktop (`infrastructure/buzz/bin/desktop-upgrade.sh`) | see the amendment in §18 |
+
+Amendments in this plan, each dated at the section it changes: §13 (WP-6, 2026-09-15), §14 (WP-7),
+§15 (WP-8), §16.6 (channels) and §18 (WP-11), all 2026-09-23.
 
 ---
 
@@ -779,6 +806,20 @@ After installation, look up the bot user via `GET /users/<slug>[bot]` and record
 Dallas, Brett, and Mother receive Apps only when their GitHub write flows are commissioned: review comments and evidence comments in WP-9 and WP-10, and lifecycle state if it lands on Issues. Ash and Lambert read a public repository and need no identity.
 
 App registration is a browser flow and is an owner step, like the provider consoles.
+
+> ## Amendment, 2026-09-23 — five identities, not two
+>
+> Operating Model §45.4 moved most of the Apps forward, and three have happened:
+>
+> | App | State | Scope |
+> |---|---|---|
+> | `nostromo-parker`, `nostromo-ripley` | registered 2026-09-13 | **Issues read/write added** (`31cf62e`), so they can file Finding Records and cards |
+> | `nostromo-dallas` | registered 2026-09-14 (`c743809`) | Pull requests write, Contents read, Issues read, **no branch namespace** — the reviewer must not be able to fix what it reviews |
+> | `nostromo-brett` | registered 2026-09-14 (`c743809`) | branch namespace `nostromo/brett`, ruleset probed 201 own / 422 another's; **the ruleset is not yet exported** to `infrastructure/github/rulesets/` |
+> | `nostromo-mother`, `nostromo-lambert` | **not registered** | `nostromo` repo only; DEV-007 is the workaround until they are |
+> | `nostromo-ash` | **not registered** | Operating Model §45.4 gives Ash write to `tests/**`, which reverses "Ash and Lambert need no identity" above |
+>
+> Runbook: `docs/runbooks/dallas-brett-github-apps.md`.
 
 ---
 
@@ -1986,6 +2027,31 @@ First prove the local agents can communicate and respect role boundaries.
 **Execution surface:** DGX Spark + provider APIs + Buzz  
 **Goal:** commission the architecture/review/implementation roles with isolated credentials and worktrees.
 
+> ## Amendment, 2026-09-23 — running before its gate was recorded
+>
+> All three run under `nostromo@<role>` since 2026-09-17/18, each in its own Unix account (WP-4,
+> 2026-09-14) rather than the shared crew account this section assumes, and they are doing real
+> SquadOps work. What differs from the text below:
+>
+> | | Now |
+> |---|---|
+> | Ripley, Parker | `codex-acp` on `gpt-5.6-sol`, `effort_level: medium`, `agent_mode: agent-full-access` (DEV-010: codex's sandbox could not start under Ubuntu 24.04's AppArmor userns restriction, and its approvals reviewer denied every publish to the relay) |
+> | Dallas | `claude-agent-acp` on **`claude-opus-5-5`** since 2026-09-23 (was `claude-opus-5`), `effort_level: medium` |
+> | Ripley | `session_policy: thread` — one ACP session per thread instead of one per channel, as a canary before the others |
+> | Metered roles | `max_turns_per_session` caps: the ACP transcript is re-sent every turn and never rotated by default |
+> | Provider keys | in each role's own home, not shared `.env` files (DEV-009) |
+>
+> **What §14.10 still owes**, because WP-1's probes ran from the Mac and nothing has run from inside
+> a live agent: request attribution observed from each agent's own turn; the git attribution and
+> ruleset probe from each role's clone; the permission probe under the modes above; and the
+> credential-removal fail-closed probe. The §14.11 gate stands — this amendment records that it was
+> passed over, not that it was met.
+>
+> **A budget exhaustion has already happened.** Dallas spent his $25 by 2026-09-22 (two causes,
+> both since fixed: full-depth thinking on every turn, `0d4ded4`, and an unrotated transcript).
+> The API refuses him until 2026-10-01. How that surfaced in Buzz — whether he reported `BLOCKED`
+> as Operating Model §31's layer table requires (stop metered use, report `BLOCKED`, wait) — was not observed, and is the §18.2 test done by accident.
+
 ---
 
 # 14.1 Install Codex ACP
@@ -2186,6 +2252,27 @@ All three cloud agents must prove isolated billing attribution before crew colla
 
 **Execution surface:** Mac + Buzz  
 **Goal:** commission the non-Spark crew without making the Mac a dependency of the core execution ship.
+
+> ## Amendment, 2026-09-23 — WP-8 folds into WP-7; the Mac runs no agents
+>
+> **The Mac is a pure cockpit** (Operating Model §35.4), in effect since 2026-09-13: Desktop's
+> default agents were purged, the Mac-agent tests were retired, and `crew/manifest.yaml` puts Ash
+> and Lambert on the **Spark**, supervised by systemd like everyone else. The Mac keeps Buzz Desktop,
+> the owner identity, `gh`, and SSH. The rest of this section describes a host that no longer runs
+> crew; read it for the evidence it asks for, not the place it asks for it.
+>
+> | | Now |
+> |---|---|
+> | Ash | Spark, `codex-acp`, ChatGPT subscription; unit exists, **inactive and disabled**; no persona yet |
+> | Lambert | Spark, `gemini-acp`, existing Gemini subscription; unit exists, **inactive and disabled**; no persona yet; role narrowed to Navigator (release cut steps 1–4 and 7, never 5) |
+>
+> **What still applies from §15.8, moved to the Spark:** Ash's Buzz round trip; ChatGPT
+> subscription auth completed *on the Spark* with no `OPENAI_API_KEY` or `CODEX_API_KEY` present and
+> zero attribution to Parker's or Ripley's projects; Lambert's Buzz round trip and Gemini auth on
+> the Spark; Lambert's production-code denial. Persistence is systemd's, proven once for Mother.
+>
+> **The §15.9 gate is unchanged and now binding:** Ash must work before the canonical IDEA workflow
+> is commissioned, and WP-10 starts with Ash. Ash is on WP-10's critical path.
 
 ---
 
@@ -2524,6 +2611,33 @@ or a low-risk real SquadOps issue/SIP channel.
 
 Do not create the entire roadmap structure before the operating pattern is proven.
 
+> ## Amendment, 2026-09-23 — the control channel, and what a channel boundary now means
+>
+> **The control channel is `#nostromo`**, created 2026-09-14 (WP-5 §12.7): private, the owner and
+> all seven. Wherever this plan says `#nostromo-control` it means `#nostromo`; Platform Spec §17 was
+> amended the same day to say so.
+>
+> **A channel is no longer simply the context boundary.** `buzz-acp` runs one ACP session per
+> channel by default, which is what Operating Model §28 builds on. Since 2026-09-22 Ripley runs
+> `session_policy: thread` — one session per thread — and every reply still has the channel's last
+> twelve messages injected (`--context-message-limit`, default 12). So the **thread is the session**
+> and the **channel is the injection radius**: a busy mixed-purpose channel still makes every turn
+> in it dearer and noisier, whichever policy a role runs.
+>
+> **Proposed, not adopted** — pending two owner answers (does the owner follow the line channel day
+> to day; is Dallas in planning):
+>
+> ```text
+> #nostromo              control: presence, status, budget, escalations, the daily sweep
+> #squadops-planning     backlog triage, roadmap and sequencing; a weekly refinement thread
+> #squadops-1.8          the current release line; one thread per item; archived when 1.8 ships
+> #nostromo-<item>       only for SIP-sized Lane A design work
+> ```
+>
+> That is two work channels, not the roadmap structure this section rules out, and it moves Lane B
+> repairs out of `#nostromo` into the line channel's threads. Its prerequisite is thread-scoped
+> sessions on the execution roles; without it, a release-line channel is one Parker session.
+
 ---
 
 # 16.7 Crew allowlist verification
@@ -2609,6 +2723,11 @@ Only after role collaboration works should Nostromo be used on a meaningful Squa
 **Execution surface:** All  
 **Goal:** prove the system on a bounded, real SquadOps change.
 
+
+> **Note, 2026-09-23.** Operating Model §40–§42 proposes replacing this package with two
+> commissioning runs — a bounded feature (A) and a real finding (B) — plus a delegation experiment.
+> That is awaiting owner review; until it is decided, this section stands. Either way WP-10 starts
+> with Ash, who is not yet running (§15 amendment).
 ---
 
 # 17.1 Select commissioning work item
@@ -2852,6 +2971,21 @@ A failed acceptance criterion becomes a work item before baseline freeze.
 
 **Execution surface:** all hosts  
 **Goal:** turn a successful demo into an operable baseline.
+
+> ## Amendment, 2026-09-23 — what is already done, ahead of WP-10
+>
+> Several WP-11 items were done early because upgrades forced them. They count; the package does
+> not close until WP-10 has run.
+>
+> | § | State |
+> |---|---|
+> | 18.1 restart | **Mother killed and rebuilt** by systemd in ~10 s, same identity (2026-09-16). **Relay restarted** on upgrade (2026-09-23): the owner and all five running roles re-authenticated within five minutes. Not yet: a Spark reboot, a Jetson reboot since WP-2, Herdr restoration |
+> | 18.2 budget failure | **Happened for real**: Dallas's workspace refused him from 2026-09-22 until 2026-10-01. The crew-side behaviour — did he report `BLOCKED` — was not observed; observe it on purpose |
+> | 18.3 secret scan | not done |
+> | 18.4 pinning | in `docs/source-baseline.md` for the relay image, Compose bundle, Desktop, Herdr, OpenCode, codex-acp, claude-agent-acp, Node, Ollama and Mother's Qwen. **Gaps:** the Gemini CLI (still `TBD`, waits on Lambert), Brett's `qwen3.8:27b`, and `gh 2.101.0`, which is pinned in `infrastructure/spark/bin/versions.lock` but absent from the ledger |
+> | 18.5 backup | **relay: backup, off-host copy and a tested restore** — `infrastructure/jetson/bin/rehearse-upgrade.sh` restores a set into the pinned Postgres and checks the old relay accepts it, and `upgrade.sh` runs it on every upgrade. Off-host copies had silently stopped on 2026-09-09 until this was built. **Desktop:** app and data backed up by `infrastructure/buzz/bin/desktop-upgrade.sh`. **Crew keys:** `infrastructure/buzz/bin/backup-crew-keys.sh` (WP-5). Not yet: Spark-side role state |
+> | 18.6–18.7 runbooks | partial: `infrastructure/jetson/README.md` (upgrade and rollback), three runbooks in `docs/runbooks/`, `crewctl`'s help. No single operator runbook |
+> | 18.8 baseline tag | not done |
 
 ---
 

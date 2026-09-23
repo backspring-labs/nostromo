@@ -1,7 +1,8 @@
 # Crew Operating Model and SquadOps 1.8 Commissioning Plan
 
-**Status.** Proposed. Awaiting owner review.
-**Date.** 2026-09-10.
+**Status.** Proposed; **partly in effect**. Owner review of the whole is still open, but several of its
+decisions are already running — §45 opens with which, as of 2026-09-23.
+**Date.** 2026-09-10; status added 2026-09-23.
 **Supersedes.** Nothing. Amends Platform Spec where §1.3 says so.
 **Governs.** How the Nostromo crew works once it is live, and what must be true before it touches SquadOps 1.8 code.
 
@@ -1646,6 +1647,14 @@ id and the line.
   never inferred from silence, and an agent never begins work because a message merely mentioned its area.
 - **Every agent runs `respond_to: allowlist`.** No agent responds to `anyone`, ever.
 
+> **Amended 2026-09-23.** "Buzz's ACP conversation context is channel-scoped, so the channel boundary is
+> also the context boundary" was true of `buzz-acp`'s default and no longer of the whole crew. Ripley runs
+> `session_policy: thread` since 2026-09-22: one session per thread, with the channel's last twelve messages
+> injected into each reply (`--context-message-limit`, default 12). The **thread is the session** and the
+> **channel is the injection radius**. Separating work by channel still keeps one item's traffic out of
+> another's prompts; it no longer keeps it out of one session, because there is no longer one session. The
+> proposed channel layout that follows from this is in Bootstrap Plan §16.6's amendment.
+
 **How Mother knows to activate a role.** Three sources, in order of reliability: a GitHub webhook or poll
 result (PR opened, checks completed, review submitted, merged); a crew member's explicit handoff @mention;
 and the tracking issue's state, which Mother owns. Mother never activates a role because a conversation
@@ -2576,6 +2585,39 @@ the record's worst delegation failures happened, and the model doing the work di
 ## 45. What must change in this repository
 
 Every row names the actual current file. `R` = required before commissioning. `F` = may follow.
+
+> ### Status, 2026-09-23
+>
+> What is **in effect**, whether by owner decision or because the running system already works that way:
+>
+> - **The Mac is a pure cockpit** (§35.4). No agent runs on it; Ash and Lambert are on the Spark in the manifest.
+> - **Brett implements** (§2.1, owner decision): `github_identity: nostromo-brett`, `branch_namespace: nostromo/brett`,
+>   App registered 2026-09-14 (`c743809`), branch ruleset probed 201 own / 422 another's. His harness moved to `buzz-agent` on `qwen3.8-27b` (§35.1's experiment, `6812528`).
+> - **`nostromo-dallas`** App registered 2026-09-14 with no content write; **Parker and Ripley gained Issues read/write**.
+> - **The $140 envelope** (§35.3) is `crew/budgets.yaml`.
+> - **Supervisor is systemd, not Herdr.** Where the rows below say `supervisor: herdr`, the Bootstrap Plan's WP-6
+>   amendment (2026-09-15) overrides them.
+> - **Lambert is the Navigator** (§10A): `capability: navigation`.
+>
+> **Partly done:**
+>
+> - The capability map is mid-rename: `repository_evidence: brett` was added beside `verification: brett`, but the
+>   manifest still says `verification`, so the one-capability-per-role test fails. The §45.1 split is not applied.
+> - A reasoning profile exists as `effort_level` on Ripley, Parker and Dallas, not as `reasoning_profile` on every agent.
+> - Personas: five of seven in `crew/personas/` (no Ash, no Lambert), not `agents/*.persona.md`.
+> - Ash and Lambert moved host, but not `workspace_profile`, `path_scope` or `github_identity`.
+> - `tests/test_crew_config.py` was extended for some of this and is **red** on the rest — five failures.
+>
+> **Not started:** the Mother, Ash and Lambert Apps (DEV-007 stands in for Mother's); Ash's and Lambert's
+> subscription sign-ins on the Spark; the two-lane `crew/lifecycle.yaml`; every §45.3 directory except
+> `infrastructure/github/rulesets/` (which still lacks Brett's export); the §45.2 doctrine rules, review
+> vocabulary and load-bearing-facts rule in `instructions.md`; the Spark mode guard (§36.3) and its test;
+> `tests/test_contracts.py`; the `.plugin/plugin.json` description; the six Platform Spec amendments in §1.3;
+> and README's two open decisions. **Not verified:** labels, the require-review-from-non-author rule, and the
+> launcher preflight additions.
+>
+> §45.6's Bootstrap Plan row is done as of 2026-09-23: WP-1 §8.7, WP-8's fold into WP-7, and a status section,
+> each as a dated amendment. WP-10's replacement by §40–§42 is noted there, not applied.
 
 ### 45.1 Configuration
 
