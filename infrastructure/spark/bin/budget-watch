@@ -166,8 +166,14 @@ def resume_due() -> None:
 
 
 def entries(*journal_args) -> subprocess.Popen:
-    """The crew units' journal, one JSON entry per line."""
-    proc = subprocess.Popen(["journalctl", "-u", "nostromo@*", "-o", "json", "--no-pager", *journal_args],
+    """The crew units' turn outcomes, one JSON entry per line.
+
+    Filtered by journald, not here: everything this acts on is an `agent_returned` line, and the
+    rest is mostly relay pings. Measured on the Spark 2026-09-28, seven days was 92,604 entries
+    unfiltered and 21 filtered; parsing the unfiltered stream in Python took the watcher to its
+    256 MB cap and 67 s on a cold boot."""
+    proc = subprocess.Popen(["journalctl", "-u", "nostromo@*", "-o", "json", "--no-pager",
+                             "--grep", "agent_returned", *journal_args],
                             stdout=subprocess.PIPE, text=True)
     return proc
 
