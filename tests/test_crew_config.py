@@ -211,10 +211,16 @@ def test_repo_writing_templates_carry_github_app_fields():
 # --- Host and supervisor (NSTR-RUN-001, NSTR-RUN-002, D-007, D-008) -----------------
 
 
-def test_spark_agents_use_herdr(agents):
+def test_spark_agents_are_supervised_by_systemd(agents):
+    """Bootstrap Plan §13's amendment, 2026-09-15: systemd owns existence, Herdr observes.
+
+    This asserted `herdr` until 2026-09-23, eight days after the amendment moved every role to
+    `nostromo@<role>` units. Herdr as supervisor meant one crashed server took the whole crew, a
+    closed session deleted an agent, and nothing came back after a reboot.
+    """
     for name in SPARK_AGENTS:
         assert agents[name]["host"] == "spark", name
-        assert agents[name]["supervisor"] == "herdr", name
+        assert agents[name]["supervisor"] == "systemd", name
 
 
 def test_no_agent_runs_on_the_mac(agents):
@@ -246,10 +252,16 @@ def test_every_agent_has_its_own_unix_account(agents):
 # --- Model and harness bindings (NSTR-MOD-001 .. NSTR-MOD-007, D-013) ---------------
 
 
-def test_local_agents_use_ollama_via_opencode(agents):
+def test_local_agents_use_ollama_via_buzz_agent(agents):
+    """Mother and Brett moved from OpenCode ACP to buzz-agent on 2026-09-16.
+
+    An A/B with everything but the harness held constant showed the delivery defect was the harness
+    (wp6-mother-launch-adapter-2026-09-16.md). crew/opencode/ is kept as the record of the profiles
+    WP-4 §11.11 probed; the launcher does not read it, so those profiles are not what bounds either role.
+    """
     for name in LOCAL_AGENTS:
         assert agents[name]["provider"] == "ollama", name
-        assert agents[name]["harness"] == "opencode-acp", name
+        assert agents[name]["harness"] == "buzz-agent", name
         assert agents[name]["budget_profile"] == "local", name
 
 
@@ -298,12 +310,42 @@ def test_every_agent_uses_allowlist(agents):
 def test_capability_map_resolves_to_valid_agents(capabilities, agents):
     for capability, agent in capabilities.items():
         assert agent in agents, f"{capability} -> {agent} is not a crew member"
-        assert agents[agent]["capability"] == capability, f"{agent} manifest capability disagrees"
 
 
-def test_capability_map_is_a_bijection(capabilities, agents):
-    assert set(capabilities.values()) == set(agents)
-    assert set(capabilities) == {a["capability"] for a in agents.values()}
+def test_each_capability_routes_to_exactly_one_agent():
+    """Mother resolves by name and must never have to choose.
+
+    yaml.safe_load keeps the last of two duplicate keys without a word, so a capability declared
+    twice would route silently to whichever came second. Read the keys from the text instead.
+    """
+    text = (CREW / "capabilities.yaml").read_text().split("capabilities:", 1)[1]
+    keys = re.findall(r"(?m)^  ([a-z_]+):", text)
+    dupes = sorted({k for k in keys if keys.count(k) > 1})
+    assert not dupes, f"declared more than once: {dupes}"
+
+
+def test_every_agent_is_routable_by_its_primary_capability(capabilities, agents):
+    """An agent may hold several capabilities; the manifest names its primary one.
+
+    This replaced a one-capability-per-agent bijection on 2026-09-23. That rule broke when Brett
+    gained repository_evidence (2026-09-20), and Operating Model §45.1 gives Ash five and Lambert
+    two. What still has to hold: every agent is reachable, and its primary routes back to it.
+    """
+    assert set(capabilities.values()) == set(agents), "an agent no capability routes to"
+    for name, agent in agents.items():
+        primary = agent["capability"]
+        assert capabilities.get(primary) == name, f"{name}: primary {primary!r} routes to {capabilities.get(primary)!r}"
+
+
+def test_brett_holds_no_concluding_capability(capabilities):
+    """Operating Model §2.1, owner decision: Brett implements and never concludes.
+
+    Mother routes by capability name, so a concluding name on Brett is a routing bug, not a label.
+    `verification` was that name until 2026-09-23.
+    """
+    concluding = {"verification", "qa", "review", "adversarial_review", "approval", "acceptance"}
+    held = {c for c, a in capabilities.items() if a == "brett"}
+    assert not held & concluding, f"brett holds {sorted(held & concluding)}"
 
 
 # --- Budgets (NSTR-BUD-001 .. NSTR-BUD-005, D-017) -----------------------------------

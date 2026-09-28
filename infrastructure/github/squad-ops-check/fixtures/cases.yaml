@@ -82,6 +82,31 @@ cases:
     expect: fail
     why: allowlist, not denylist — anything outside tests/ is outside Ash's boundary
 
+  # --- dallas: reviews, never writes ---------------------------------------------------
+  # `allowed: []`, so nothing on this namespace can pass, and the per-role test cannot ask for a
+  # passing case here. Its paired control is each change passing for a role allowed to make it:
+  # that proves the check rejects Dallas, not every change.
+  - name: dallas fixes what he reviewed
+    branch: nostromo/dallas/pr-1523
+    files: [src/squadops/checks.py]
+    expect: fail
+    why: the reviewer must not be able to fix what it reviews (Operating Model §45.4)
+  - name: the same fix, by parker
+    branch: nostromo/parker/pr-1523
+    files: [src/squadops/checks.py]
+    expect: pass
+    why: paired control for the case above
+  - name: dallas writes up a review
+    branch: nostromo/dallas/pr-1523
+    files: [docs/reviews/pr-1523.md]
+    expect: fail
+    why: a review is submitted on GitHub, where the non-author rule can see it — never committed
+  - name: the same write-up, by ripley
+    branch: nostromo/ripley/pr-1523
+    files: [docs/reviews/pr-1523.md]
+    expect: pass
+    why: paired control for the case above
+
   # --- the boundary protects itself ----------------------------------------------------
   - name: parker edits the rules file
     branch: nostromo/parker/x

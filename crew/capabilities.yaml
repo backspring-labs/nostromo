@@ -1,5 +1,10 @@
 # Capability routing table (Bootstrap Plan §16.4).
 # Mother resolves a requested capability to an agent here, never from prompt assumptions.
+#
+# Each capability routes to exactly one agent, so Mother never has to choose. An agent may hold
+# several; the manifest's `capability` is its primary one and must appear here pointing back at it.
+# The one-per-agent rule this file used to follow was retired 2026-09-23: it broke the day Brett
+# gained repository_evidence (2026-09-20), and Operating Model §45.1 gives Ash five and Lambert two.
 version: 1
 
 capabilities:
@@ -8,8 +13,13 @@ capabilities:
   architecture: ripley
   adversarial_review: dallas
   implementation: parker
-  verification: brett
-  # Adjacent to verification, not a rename. Ripley's recommendation, 2026-09-20: Brett's governing
+  # Brett implements and never concludes (Operating Model §2.1, owner decision). This was
+  # `verification` until 2026-09-23 — a concluding word, and Mother routes by name, so "verify this"
+  # would have gone to the one role forbidden to conclude it. Nothing routed by the old name.
+  bounded_implementation: brett
+  # Deterministic runs — the suite, the command, its output — returned as evidence, never a verdict.
+  evidence_collection: brett
+  # Added beside what was then `verification`, not as a rename. Ripley's recommendation, 2026-09-20: Brett's governing
   # job is already "produce deterministic evidence about whether something is true", and a bounded
   # repository lookup is that job with a smaller question. He runs local inference, so a search that
   # would otherwise spend frontier tokens costs nothing here.

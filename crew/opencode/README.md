@@ -1,5 +1,13 @@
 # OpenCode permission profiles
 
+> **A record, not live configuration — since 2026-09-16.** Mother and Brett moved from OpenCode
+> ACP to `buzz-agent` after an A/B showed the delivery defect was the harness
+> (`infrastructure/spark/evidence/wp6-mother-launch-adapter-2026-09-16.md`). The launcher does not
+> read these files, so **they are not what bounds either role**. §13.5's permission probes were
+> re-run under `buzz-agent` for Mother; Brett's have not been. Kept because they are what WP-4
+> §11.11 probed, and because the probe method below — refuse permission requests so `ask` is
+> distinguishable from `allow`, and pick a denial whose effect is observable — still applies.
+
 Bootstrap Plan §11.11, amended by Operating Model §2.1 and §45.4. Pinned to **OpenCode 1.18.30**;
 the permission identifiers below were read out of that build, not from documentation, because the
 plan warns that the V1 and V2 syntaxes must not be mixed.

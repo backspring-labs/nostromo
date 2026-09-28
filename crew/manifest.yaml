@@ -208,7 +208,7 @@ agents:
   brett:
     display_name: Brett
     nip05: brett@nostromo.backspring.xyz
-    capability: verification
+    capability: bounded_implementation
     host: spark
     supervisor: systemd
     harness: buzz-agent

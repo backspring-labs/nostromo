@@ -2591,7 +2591,7 @@ Every row names the actual current file. `R` = required before commissioning. `F
 > What is **in effect**, whether by owner decision or because the running system already works that way:
 >
 > - **The Mac is a pure cockpit** (§35.4). No agent runs on it; Ash and Lambert are on the Spark in the manifest.
-> - **Brett implements** (§2.1, owner decision): `github_identity: nostromo-brett`, `branch_namespace: nostromo/brett`,
+> - **Brett implements** (§2.1, owner decision): `capability: bounded_implementation`, `github_identity: nostromo-brett`, `branch_namespace: nostromo/brett`,
 >   App registered 2026-09-14 (`c743809`), branch ruleset probed 201 own / 422 another's. His harness moved to `buzz-agent` on `qwen3.8-27b` (§35.1's experiment, `6812528`).
 > - **`nostromo-dallas`** App registered 2026-09-14 with no content write; **Parker and Ripley gained Issues read/write**.
 > - **The $140 envelope** (§35.3) is `crew/budgets.yaml`.
@@ -2601,12 +2601,13 @@ Every row names the actual current file. `R` = required before commissioning. `F
 >
 > **Partly done:**
 >
-> - The capability map is mid-rename: `repository_evidence: brett` was added beside `verification: brett`, but the
->   manifest still says `verification`, so the one-capability-per-role test fails. The §45.1 split is not applied.
+> - The capability map: Brett's part of §45.1 is applied (2026-09-23) — `verification` became `bounded_implementation`,
+>   with `evidence_collection` and the earlier `repository_evidence` beside it — and the tests now require one agent
+>   per capability rather than one capability per agent. Ash's, Lambert's, Ripley's and Mother's renames are not applied.
 > - A reasoning profile exists as `effort_level` on Ripley, Parker and Dallas, not as `reasoning_profile` on every agent.
 > - Personas: five of seven in `crew/personas/` (no Ash, no Lambert), not `agents/*.persona.md`.
 > - Ash and Lambert moved host, but not `workspace_profile`, `path_scope` or `github_identity`.
-> - `tests/test_crew_config.py` was extended for some of this and is **red** on the rest — five failures.
+> - `tests/test_crew_config.py` covers what is applied, and is green as of 2026-09-23.
 >
 > **Not started:** the Mother, Ash and Lambert Apps (DEV-007 stands in for Mother's); Ash's and Lambert's
 > subscription sign-ins on the Spark; the two-lane `crew/lifecycle.yaml`; every §45.3 directory except

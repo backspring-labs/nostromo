@@ -48,12 +48,30 @@ def test_the_control_set_contains_both_outcomes():
 
 
 def test_every_declared_role_has_both_a_passing_and_a_failing_case():
-    """Per-role paired control. A role covered only by passing cases is untested."""
+    """Per-role paired control. A role covered only by passing cases is untested.
+
+    A role allowed nothing (`allowed: []`, Dallas) can never pass on its own namespace, so for it
+    the passing half is a twin: the same files passing on another role's namespace. Without the
+    twin, a checker that failed every crew branch would satisfy this test for that role.
+    """
     roles = yaml.safe_load(RULES.read_text())["roles"]
-    for role in roles:
+    for role, rule in roles.items():
         prefix = f"nostromo/{role}/"
-        got = {c["expect"] for c in CASES if c["branch"].startswith(prefix)}
-        assert got == {"pass", "fail"}, f"{role}: only {got or 'no cases'}"
+        mine = [c for c in CASES if c["branch"].startswith(prefix)]
+        got = {c["expect"] for c in mine}
+        if rule.get("allowed") == []:
+            assert got == {"fail"}, f"{role} is allowed nothing, yet has {got or 'no cases'}"
+            for case in mine:
+                twins = [
+                    o for o in CASES
+                    if o["expect"] == "pass"
+                    and sorted(o["files"]) == sorted(case["files"])
+                    and o["branch"].startswith("nostromo/")
+                    and not o["branch"].startswith(prefix)
+                ]
+                assert twins, f"{role}: {case['name']!r} has no passing twin on another role's namespace"
+        else:
+            assert got == {"pass", "fail"}, f"{role}: only {got or 'no cases'}"
 
 
 def test_the_boundary_protects_itself():
