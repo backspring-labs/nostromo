@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Keep each crew member's Buzz profile in line with the manifest, and set avatars. From the Mac.
 #
-#   sync-profiles.sh [--avatars] [--dry-run] [role...]     default: every role in the manifest
+#   sync-profiles.sh [--avatars] [--republish] [--dry-run] [role...]   default: every role in the manifest
 #
 # For each role, AS that role on the Spark — its key never leaves its own account (WP-5):
 #   - display name, NIP-05 handle and about (= the manifest's capability) are set with
@@ -14,6 +14,16 @@
 # Then the profile is read back and compared with the manifest, including that the key that signed
 # it is the one the manifest records for that role.
 #
+# Profiles are signed WITHOUT the NIP-OA owner tag, deliberately. Buzz Desktop treats a member whose
+# profile carries that tag as an agent, and offers an agent in the @-mention picker only when the
+# owner's Desktop holds a managed-agent record for it (kind:30177), which ours never does: the crew
+# is supervised on the Spark, not by Desktop. Tagged, the whole crew vanished from the picker and a
+# typed "@mother" went out as plain text that no one received (2026-09-28). The `buzz` CLI injects
+# BUZZ_AUTH_TAG into every event it signs, so it is left unset here. Messages the crew sends still
+# carry the tag; only the profile goes without it. The cost: buzz-acp recognises a DM author as a
+# sibling agent from that profile tag, so crew-to-crew DMs are ignored, as they always were.
+# --republish re-signs a profile even when every field matches, to replace one signed with the tag.
+#
 # Nothing is published for a role that already matches. Run it after any capability rename: the
 # about lines drifted once already, when Brett's `verification` became `bounded_implementation`.
 #
@@ -23,11 +33,12 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 MANIFEST="$ROOT/crew/manifest.yaml"
 AVDIR="$HOME/.nostromo/avatars"
-AVATARS=0; DRY=0; ROLES=()
+AVATARS=0; DRY=0; REPUBLISH=0; ROLES=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --avatars) AVATARS=1; shift ;;
     --dry-run) DRY=1; shift ;;
+    --republish) REPUBLISH=1; shift ;;
     -*)        echo "unknown flag $1" >&2; exit 2 ;;
     *)         ROLES+=("$1"); shift ;;
   esac
@@ -77,14 +88,15 @@ for r in "${ROLES[@]}"; do
     avsha="$(clean_avatar "$AVDIR/$r.png" "$TMP/$r.png")"
     scp -q "$TMP/$r.png" "$r@spark:.avatar-sync.png"
   fi
-  env_line="$(printf 'NAME=%q NIP05=%q ABOUT=%q EXPECT_PUB=%q AVSHA=%q DRY=%q' "$name" "$nip05" "$about" "$pub" "$avsha" "$DRY")"
+  env_line="$(printf 'NAME=%q NIP05=%q ABOUT=%q EXPECT_PUB=%q AVSHA=%q DRY=%q REPUBLISH=%q' \
+    "$name" "$nip05" "$about" "$pub" "$avsha" "$DRY" "$REPUBLISH")"
   if ! ssh "$r@spark" "$env_line bash -s" <<'REMOTE'; then fail=1; fi
 set -euo pipefail
 . /opt/nostromo/runtime/env.sh
 M=/opt/nostromo/nostromo-src/crew/manifest.yaml
 me="$(id -un)"
 export BUZZ_RELAY_URL="$(python3 -c 'import yaml,sys; print(yaml.safe_load(open(sys.argv[1]))["relay"]["url"])' "$M")"
-export BUZZ_AUTH_TAG="$(python3 -c 'import yaml,sys; print(yaml.safe_load(open(sys.argv[1]))["agents"][sys.argv[2]]["buzz_auth_tag"])' "$M" "$me")"
+unset BUZZ_AUTH_TAG   # a tagged profile hides the role from Desktop's @-mention picker; see the header
 export BUZZ_PRIVATE_KEY="$(cat ~/.config/nostromo/secrets/buzz.key)"
 W="$(mktemp -d)"; trap 'rm -rf "$W" ~/.avatar-sync.png' EXIT
 snap() { buzz users get > "$W/p.json"; }   # one relay read; get() only parses it
@@ -109,6 +121,7 @@ if [ -n "$AVSHA" ]; then
        fi ;;
   esac
 fi
+[ ${#args[@]} -gt 0 ] || [ "$REPUBLISH" != 1 ] || args+=(--about "$ABOUT")
 if [ ${#args[@]} -eq 0 ]; then echo "$(printf '%-8s' "$me") in line, nothing published"; exit 0; fi
 if [ "$DRY" = 1 ]; then echo "$(printf '%-8s' "$me") would set: ${args[*]}"; exit 0; fi
 buzz users set-profile "${args[@]}" >/dev/null
