@@ -116,7 +116,9 @@ def pause(role: str, verdict: dict, detail: str) -> None:
     reset = verdict["reset"]
     if path.exists():
         known = dt.datetime.fromisoformat(json.loads(path.read_text())["paused_until"])
-        if known >= reset and systemctl("is-active", f"nostromo@{role}").stdout.strip() != "active":
+        # "activating" counts as running: at boot this unit and the role's start in the same second,
+        # and on 2026-09-28 treating "activating" as stopped left Dallas up with his budget spent.
+        if known >= reset and systemctl("is-active", f"nostromo@{role}").stdout.strip() not in ("active", "activating"):
             return  # already paused through at least this long
     path.write_text(json.dumps({
         "role": role,
