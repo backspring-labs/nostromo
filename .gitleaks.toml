@@ -1,0 +1,21 @@
+# gitleaks configuration: the default rules, plus two allowlisted shapes that are public by design.
+# Scan with:  gitleaks git --redact --log-opts="--all" .    and    gitleaks dir --redact .
+# Both must report no leaks. Keep each entry narrow: a false positive allowed too broadly hides the
+# real leak it resembles.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = """NIP-OA owner attestation (crew/manifest.yaml buzz_auth_tag): the owner's public key
+and the owner's signature over one agent's public key. Not a bearer credential — acting as the agent
+still needs the agent's own key (infrastructure/buzz/bin/mint-auth-tags.py). Matched on the tag's full
+shape, so only a well-formed auth tag is allowed."""
+regexTarget = "line"
+regexes = ['''\["auth","[0-9a-f]{64}","[^"]*","[0-9a-f]{128}"\]''']
+
+[[allowlists]]
+description = """The sample nonce from RFC 6455 section 1.3, used by infrastructure/jetson/bin/probe.sh
+to request a WebSocket upgrade. A published constant."""
+regexTarget = "line"
+regexes = ['''Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==''']

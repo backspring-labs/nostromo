@@ -91,3 +91,7 @@ Resolved 2026-09-07: per-agent GitHub identities and path-scoped write boundarie
 
 - **Lifecycle state store.** The specification defers where durable work-item state lives. Candidate: GitHub Issues on squad-ops with lifecycle labels.
 - **Reviewer checkout convention.** Git allows a branch in one worktree at a time. Dallas and Brett will review at a detached commit.
+
+## License
+
+MIT — see [LICENSE](LICENSE). Secrets never live in this repository: provider keys and Nostr keys stay in each role's own home on the Spark, relay secrets in `secrets.env` on the Jetson. `.gitleaks.toml` allowlists the two public-by-design values that look like secrets (NIP-OA owner attestations, the RFC 6455 sample nonce); `gitleaks git --log-opts="--all" .` and `gitleaks dir .` should both report nothing.
