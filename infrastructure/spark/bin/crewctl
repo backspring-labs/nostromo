@@ -205,16 +205,29 @@ def check_role(role, cfg, tags_cache):
 
 
 # ---- commands -------------------------------------------------------------------------------
+BUDGET_STATE = Path("/opt/nostromo/state/budget")
+
+
+def budget_pause(role):
+    """The time budget-watch will resume this role, when it has paused it; None otherwise."""
+    path = BUDGET_STATE / f"{role}.json"
+    try:
+        return json.loads(path.read_text()).get("paused_until")
+    except (OSError, ValueError):
+        return None
+
+
 def cmd_status(args, roles):
     want = [args.role] if args.role else list(roles)
-    rows = [{"role": r, **unit_state(r)} for r in want]
+    rows = [{"role": r, **unit_state(r), "paused_until": budget_pause(r)} for r in want]
     if args.json:
         print(json.dumps({"crew": rows}, indent=2))
         return 0
     print(f"{'ROLE':<9}{'ACTIVE':<10}{'ENABLED':<10}{'PID':>8}{'RESTARTS':>10}  SINCE")
     for r in rows:
         print(f"{r['role']:<9}{r['active']:<10}{r['enabled']:<10}"
-              f"{(r['pid'] or '-'):>8}{r['restarts']:>10}  {(r['since'] or '-')[:24]}")
+              f"{(r['pid'] or '-'):>8}{r['restarts']:>10}  {(r['since'] or '-')[:24]}"
+              + (f"  paused by budget-watch until {r['paused_until']}" if r["paused_until"] else ""))
     return 0
 
 

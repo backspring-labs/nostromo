@@ -1,0 +1,38 @@
+# Pause a metered crew role when its provider budget runs out; resume it when the budget resets.
+# See infrastructure/spark/bin/budget-watch for what it matches and why.
+#
+# Runs as the supervisor, which the polkit rule (49-nostromo-crewctl.rules) already lets start and
+# stop nostromo@* units, and nothing else. SupplementaryGroups grants this one process read access
+# to the system journal, where the crew's refusals are logged, without adding the supervisor account
+# to that group for everything else it does.
+#
+# Install:  sudo /opt/nostromo/nostromo-src/infrastructure/spark/bin/install-budget-watch.sh
+
+[Unit]
+Description=Nostromo budget watch (pause metered roles at budget exhaustion, resume at reset)
+Documentation=https://github.com/backspring-labs/nostromo
+After=network-online.target
+
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=simple
+User=nostromo
+SupplementaryGroups=systemd-journal
+ExecStart=/opt/nostromo/nostromo-src/infrastructure/spark/bin/budget-watch
+Restart=always
+RestartSec=10s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=nostromo-budget-watch
+
+MemoryMax=256M
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=yes
+ReadWritePaths=/opt/nostromo/state
+
+[Install]
+WantedBy=multi-user.target

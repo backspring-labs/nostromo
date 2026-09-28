@@ -50,6 +50,14 @@ fi
 for r in "${ROLES[@]}"; do
   [[ "$(field "$r" enabled <<<"$STATUS")" == enabled ]] || die "$r is not enabled; this never starts a disabled role"
 done
+# A role budget-watch has paused stays down until its reset: restarting it only earns another refusal.
+KEEP=()
+for r in "${ROLES[@]}"; do
+  until_="$(field "$r" paused_until <<<"$STATUS")"
+  if [[ -n "$until_" && "$until_" != None ]]; then echo "   $r: skipped — paused by budget-watch until $until_"; else KEEP+=("$r"); fi
+done
+[[ ${#KEEP[@]} -gt 0 ]] || die "every requested role is paused by budget-watch"
+ROLES=("${KEEP[@]}")
 # Mother first when she is in the set: local inference, so a bad canary costs nothing.
 ORDERED=()
 for r in "${ROLES[@]}"; do [[ $r == mother ]] && ORDERED+=("$r"); done

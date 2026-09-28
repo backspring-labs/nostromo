@@ -1,0 +1,227 @@
+#!/usr/bin/env python3
+"""budget-watch — pause a metered crew role the moment its provider budget runs out, and resume it
+when the budget resets. Runs as the service nostromo-budget-watch, as the supervisor.
+
+Why it exists. On 2026-09-28 Dallas's Anthropic workspace had spent its month. A question to him
+failed in 1.5 s, and buzz-acp — which dead-letters immediately only for "model not found" and auth
+errors — treated the refusal as transient and re-queued the event ten times with backoff, answering
+25 minutes later. The Operating Model's rule at exhaustion is "stop metered use, report BLOCKED,
+wait". This is the stop and the wait, without anybody doing either by hand.
+
+How. It follows the crew units' journal. When a buzz-acp `agent_returned` error carries a provider's
+budget refusal, it records the role's reset time in /opt/nostromo/state/budget/<role>.json and stops
+nostromo@<role>. The role goes offline in Buzz, which is the visible signal, and nothing retries.
+Once a minute it starts every paused role whose reset time has passed. It never starts a unit that
+is disabled — disabled is the owner's decision (Ash is held) — and it never pauses a local role.
+
+Reset time. Taken from the refusal when the provider states it ("You will regain access on
+2026-10-01 at 00:00 UTC"); otherwise the start of the next calendar month in UTC, which is when the
+monthly hard limits in crew/budgets.yaml renew. Resumes a minute after, not on the second.
+
+Restarts and reboots. On start it re-reads the last seven days of journal: a refusal whose reset is
+still ahead, with no successful turn after it, pauses that role again.
+
+Override. Delete a role's state file (or raise the limit and delete it) and `crewctl start <role>`.
+
+Usage: budget-watch                      run as the service
+       budget-watch --classify <text>    print what a message would do (for tests and doubt)
+       budget-watch --dry-run            the start-up catch-up only, printing what it would pause;
+                                         touches no unit and writes no state (needs journal access)
+"""
+from __future__ import annotations
+
+import datetime as dt
+import json
+import pathlib
+import re
+import selectors
+import subprocess
+import sys
+import time
+
+STATE = pathlib.Path("/opt/nostromo/state/budget")
+MANIFEST = pathlib.Path("/opt/nostromo/nostromo-src/crew/manifest.yaml")
+TICK_SECONDS = 60
+GRACE = dt.timedelta(minutes=1)
+ANSI = re.compile(r"\x1b\[[0-9;]*m")
+UNIT = re.compile(r"^nostromo@([a-z]+)\.service$")
+
+# (provider, what the refusal says). Kept to wording a provider uses for a spent budget, so a
+# transient 429 or an overloaded 529 is never mistaken for one.
+EXHAUSTED = [
+    ("anthropic", re.compile(r"reached your specified workspace API usage limits", re.I)),
+    ("anthropic", re.compile(r"credit balance is too low", re.I)),
+    ("openai", re.compile(r"insufficient_quota|exceeded your current quota", re.I)),
+]
+STATED_RESET = re.compile(r"regain access on (\d{4}-\d{2}-\d{2}) at (\d{2}:\d{2}) UTC", re.I)
+
+
+def log(msg: str) -> None:
+    print(f"budget-watch: {msg}", flush=True)
+
+
+def text(message) -> str:
+    """journald hands MESSAGE back as a list of bytes when it holds control characters, and
+    buzz-acp's lines are coloured, so both shapes arrive."""
+    if isinstance(message, list):
+        message = bytes(message).decode("utf-8", "replace")
+    return ANSI.sub("", message or "")
+
+
+def next_month(now: dt.datetime) -> dt.datetime:
+    year, month = (now.year + 1, 1) if now.month == 12 else (now.year, now.month + 1)
+    return dt.datetime(year, month, 1, tzinfo=dt.timezone.utc)
+
+
+def classify(message: str, now: dt.datetime | None = None):
+    """Return {"provider", "reset", "stated"} for a budget refusal, None for anything else."""
+    now = now or dt.datetime.now(dt.timezone.utc)
+    if "agent_returned" not in message or 'outcome="error"' not in message:
+        return None
+    for provider, pattern in EXHAUSTED:
+        if pattern.search(message):
+            m = STATED_RESET.search(message)
+            if m:
+                reset = dt.datetime.fromisoformat(f"{m.group(1)}T{m.group(2)}:00+00:00")
+                return {"provider": provider, "reset": reset, "stated": True}
+            return {"provider": provider, "reset": next_month(now), "stated": False}
+    return None
+
+
+def succeeded(message: str) -> bool:
+    return "agent_returned" in message and 'outcome="ok"' in message
+
+
+def local_roles() -> set[str]:
+    """Roles on local inference never hit a provider budget; never pause them on a pattern match."""
+    out, role = set(), None
+    for line in MANIFEST.read_text().splitlines():
+        m = re.match(r"^  ([a-z]+):$", line)
+        if m:
+            role = m.group(1)
+        elif role and re.match(r"^    provider:\s*ollama\s*$", line):
+            out.add(role)
+    return out
+
+
+def systemctl(*args) -> subprocess.CompletedProcess:
+    return subprocess.run(["systemctl", *args], capture_output=True, text=True)
+
+
+def pause(role: str, verdict: dict, detail: str) -> None:
+    STATE.mkdir(parents=True, exist_ok=True)
+    path = STATE / f"{role}.json"
+    reset = verdict["reset"]
+    if path.exists():
+        known = dt.datetime.fromisoformat(json.loads(path.read_text())["paused_until"])
+        if known >= reset and systemctl("is-active", f"nostromo@{role}").stdout.strip() != "active":
+            return  # already paused through at least this long
+    path.write_text(json.dumps({
+        "role": role,
+        "paused_until": reset.isoformat(),
+        "reset_stated_by_provider": verdict["stated"],
+        "provider": verdict["provider"],
+        "paused_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+        "refusal": detail[:300],
+    }, indent=2) + "\n")
+    r = systemctl("stop", "--no-block", f"nostromo@{role}")
+    how = "stated by the provider" if verdict["stated"] else "start of next month, none stated"
+    log(f"paused {role}: {verdict['provider']} budget exhausted; resumes after {reset.isoformat()} "
+        f"({how}){'' if r.returncode == 0 else ' — STOP FAILED: ' + r.stderr.strip()}")
+
+
+def resume_due() -> None:
+    now = dt.datetime.now(dt.timezone.utc)
+    for path in sorted(STATE.glob("*.json")) if STATE.exists() else []:
+        state = json.loads(path.read_text())
+        role = state["role"]
+        if now < dt.datetime.fromisoformat(state["paused_until"]) + GRACE:
+            continue
+        if systemctl("is-enabled", f"nostromo@{role}").stdout.strip() != "enabled":
+            log(f"{role}'s budget has reset, but its unit is disabled — leaving it stopped")
+            path.unlink()
+            continue
+        r = systemctl("start", "--no-block", f"nostromo@{role}")
+        if r.returncode == 0:
+            path.unlink()
+            log(f"resumed {role}: budget reset at {state['paused_until']}")
+        else:
+            log(f"could not start {role}, will retry: {r.stderr.strip()}")
+
+
+def entries(*journal_args) -> subprocess.Popen:
+    """The crew units' journal, one JSON entry per line."""
+    proc = subprocess.Popen(["journalctl", "-u", "nostromo@*", "-o", "json", "--no-pager", *journal_args],
+                            stdout=subprocess.PIPE, text=True)
+    return proc
+
+
+def parse(line: str):
+    try:
+        d = json.loads(line)
+    except json.JSONDecodeError:
+        return None, ""
+    m = UNIT.match(d.get("_SYSTEMD_UNIT", ""))
+    return (m.group(1) if m else None), text(d.get("MESSAGE"))
+
+
+def catch_up(skip: set[str], dry: bool = False) -> None:
+    """A refusal still in force, with no successful turn after it, pauses its role again."""
+    latest: dict[str, tuple[dict, str]] = {}
+    proc = entries("--since", "-7d")
+    for line in proc.stdout:
+        role, msg = parse(line)
+        if not role or role in skip:
+            continue
+        verdict = classify(msg)
+        if verdict:
+            latest[role] = (verdict, msg)
+        elif succeeded(msg):
+            latest.pop(role, None)
+    proc.wait()
+    now = dt.datetime.now(dt.timezone.utc)
+    for role, (verdict, msg) in latest.items():
+        if verdict["reset"] > now:
+            if dry:
+                log(f"would pause {role} until {verdict['reset'].isoformat()} ({verdict['provider']}, "
+                    f"{'stated' if verdict['stated'] else 'next month'})")
+            else:
+                pause(role, verdict, msg[msg.find("error="):])
+    if dry and not any(v["reset"] > now for v, _ in latest.values()):
+        log("would pause nothing: no refusal in the last 7 days is still in force")
+
+
+def main() -> int:
+    if len(sys.argv) == 3 and sys.argv[1] == "--classify":
+        v = classify(sys.argv[2])
+        print(json.dumps(v and {**v, "reset": v["reset"].isoformat()}))
+        return 0
+    skip = local_roles()
+    if sys.argv[1:] == ["--dry-run"]:
+        catch_up(skip, dry=True)
+        return 0
+    log(f"watching nostromo@* for provider budget refusals; never pausing local roles {sorted(skip)}")
+    catch_up(skip)
+    resume_due()
+    proc = entries("--follow", "--lines=0")
+    sel = selectors.DefaultSelector()
+    sel.register(proc.stdout, selectors.EVENT_READ)
+    next_tick = time.monotonic() + TICK_SECONDS
+    while True:
+        if sel.select(timeout=max(0, next_tick - time.monotonic())):
+            line = proc.stdout.readline()
+            if not line:
+                log("journal follower ended; exiting so systemd restarts us")
+                return 1
+            role, msg = parse(line)
+            if role and role not in skip:
+                verdict = classify(msg)
+                if verdict:
+                    pause(role, verdict, msg[msg.find("error="):])
+        if time.monotonic() >= next_tick:
+            resume_due()
+            next_tick = time.monotonic() + TICK_SECONDS
+
+
+if __name__ == "__main__":
+    sys.exit(main())

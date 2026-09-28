@@ -68,6 +68,12 @@ for role in "${roles[@]}"; do
     sleep 2
   fi
   systemctl enable "nostromo@$role"
+  # budget-watch paused this role until its provider budget resets; starting it would only earn
+  # another refusal. Enabled, not started — budget-watch starts it when the reset arrives.
+  if [[ -f "/opt/nostromo/state/budget/$role.json" ]]; then
+    echo "  $role: enabled, NOT started — paused by budget-watch until $(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["paused_until"])' "/opt/nostromo/state/budget/$role.json")"
+    continue
+  fi
   # `enable --now` does not restart an already-running unit, so a changed ExecStart or MemoryMax
   # would silently not take effect until the next reboot — the exact failure this installer exists
   # to prevent.
