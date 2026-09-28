@@ -228,7 +228,7 @@ waived by default.
 | WP-0 | **closed** | repo, tests | — |
 | WP-1 | **closed** | `infrastructure/providers/evidence/wp1-providers-2026-09-13.md` | Dallas moved to `claude-opus-5-5` on 2026-09-23; the probe asks for it, unconfirmed until the workspace's September limit resets on 2026-10-01 |
 | WP-2 | **closed** | `infrastructure/jetson/evidence/wp2-2026-09-08.md`; relay upgraded to `0cc63fe3` in `relay-upgrade-2026-09-23.md` | — |
-| WP-3 | **closed** | `infrastructure/buzz/evidence/wp3-owner-identity-2026-09-13.md`; Desktop now `0.5.24` | — |
+| WP-3 | **closed** | `infrastructure/buzz/evidence/wp3-owner-identity-2026-09-13.md`; Desktop now `0.5.25` | — |
 | WP-4 | **closed** | `infrastructure/spark/evidence/wp4-*.md`; **one Unix account per role** since 2026-09-14 (`role-isolation-2026-09-14.md`), replacing the single crew account §11 describes | moving each role's App key and worktree from the supervisor to the role's own account, noted open on 2026-09-14 and not re-verified since |
 | WP-5 | **closed** | `infrastructure/buzz/evidence/wp5-crew-identities-2026-09-14.md` | — |
 | WP-6 | running, **not closed** | `wp6-first-agent-2026-09-15.md`; `wp6-mother-launch-adapter-2026-09-16.md`, which grew to hold §13.2–§13.6 and §13.11 for Mother (including kill-persistence under systemd) and §13.8 for Brett | Brett's §13.12 items are spread across commits and §13.8 rather than written up against the list — his harness is now `buzz-agent` on `qwen3.8-27b`, and edit-denial is obsolete since he implements (Operating Model §2.1); persistence across a **reboot**, where only a kill has been proven; the §36 Ollama memory interlock |
