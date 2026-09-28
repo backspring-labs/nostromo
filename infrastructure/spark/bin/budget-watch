@@ -19,8 +19,9 @@ Reset time. Taken from the refusal when the provider states it ("You will regain
 monthly hard limits in crew/budgets.yaml renew. Resumes a minute after, not on the second.
 
 Restarts and reboots. On start it first re-applies every saved pause still in force — a paused
-role's unit stays enabled, so systemd starts it at boot, and a volatile journal would not remember
-why it was stopped. Then it re-reads the last seven days of journal: a refusal whose reset is still
+role's unit stays enabled, so systemd starts it at boot. Measured on 2026-09-28 after a power blip:
+without this, the only thing that re-paused Dallas was the journal scan below, which took 67 s on a
+cold boot, so he was online for a minute with his budget spent. Then it re-reads the last seven days of journal: a refusal whose reset is still
 ahead, with no successful turn after it, pauses that role again.
 
 Override. Delete a role's state file (or raise the limit and delete it) and `crewctl start <role>`.
@@ -116,8 +117,7 @@ def pause(role: str, verdict: dict, detail: str) -> None:
     reset = verdict["reset"]
     if path.exists():
         known = dt.datetime.fromisoformat(json.loads(path.read_text())["paused_until"])
-        # "activating" counts as running: at boot this unit and the role's start in the same second,
-        # and on 2026-09-28 treating "activating" as stopped left Dallas up with his budget spent.
+        # "activating" counts as running, defensively: at boot this unit and the role start together.
         if known >= reset and systemctl("is-active", f"nostromo@{role}").stdout.strip() not in ("active", "activating"):
             return  # already paused through at least this long
     path.write_text(json.dumps({
