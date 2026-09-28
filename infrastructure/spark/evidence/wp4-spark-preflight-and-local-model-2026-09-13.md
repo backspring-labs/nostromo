@@ -41,6 +41,16 @@ second worktree root on this one.
    loopback and is reached through Tailscale. This one is reachable by anything on the LAN. It may well
    be deliberate for SquadOps — the Compose stack may reach it from a container — so it was left alone
    and is recorded for the owner rather than changed.
+
+   > **Corrected 2026-09-28, by measurement.** "Reachable by anything on the LAN" was inferred from
+   > the listener and is wrong: `ufw` is active on the Spark. A request to `192.168.1.34:11434` from
+   > the nano, on the same LAN, times out; the same request to the Spark's tailnet address returns
+   > HTTP 200. The Spark has no public IPv6 address (only Tailscale's `fd7a:` one), and the home router
+   > forwards nothing, so there is no internet path either. What remains exposed is the **tailnet**,
+   > under Tailscale's ACLs, plus the Docker bridges on the box. Ollama has no authentication, so a
+   > tailnet device can run, pull or delete models. **Do not fix this by binding to loopback**: SquadOps
+   > containers may reach Ollama over the Docker bridge. If it ever needs tightening, deny 11434 on
+   > `tailscale0` in `ufw`.
 2. **The credential surface.** See part 2; it is the finding that gates the rest of WP-4.
 
 ---
