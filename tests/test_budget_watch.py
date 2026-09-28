@@ -71,3 +71,26 @@ def test_the_unit_name_gives_the_role():
 def test_local_roles_are_never_paused():
     bw.MANIFEST = ROOT / "crew" / "manifest.yaml"
     assert bw.local_roles() == {"mother", "brett"}
+
+
+def test_a_saved_pause_is_reapplied_after_a_reboot(tmp_path, monkeypatch):
+    """A paused role's unit stays enabled, so a reboot starts it; the saved state must stop it again.
+    Found on 2026-09-28, when a power blip rebooted the Spark with Dallas paused."""
+    import json
+    (tmp_path / "dallas.json").write_text(json.dumps({"role": "dallas", "paused_until": "2026-10-01T00:00:00+00:00"}))
+    (tmp_path / "ripley.json").write_text(json.dumps({"role": "ripley", "paused_until": "2026-09-01T00:00:00+00:00"}))
+    calls = []
+
+    class R:
+        returncode, stderr = 0, ""
+        def __init__(self, out): self.stdout = out
+
+    def fake(*args):
+        calls.append(args)
+        return R("active\n")
+
+    monkeypatch.setattr(bw, "STATE", tmp_path)
+    monkeypatch.setattr(bw, "systemctl", fake)
+    bw.enforce_saved(NOW)
+    assert ("stop", "--no-block", "nostromo@dallas") in calls
+    assert not any(c[0] == "stop" and c[-1] == "nostromo@ripley" for c in calls), "an expired pause must not stop anything"

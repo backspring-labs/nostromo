@@ -18,8 +18,10 @@ Reset time. Taken from the refusal when the provider states it ("You will regain
 2026-10-01 at 00:00 UTC"); otherwise the start of the next calendar month in UTC, which is when the
 monthly hard limits in crew/budgets.yaml renew. Resumes a minute after, not on the second.
 
-Restarts and reboots. On start it re-reads the last seven days of journal: a refusal whose reset is
-still ahead, with no successful turn after it, pauses that role again.
+Restarts and reboots. On start it first re-applies every saved pause still in force — a paused
+role's unit stays enabled, so systemd starts it at boot, and a volatile journal would not remember
+why it was stopped. Then it re-reads the last seven days of journal: a refusal whose reset is still
+ahead, with no successful turn after it, pauses that role again.
 
 Override. Delete a role's state file (or raise the limit and delete it) and `crewctl start <role>`.
 
@@ -130,6 +132,18 @@ def pause(role: str, verdict: dict, detail: str) -> None:
         f"({how}){'' if r.returncode == 0 else ' — STOP FAILED: ' + r.stderr.strip()}")
 
 
+def enforce_saved(now: dt.datetime | None = None) -> None:
+    """Stop any role whose saved pause is still in force but whose unit is running again."""
+    now = now or dt.datetime.now(dt.timezone.utc)
+    for path in sorted(STATE.glob("*.json")) if STATE.exists() else []:
+        state = json.loads(path.read_text())
+        role, until = state["role"], dt.datetime.fromisoformat(state["paused_until"])
+        if until > now and systemctl("is-active", f"nostromo@{role}").stdout.strip() in ("active", "activating"):
+            r = systemctl("stop", "--no-block", f"nostromo@{role}")
+            log(f"re-applied pause on {role} until {until.isoformat()} (it was running again)"
+                f"{'' if r.returncode == 0 else ' — STOP FAILED: ' + r.stderr.strip()}")
+
+
 def resume_due() -> None:
     now = dt.datetime.now(dt.timezone.utc)
     for path in sorted(STATE.glob("*.json")) if STATE.exists() else []:
@@ -201,6 +215,7 @@ def main() -> int:
         catch_up(skip, dry=True)
         return 0
     log(f"watching nostromo@* for provider budget refusals; never pausing local roles {sorted(skip)}")
+    enforce_saved()
     catch_up(skip)
     resume_due()
     proc = entries("--follow", "--lines=0")
