@@ -85,8 +85,14 @@ for i in "${!ORDERED[@]}"; do
   [[ "$(field "$r" pid <<<"$now")" == "$pid" ]] || problems+=" pid changed ($pid -> $(field "$r" pid <<<"$now")), so it crashed and was restarted;"
   [[ "$(field "$r" restarts <<<"$now")" == 0 ]] || problems+=" $(field "$r" restarts <<<"$now") automatic restarts;"
   key="$(pubkey "$r")"
-  auths="$(ssh "$NANO" "cd /mnt/ssd/buzz/deploy && ./buzzctl logs relay --since '${since/ /T}Z' 2>/dev/null" \
-           | grep -a 'NIP-42 auth successful' | grep -ac "${key:0:8}" || true)"
+  # A short --tail, filtered on the relay's own timestamps — never docker's --since or a full read. The
+  # power cut of 2026-09-28 left the relay's json log damaged at 16:15:21Z: any read that STARTS before
+  # that point (--since, a full read, a long --tail) ends there, so nothing logged since is visible to
+  # it. A --tail short enough to start after the damage reads fine. 1000 lines is hours of relay log,
+  # far more than one rollout. A canary that had re-authenticated failed the --since check for this.
+  auths="$(ssh "$NANO" "cd /mnt/ssd/buzz/deploy && ./buzzctl logs relay --tail 1000 2>/dev/null" \
+           | grep -a 'NIP-42 auth successful' | grep -a "${key:0:8}" \
+           | sed -nE 's/.*"timestamp":"([^"]+)".*/\1/p' | awk -v s="${since/ /T}" '$1 >= s' | wc -l | tr -d ' ')"
   [[ "$auths" -gt 0 ]] || problems+=" did not re-authenticate on the relay;"
   # The colour codes are stripped on the Spark: GNU sed reads \x1b, the Mac's does not.
   stop="$(ssh "$OWN" "journalctl -u nostromo@$r --since '$since UTC' --no-pager -o cat 2>/dev/null | sed -E 's/\x1b\[[0-9;]*m//g'" \
