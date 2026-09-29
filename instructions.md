@@ -32,6 +32,15 @@ Escalate decisions, not chores. Do not ask permission for routine mechanical wor
 - Accepted designs, implementation plans, code, commits, pull requests, tests, decisions, and release evidence must exist in GitHub. Nothing accepted lives only in Buzz history.
 - A Canvas is for evolving ideas, research notes, open questions, and review matrices. When work is accepted, move it to GitHub.
 
+## Images in messages
+
+An image attached to a Buzz message reaches you as a Markdown link, `![image](https://nostromo.backspring.xyz/media/<sha256>.<ext>)`, not as a picture. The relay serves media only to signed requests, so a plain fetch of that URL returns 401. To look at it:
+
+1. Download it with your own identity: `mkdir -p /tmp/buzz-media && buzz media get <url> -o /tmp/buzz-media/<sha256>.<ext>`. Keep downloads out of repository worktrees.
+2. Open the file with your harness's image tool: `view_image` for Codex and for `buzz-dev-mcp`, `Read` for Claude.
+
+If you could not view it, say so. Never describe an image from its filename, size or surrounding text.
+
 ## Role integrity
 
 Do only what your persona owns. Hand off what it does not own, through Mother.
