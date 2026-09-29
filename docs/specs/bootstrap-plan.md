@@ -239,7 +239,7 @@ waived by default.
 | WP-11 | partly done early | pinning in `docs/source-baseline.md`; tested backup and restore for the relay (`infrastructure/jetson/bin/{upgrade,rehearse-upgrade}.sh`) and for Desktop (`infrastructure/buzz/bin/desktop-upgrade.sh`) | see the amendment in §18 |
 
 Amendments in this plan, each dated at the section it changes: §13 (WP-6, 2026-09-15), §14 (WP-7),
-§15 (WP-8), §16.6 (channels) and §18 (WP-11), all 2026-09-23.
+§15 (WP-8), §16.6 (channels) and §18 (WP-11), all 2026-09-23; §16.6 again on 2026-09-28 (campaigns).
 
 ---
 
@@ -2637,6 +2637,42 @@ Do not create the entire roadmap structure before the operating pattern is prove
 > That is two work channels, not the roadmap structure this section rules out, and it moves Lane B
 > repairs out of `#nostromo` into the line channel's threads. Its prerequisite is thread-scoped
 > sessions on the execution roles; without it, a release-line channel is one Parker session.
+
+> ## Amendment, 2026-09-28 — a campaign is written in planning and runs in a channel of its own
+>
+> SquadOps 2.0's Campaign makes a campaign's **objective and backlog** a crew responsibility: the
+> crew authors at most those two, never the scope of a cycle inside a running campaign (squad-ops
+> `docs/plans/post-1-8-2-roadmap-reconciliation.md`; PR #1719 revises it). The owner agreed on
+> 2026-09-28 to split that work across two channels, which also answers one of the two questions
+> above: **Dallas is in `#squadops-planning`.**
+>
+> ```text
+> #squadops-planning     + one thread per campaign: its objective, allowed scope and backlog
+> #squadops-campaign     a campaign running: one thread per run; the bridge's start, stall and
+>                        morning-digest pointers; stall triage; the canvas holds the live state
+> ```
+>
+> - **Written in `#squadops-planning`.** Ripley drafts; plan authoring is hers (Operating Model
+>   §44.1). Dallas challenges whether each item can be checked under accumulated acceptance and
+>   whether the scope keeps the calibration cycle comparable. Ash offers candidates once he is up.
+>   The record is a file in squad-ops that the owner merges; the thread is the discussion.
+> - **Run in `#squadops-campaign`,** with the owner, Mother, Ripley, Parker and Dallas. Brett sits
+>   campaigns out: he is local, and only cloud roles are used while the squad runs cycles
+>   (Operating Model §36). What posts there is a bridge on the Nostromo side — deterministic, no
+>   model, polling the SquadOps CLI under `cycles:read` and posting as Mother. It is not built.
+> - **Why two channels.** Every reply carries its channel's last twelve messages, so overnight bridge
+>   traffic would tax every planning turn and planning discussion every stall turn; and the two
+>   run at different paces — deliberate and owner-led, against machine-driven and read in the
+>   morning.
+> - **Where they meet.** A stall judged to be the app's takes the item off the squad's menu. That is
+>   a backlog edit, made only at a stall or between campaigns, as a pull request the owner merges,
+>   with the reason in the campaign's thread.
+> - **Consequence.** Ripley's entry in squad-ops' `.github/nostromo-crew-boundaries.yml` needs the
+>   backlog file's path once the Campaign SIP names it; until then her pull request would fail.
+>
+> Still **proposed** as a whole, pending the other answer (whether the owner follows the line channel
+> day to day). Neither campaign channel is created before the first campaign exists, by this
+> section's own rule.
 
 ---
 
