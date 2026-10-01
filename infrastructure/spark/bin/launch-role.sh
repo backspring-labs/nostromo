@@ -59,6 +59,12 @@ yaml_agent() {  # yaml_agent <key>   (under agents: <ROLE>:)
     ina && /^  [a-z]+:/ { role = $1; sub(":", "", role) }
     ina && role == r && $1 == k":" { print $2; exit }' "$MANIFEST"
 }
+yaml_agent_text() {  # yaml_agent_text <key> — the whole value, for the one field made of words
+  awk -v r="$ROLE" -v k="$1" '
+    /^agents:/ { ina = 1; next }
+    ina && /^  [a-z]+:/ { role = $1; sub(":", "", role) }
+    ina && role == r && $1 == k":" { sub("^[[:space:]]*" k ":[[:space:]]*", ""); print; exit }' "$MANIFEST"
+}
 
 for f in "$MANIFEST" "$ALLOWFILE" "$PERSONA" "$INSTRUCTIONS" "$BASE_PROMPT"; do
   [[ -r "$f" ]] || die "missing or unreadable: $f  (run push-repo.sh from the Mac)"
@@ -100,7 +106,7 @@ MODEL_FAMILY="$(yaml_agent model_family)"
 PINNED="$(yaml_agent model)"
 # Told to the role in its resolved prompt, so "what is your backing model?" has a true answer: on
 # 2026-10-01 Mother could only say "local inference", because nothing had ever told her.
-MODEL_LABEL="$(yaml_agent model_label)"
+MODEL_LABEL="$(yaml_agent_text model_label)"
 if [[ -n "$MODEL_FAMILY" && -n "$PINNED" ]]; then
   [[ "$PINNED" == *"$MODEL_FAMILY"* ]] \
     || die "manifest says model_family=$MODEL_FAMILY but model=$PINNED — they disagree; change both or neither"
