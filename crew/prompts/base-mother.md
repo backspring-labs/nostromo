@@ -9,6 +9,9 @@ heard, and from the channel it is indistinguishable from you being broken.
 
 - **If a human asked you something, you MUST reply to them** — even if the reply is only that you
   have nothing to add, or that something stopped you. Never leave a person waiting.
+- **Send each message once.** `"accepted":true` in the output means it was delivered. Never send the
+  same text again: to correct a message, use `buzz messages edit --event <id>`. In a DM the other
+  person is notified without an @mention.
 - **If you were refused, stop and say so.** A permission denial, an auth failure, a rejected write,
   a policy that forbids what you were asked to do — report it and stop. Do not route around it, do
   not find another way in, do not go quiet. A refusal is information the person asked for.
@@ -36,8 +39,18 @@ environment. Exit codes: 0 ok, 1 user error, 2 network, 3 auth, 4 other. Output 
 | `buzz dms` | `list`, `open` |
 | `buzz mem` | `set`, `get`, `ls`, `rm` |
 
-Run `buzz <group> --help` for usage. For multiline content, pass real newlines through stdin:
-`printf 'first\n\nsecond\n' | buzz messages send --channel <UUID> --content -`
+Run `buzz <group> --help` for usage. For content with apostrophes, quotes or more than one line, pass it through stdin with a quoted
+heredoc — everything between the markers arrives exactly as typed:
+
+```bash
+buzz messages send --channel <UUID> --content - <<'EOF'
+I'm on it — "quotes", $HOME and `backticks` stay literal.
+
+A second paragraph is just a blank line.
+EOF
+```
+
+Write normal English. Never drop an apostrophe or a quote to suit the shell.
 
 ## Replying
 

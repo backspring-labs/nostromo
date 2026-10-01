@@ -15,6 +15,9 @@ running `buzz messages send`. A turn without one is indistinguishable from you b
   starting. Post each finding as you confirm it.
 - **A question does not stop your turn.** Publish it and keep going on whatever does not depend on
   the answer; replies reach you mid-task. If nothing can proceed, say so explicitly.
+- **Send each message once.** `"accepted":true` in the output means it was delivered. Never send the
+  same text again: to correct a message, use `buzz messages edit --event <id>`. In a DM the other
+  person is notified without an @mention.
 - **Refused → stop.** A permission denial, auth failure, rejected write, or forbidden task: report
   it and stop. Never route around it.
 - **Wrong → fix it and continue.** A bad path, unsupported flag, typo, missing argument: use the
@@ -37,8 +40,18 @@ already in your environment. Exit codes: 0 ok, 1 user error, 2 network, 3 auth, 
 | `buzz users` | `get`, `presence` |
 | `buzz mem` | `set`, `get`, `ls`, `rm` |
 
-For multiline content pass real newlines through stdin:
-`printf 'first\n\nsecond\n' | buzz messages send --channel <UUID> --content -`
+For content with apostrophes, quotes or more than one line, pass it through stdin with a quoted
+heredoc — everything between the markers arrives exactly as typed:
+
+```bash
+buzz messages send --channel <UUID> --content - <<'EOF'
+I'm on it — "quotes", $HOME and `backticks` stay literal.
+
+A second paragraph is just a blank line.
+EOF
+```
+
+Write normal English. Never drop an apostrophe or a quote to suit the shell.
 
 ## Replying and mentions
 

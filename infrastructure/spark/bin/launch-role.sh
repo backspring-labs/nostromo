@@ -98,6 +98,9 @@ WORKDIR="${WORKDIR/#\~/$HOME}"
 # still claimed otherwise. Documentation that can drift from what runs is documentation that lies.
 MODEL_FAMILY="$(yaml_agent model_family)"
 PINNED="$(yaml_agent model)"
+# Told to the role in its resolved prompt, so "what is your backing model?" has a true answer: on
+# 2026-10-01 Mother could only say "local inference", because nothing had ever told her.
+MODEL_LABEL="$(yaml_agent model_label)"
 if [[ -n "$MODEL_FAMILY" && -n "$PINNED" ]]; then
   [[ "$PINNED" == *"$MODEL_FAMILY"* ]] \
     || die "manifest says model_family=$MODEL_FAMILY but model=$PINNED — they disagree; change both or neither"
@@ -492,6 +495,7 @@ before you started; they are correct, and a path you derive yourself is not.
 | | |
 |---|---|
 | Your role | \`$ROLE\` |
+| Your model | $MODEL_LABEL (\`${OLLAMA_TAG:-$PINNED}\`) |
 | Your Unix account | \`$ROLE\` — you are not root, and \`~\` is \`$HOME\` |
 | Your working directory | \`$WORKDIR\` — your shell already starts here |
 | Crew configuration (read-only) | \`$REPO/crew/\` |
