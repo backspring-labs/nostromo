@@ -4,9 +4,12 @@
 #   sync-profiles.sh [--avatars] [--republish] [--dry-run] [role...]   default: every role in the manifest
 #
 # For each role, AS that role on the Spark — its key never leaves its own account (WP-5):
-#   - display name, NIP-05 handle and about (= the manifest's capability) are set with
-#     `buzz users set-profile`, which reads the current profile, merges, then signs, so the avatar
-#     and anything else already there survive;
+#   - display name, NIP-05 handle and about ("<capability> · <model_label>", e.g. "adversarial_review ·
+#     Anthropic Opus 5.5") are set with `buzz users set-profile`, which reads the current profile,
+#     merges, then signs, so the avatar and anything else already there survive;
+#   - the status beside the name (NIP-38) is 🤖 with the model label as its hover text. The CLI cannot
+#     read a status back, so it is set whenever the about line changes — both come from the label —
+#     and on --republish;
 #   - with --avatars, ~/.nostromo/avatars/<role>.png is re-encoded without metadata, uploaded to the
 #     relay's own media store (reachable only on the tailnet) and set as the picture. The relay
 #     refuses media carrying EXIF, XMP, an ICC profile or similar with a 422, and macOS screenshots
@@ -34,6 +37,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 MANIFEST="$ROOT/crew/manifest.yaml"
 AVDIR="$HOME/.nostromo/avatars"
 AVATARS=0; DRY=0; REPUBLISH=0; ROLES=()
+STATUS_EMOJI="🤖"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --avatars) AVATARS=1; shift ;;
@@ -80,7 +84,9 @@ TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 fail=0
 for r in "${ROLES[@]}"; do
   name="$(agent "$r" display_name)"; nip05="$(agent "$r" nip05)"
-  about="$(agent "$r" capability)"; pub="$(agent "$r" buzz_pubkey)"
+  label="$(agent "$r" model_label)"; about="$(agent "$r" capability) · $label"
+  pub="$(agent "$r" buzz_pubkey)"
+  [[ -n "$label" ]] || die "$r has no model_label in the manifest"
   [[ -n "$pub" ]] || die "$r has no buzz_pubkey in the manifest"
   avsha=""
   if [[ $AVATARS == 1 ]]; then
@@ -88,8 +94,8 @@ for r in "${ROLES[@]}"; do
     avsha="$(clean_avatar "$AVDIR/$r.png" "$TMP/$r.png")"
     scp -q "$TMP/$r.png" "$r@spark:.avatar-sync.png"
   fi
-  env_line="$(printf 'NAME=%q NIP05=%q ABOUT=%q EXPECT_PUB=%q AVSHA=%q DRY=%q REPUBLISH=%q' \
-    "$name" "$nip05" "$about" "$pub" "$avsha" "$DRY" "$REPUBLISH")"
+  env_line="$(printf 'NAME=%q NIP05=%q ABOUT=%q LABEL=%q EMOJI=%q EXPECT_PUB=%q AVSHA=%q DRY=%q REPUBLISH=%q' \
+    "$name" "$nip05" "$about" "$label" "$STATUS_EMOJI" "$pub" "$avsha" "$DRY" "$REPUBLISH")"
   if ! ssh "$r@spark" "$env_line bash -s" <<'REMOTE'; then fail=1; fi
 set -euo pipefail
 . /opt/nostromo/runtime/env.sh
@@ -122,9 +128,13 @@ if [ -n "$AVSHA" ]; then
   esac
 fi
 [ ${#args[@]} -gt 0 ] || [ "$REPUBLISH" != 1 ] || args+=(--about "$ABOUT")
+status=0; case " ${args[*]} " in *" --about "*) status=1 ;; esac
 if [ ${#args[@]} -eq 0 ]; then echo "$(printf '%-8s' "$me") in line, nothing published"; exit 0; fi
-if [ "$DRY" = 1 ]; then echo "$(printf '%-8s' "$me") would set: ${args[*]}"; exit 0; fi
+if [ "$DRY" = 1 ]; then
+  echo "$(printf '%-8s' "$me") would set: ${args[*]}$([ $status = 1 ] && echo " + status $EMOJI $LABEL")"; exit 0
+fi
 buzz users set-profile "${args[@]}" >/dev/null
+[ $status = 0 ] || buzz users set-status --emoji "$EMOJI" --text "$LABEL" >/dev/null
 snap
 bad=""
 [ "$(get display_name)" = "$NAME" ] || bad+=" display_name"
@@ -132,7 +142,7 @@ bad=""
 [ "$(get about)" = "$ABOUT" ]       || bad+=" about"
 [ -z "$AVSHA" ] || case "$(get picture)" in *"$AVSHA"*) ;; *) bad+=" picture" ;; esac
 [ -z "$bad" ] || { echo "$me: read back wrong:$bad"; exit 1; }
-echo "$(printf '%-8s' "$me") published: $(printf '%s ' "${args[@]}" | sed -E 's#https://[^ ]*/media/([0-9a-f]{12})[0-9a-f]*[^ ]*#…/\1…#')"
+echo "$(printf '%-8s' "$me") published: $(printf '%s ' "${args[@]}" | sed -E 's#https://[^ ]*/media/([0-9a-f]{12})[0-9a-f]*[^ ]*#…/\1…#')$([ $status = 1 ] && echo "+ status")"
 REMOTE
 done
 [[ $fail == 0 ]] || die "one or more roles failed; see above"

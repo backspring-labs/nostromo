@@ -121,6 +121,29 @@ def test_display_names_are_unique(agents):
     assert len(names) == len(set(names))
 
 
+# The provider named first on the Buzz profile's model label (sync-profiles.sh), so a provider
+# change that forgets the label fails here rather than showing a wrong model to the owner.
+LABEL_PREFIX = {"anthropic": "Anthropic ", "openai": "OpenAI ", "chatgpt": "OpenAI ",
+                "gemini": "Google ", "ollama": "Local "}
+
+
+def test_every_agent_labels_its_model_under_its_provider(agents):
+    for name, agent in agents.items():
+        label = agent.get("model_label", "")
+        prefix = LABEL_PREFIX.get(agent["provider"])
+        assert prefix, f"{name}: no label prefix for provider {agent['provider']!r}"
+        assert label.startswith(prefix) and len(label) > len(prefix), \
+            f"{name}: model_label {label!r} should start {prefix!r}"
+
+
+def test_model_labels_stay_out_of_display_names(agents):
+    # Crew @mentions resolve on the exact display name (buzz CLI, resolve_content_mentions);
+    # "Dallas (Opus 5.5)" would make "@Dallas" fail to notify.
+    for name, agent in agents.items():
+        assert agent["model_label"] not in agent["display_name"], name
+        assert "(" not in agent["display_name"], name
+
+
 # --- Identity (NSTR-ID-001, NSTR-ID-004) ---------------------------------------------
 
 

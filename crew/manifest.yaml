@@ -28,6 +28,11 @@ agents:
     harness: buzz-agent
     provider: ollama
     model: qwen3.6-35b-a3b
+    # Shown on the Buzz profile — about line "<capability> · <label>" and the status beside the
+    # name — by infrastructure/buzz/bin/sync-profiles.sh. Provider first; "Local" for Ollama. Change it
+    # with the model, then run sync-profiles.sh. Never put it in display_name: crew @mentions resolve
+    # on the exact display name.
+    model_label: Local Qwen 3.6 35B-A3B
     ollama_tag: qwen3.6:35b-a3b
     budget_profile: local
     workspace_profile: control
@@ -48,6 +53,7 @@ agents:
     harness: codex-acp
     provider: chatgpt
     model: subscription-backed
+    model_label: OpenAI ChatGPT (subscription)
     budget_profile: chatgpt-plus
     workspace_profile: research
     respond_to: allowlist
@@ -65,6 +71,7 @@ agents:
     agent_mode: agent-full-access
     provider: openai
     model: gpt-5.6-sol
+    model_label: OpenAI GPT-5.6 Sol
     provider_boundary: nostromo-ripley
     github_identity: nostromo-ripley
     github:
@@ -120,6 +127,7 @@ agents:
     # budgets.yaml, which the operating model treats as load-bearing — he cannot review
     # every PR, so he reviews where the record says rework lives.
     model: claude-opus-5-5
+    model_label: Anthropic Opus 5.5
     model_family: opus
     provider_boundary: nostromo-dallas
     budget_profile: dallas
@@ -171,6 +179,7 @@ agents:
     agent_mode: agent-full-access
     provider: openai
     model: gpt-5.6-sol
+    model_label: OpenAI GPT-5.6 Sol
     provider_boundary: nostromo-parker
     github_identity: nostromo-parker
     github:
@@ -218,6 +227,7 @@ agents:
     # MoE was weakest on 2026-09-15. It is also already resident for other work on this box, so
     # it costs no additional VRAM beside Mother's model.
     model: qwen3.8-27b
+    model_label: Local Qwen 3.8 27B
     ollama_tag: qwen3.8:27b
     budget_profile: local
     workspace_profile: verification
@@ -254,6 +264,7 @@ agents:
     harness: gemini-acp
     provider: gemini
     model: subscription-backed
+    model_label: Google Gemini (subscription)
     budget_profile: existing-subscription
     workspace_profile: knowledge
     respond_to: allowlist
