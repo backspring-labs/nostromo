@@ -370,8 +370,10 @@ case "$HARNESS" in
     ;;
   claude-agent-acp|codex-acp)
     # Metered harnesses take their credential from the provider's standard variable. Read from the
-    # role's own 600 file at launch and never written anywhere: not into the repo, not into a
-    # config file, not into another role's environment.
+    # role's own 600 file at launch and never written by us: not into the repo, not into a config
+    # file, not into another role's environment. codex-acp does persist it, in ~/.codex/auth.json,
+    # mode 600 in the role's 700 home (found 2026-10-02, there since 2026-09-18) — the same
+    # protection as the file it came from, but a second copy to remember when rotating a key.
     if [[ "$PROVIDER" == "anthropic" ]]; then
       export ANTHROPIC_API_KEY="$(cat "$PROVIDER_KEY")"
     else
