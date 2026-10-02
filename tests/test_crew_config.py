@@ -136,6 +136,18 @@ def test_every_agent_labels_its_model_under_its_provider(agents):
             f"{name}: model_label {label!r} should start {prefix!r}"
 
 
+def test_metered_codex_roles_cap_their_context(agents):
+    # Every model call re-sends the session so far; without these the 2026-10-01 review re-sent a
+    # median 115K tokens per call. launch-role.sh writes them into ~/.codex/config.toml.
+    for name, agent in agents.items():
+        if agent["harness"] != "codex-acp" or agent["provider"] != "openai":
+            continue
+        tool = agent.get("codex_tool_output_token_limit")
+        compact = agent.get("codex_auto_compact_token_limit")
+        assert isinstance(tool, int) and 1000 <= tool <= 10000, f"{name}: tool output limit {tool!r}"
+        assert isinstance(compact, int) and 20000 <= compact <= 200000, f"{name}: compaction limit {compact!r}"
+
+
 def test_model_labels_stay_out_of_display_names(agents):
     # Crew @mentions resolve on the exact display name (buzz CLI, resolve_content_mentions);
     # "Dallas (Opus 5.5)" would make "@Dallas" fail to notify.

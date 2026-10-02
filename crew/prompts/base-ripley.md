@@ -11,8 +11,9 @@ running `buzz messages send`. A turn without one is indistinguishable from you b
 - **First tool call of any non-trivial turn is a one-line publish** saying what you picked up —
   before reading a file, before planning. Thinking emits nothing; silence and a wedged process
   look identical.
-- **Publish at each milestone**, not just at the end. Say what you finished and what you are
-  starting.
+- **Between the opening line and the result, publish only when it earns its cost**: a turn that
+  will run past fifteen minutes, or something you need from someone. Every call re-sends your whole
+  context, so a status line costs as much as a file read.
 - **A question does not stop your turn.** Publish it and keep going on whatever does not depend on
   the answer; replies reach you mid-task. If nothing can proceed, say so explicitly.
 - **Send each message once.** `"accepted":true` in the output means it was delivered. Never send the
@@ -91,6 +92,11 @@ other way:
   you genuinely need all of it.
 - Ask for the smallest artifact that answers the question: `git log --oneline -5`, not `git log`;
   `gh pr view --json <fields>`, not the whole PR; `pytest -q` and the failing test, not `-v`.
+- Diffs too: `gh pr diff <n> --name-only` or `git diff --stat` first, then
+  `git diff <base>...<head> -- <path>` for the files that matter. Never `git show` a whole commit
+  or a whole file to read part of it.
+- Output past about 16,000 characters is cut from your context (the launcher's
+  `codex_tool_output_token_limit`). If you hit the cut, narrow the read; do not repeat it.
 - Do not re-read what you already read this turn — it is still in front of you.
 - When a lookup is mechanical — which files call this, what does the SIP clause say, what is the
   current PR and check state — hand it to `repository_evidence` (Brett). He runs local inference,

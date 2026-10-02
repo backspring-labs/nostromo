@@ -108,6 +108,12 @@ agents:
     # because context_message_limit still injects recent channel messages into thread replies.
     session_policy: thread
     effort_level: medium
+    # Codex context controls; launch-role.sh writes ~/.codex/config.toml from these at every start.
+    # Every model call re-sends the session so far: on 2026-10-01 one Ripley review made 93 calls
+    # re-sending a median 115K tokens (peak 234K), and 27 tool outputs of ~41K characters — Codex's
+    # default cap — made up 77% of everything she read. 4000 tokens is ~16K characters.
+    codex_tool_output_token_limit: 4000
+    codex_auto_compact_token_limit: 100000
     buzz_pubkey: 5dd000d70cfb4316de6a81b7ea30a0eef59302522a9544add0cfc9cacae9ec44
     buzz_auth_tag: '["auth","508cd1c7dbcddcc93b8168923cac49ef28bb02f0e60de549e44b01000d2bce5f","","4cf4e85d86657932e799d6c06b052f4d2a8c2049852acc6362c1b09f78220eaa58b7503b5f75c20a63c1bd019848a9bb7a9449403de563f78181427650e8e473"]'
     buzz_private_key: spark:~ripley/.config/nostromo/secrets/buzz.key
@@ -210,6 +216,12 @@ agents:
     max_turns_per_session: 10
     max_turn_duration: 5400
     effort_level: medium
+    # Codex context controls; launch-role.sh writes ~/.codex/config.toml from these at every start.
+    # Every model call re-sends the session so far: on 2026-10-01 one Ripley review made 93 calls
+    # re-sending a median 115K tokens (peak 234K), and 27 tool outputs of ~41K characters — Codex's
+    # default cap — made up 77% of everything she read. 4000 tokens is ~16K characters.
+    codex_tool_output_token_limit: 4000
+    codex_auto_compact_token_limit: 100000
     buzz_pubkey: 1a4e1fbefce7f6e0b63123fd86e4dce63a538614eecf443712377b5e557fee47
     buzz_auth_tag: '["auth","508cd1c7dbcddcc93b8168923cac49ef28bb02f0e60de549e44b01000d2bce5f","","cea8a330dd0d7f1a826a1941113f2168dc365f192ef87cf999b72e04dcd4c9118be49bcc9d8d36d5b43aa7168d5bff5207d7c565ad650fac0dba45987a7bfd5c"]'
     buzz_private_key: spark:~parker/.config/nostromo/secrets/buzz.key

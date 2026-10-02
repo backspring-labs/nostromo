@@ -393,6 +393,24 @@ case "$HARNESS" in
       # The manifest decides, because this is a containment decision and containment decisions
       # belong where the rest of a role's boundary is written down — not in an undocumented
       # systemd drop-in that only exists on one host. See docs/deviations.md DEV-010.
+      # Context controls, from the manifest. Codex reads them only from $CODEX_HOME/config.toml
+      # (codex-acp 1.12 has no flag or variable for them), so this file is written whole at every
+      # start: the manifest is the record, and a hand edit here would be silently overwritten.
+      # It holds no credential — the key stays in OPENAI_API_KEY above.
+      CODEX_TOOL_LIMIT="$(yaml_agent codex_tool_output_token_limit)"
+      CODEX_COMPACT_LIMIT="$(yaml_agent codex_auto_compact_token_limit)"
+      for v in "$CODEX_TOOL_LIMIT" "$CODEX_COMPACT_LIMIT"; do
+        [[ -z "$v" || "$v" =~ ^[0-9]+$ ]] || die "Codex context limit '$v' in the manifest is not a whole number"
+      done
+      install -d -m 700 "$HOME/.codex"
+      {
+        echo "# Written by launch-role.sh from crew/manifest.yaml at every start. Edits here are overwritten."
+        [[ -n "$CODEX_TOOL_LIMIT" ]] && echo "tool_output_token_limit = $CODEX_TOOL_LIMIT"
+        [[ -n "$CODEX_COMPACT_LIMIT" ]] && echo "model_auto_compact_token_limit = $CODEX_COMPACT_LIMIT"
+        true
+      } > "$HOME/.codex/config.toml.new"
+      mv -f "$HOME/.codex/config.toml.new" "$HOME/.codex/config.toml"
+
       export INITIAL_AGENT_MODE="${NOSTROMO_AGENT_MODE:-$(yaml_agent agent_mode)}"
       : "${INITIAL_AGENT_MODE:=agent}"
       case "$INITIAL_AGENT_MODE" in
