@@ -98,8 +98,11 @@ agents:
     # metered — every round is money against a $25 envelope.
     max_rounds: 30
     # Metered. The ACP session transcript is re-sent every turn and never rotated by
-    # default, so a long-lived session gets more expensive the longer it lives.
-    max_turns_per_session: 8
+    # default, so a long-lived session gets more expensive the longer it lives. Raised from 8 to 12
+    # on 2026-10-02: a ninth turn in a thread starts a fresh session that has lost the review (the
+    # owner's PR 1798 thread used seven), and codex_auto_compact_token_limit now bounds what a long
+    # session costs, which is what this cap was protecting.
+    max_turns_per_session: 12
     max_turn_duration: 3600
     # Canary for thread scoping (buzz-acp ships `channel` so this can be rolled back without code).
     # Under `channel` every topic in the channel shares one accumulating session: her delegation
