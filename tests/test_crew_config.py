@@ -148,6 +148,22 @@ def test_metered_codex_roles_cap_their_context(agents):
         assert isinstance(compact, int) and 20000 <= compact <= 200000, f"{name}: compaction limit {compact!r}"
 
 
+def test_metered_codex_models_have_a_dated_price(agents):
+    # token-report.sh turns tokens into dollars from crew/prices.yaml; a model with no entry would
+    # report no cost at all, and an entry without a check date could not warn when it went stale.
+    import datetime
+    prices = yaml.safe_load((CREW / "prices.yaml").read_text())["models"]
+    for name, agent in agents.items():
+        if agent["harness"] != "codex-acp" or agent["provider"] != "openai":
+            continue
+        entry = prices.get(agent["model"])
+        assert entry, f"{name}: no price for {agent['model']} in crew/prices.yaml"
+        for key in ("input", "cached_input", "cache_write", "output"):
+            assert isinstance(entry.get(key), (int, float)) and entry[key] > 0, f"{agent['model']}: {key}"
+        assert isinstance(entry.get("checked"), datetime.date), f"{agent['model']}: no checked date"
+        assert entry.get("source", "").startswith("https://"), f"{agent['model']}: no source"
+
+
 def test_model_labels_stay_out_of_display_names(agents):
     # Crew @mentions resolve on the exact display name (buzz CLI, resolve_content_mentions);
     # "Dallas (Opus 5.5)" would make "@Dallas" fail to notify.

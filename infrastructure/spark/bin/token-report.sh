@@ -5,8 +5,11 @@
 #
 #   --since   sessions with activity on or after this date (default: seven days ago)
 #   --turns   one row per turn, labelled with who asked and what — the per-review cost
-#   --usd     estimate dollars from prices per million tokens: uncached input, cached input, output.
-#             Prices are not hard-coded: they change, and a stale one would look authoritative.
+#   --usd     override the prices, per million tokens: IN,CACHED,OUT[,CACHE_WRITE]
+#
+# Dollars come from crew/prices.yaml for the role's model (crew/manifest.yaml), priced call by call
+# so a long-context surcharge lands only on the calls that exceeded it. Every run prints where and
+# when the prices were checked, and warns once they are stale: an estimate, not the provider's bill.
 #
 # Codex writes every model call's usage to ~/.codex/sessions/**/rollout-*.jsonl. Each call re-sends
 # the session so far, so cost tracks calls x context, not the length of the answer: "peak ctx" is
@@ -27,13 +30,35 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 [[ "$SINCE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || { echo "--since wants YYYY-MM-DD" >&2; exit 2; }
-[[ -z "$USD" || "$USD" =~ ^[0-9.]+,[0-9.]+,[0-9.]+$ ]] || { echo "--usd wants three numbers, IN,CACHED,OUT" >&2; exit 2; }
+[[ -z "$USD" || "$USD" =~ ^[0-9.]+,[0-9.]+,[0-9.]+(,[0-9.]+)?$ ]] \
+  || { echo "--usd wants IN,CACHED,OUT or IN,CACHED,OUT,CACHE_WRITE" >&2; exit 2; }
 
-ssh "$ROLE@spark" "python3 - '$SINCE' '$TURNS' '$USD'" <<'PY'
+ssh "$ROLE@spark" "python3 - '$ROLE' '$SINCE' '$TURNS' '$USD'" <<'PY'
 import datetime, glob, json, os, re, sys
+import yaml
 
-since, show_turns, usd = sys.argv[1], sys.argv[2] == "1", sys.argv[3]
-price = [float(x) for x in usd.split(",")] if usd else None
+role, since, show_turns, usd = sys.argv[1], sys.argv[2], sys.argv[3] == "1", sys.argv[4]
+REPO = "/opt/nostromo/nostromo-src/crew"
+model = yaml.safe_load(open(f"{REPO}/manifest.yaml"))["agents"].get(role, {}).get("model", "?")
+price, note = None, ""
+if usd:
+    v = [float(x) for x in usd.split(",")]
+    price = {"input": v[0], "cached_input": v[1], "output": v[2], "cache_write": v[3] if len(v) > 3 else v[0] * 1.25}
+    note = f"prices from --usd for {model}"
+else:
+    try: price = yaml.safe_load(open(f"{REPO}/prices.yaml"))["models"].get(model)
+    except FileNotFoundError: price = None
+    if price:
+        today = datetime.date.today()
+        checked, promo = price.get("checked"), price.get("promotional_until")
+        note = (f"prices for {model}: ${price['input']:.2f} input, ${price['cached_input']:.2f} cached, "
+                f"${price['cache_write']:.2f} cache write, ${price['output']:.2f} output per 1M tokens; "
+                f"checked {checked} at {price.get('source', '?')}")
+        if promo: note += f"; promotional until {promo}"
+        if (checked and (today - checked).days > 45) or (promo and today > promo):
+            note += "\n  WARNING: these prices are stale — re-check them and update crew/prices.yaml"
+    else:
+        note = f"no price for {model} in crew/prices.yaml, so no dollars"
 files = sorted(glob.glob(os.path.expanduser("~/.codex/sessions/*/*/*/rollout-*.jsonl")))
 cutoff = datetime.datetime.fromisoformat(since).timestamp()
 files = [f for f in files if os.path.getmtime(f) >= cutoff]
@@ -41,21 +66,32 @@ if not files:
     print(f"no Codex sessions since {since} in ~/.codex/sessions"); sys.exit(0)
 
 def blank(label=""):
-    return {"label": label, "calls": 0, "input": 0, "cached": 0, "output": 0, "reasoning": 0,
-            "peak": 0, "big_out": 0, "compactions": 0}
+    return {"label": label, "calls": 0, "input": 0, "cached": 0, "write": 0, "output": 0, "reasoning": 0,
+            "peak": 0, "big_out": 0, "compactions": 0, "usd": 0.0}
+
+def call_cost(u):
+    if not price: return 0.0
+    inp, cached = u.get("input_tokens", 0), u.get("cached_input_tokens", 0)
+    write = u.get("cache_write_input_tokens", 0) or 0
+    plain = max(inp - cached - write, 0)
+    xi = xo = 1.0
+    if price.get("long_context_over") and inp > price["long_context_over"]:
+        xi, xo = price.get("long_context_input_x", 1.0), price.get("long_context_output_x", 1.0)
+    return ((plain * price["input"] + cached * price["cached_input"] + write * price["cache_write"]) * xi
+            + u.get("output_tokens", 0) * price["output"] * xo) / 1e6
 
 def add(acc, usage):
     acc["calls"] += 1
     acc["input"] += usage.get("input_tokens", 0)
     acc["cached"] += usage.get("cached_input_tokens", 0)
+    acc["write"] += usage.get("cache_write_input_tokens", 0) or 0
+    acc["usd"] += call_cost(usage)
     acc["output"] += usage.get("output_tokens", 0)
     acc["reasoning"] += usage.get("reasoning_output_tokens", 0)
     acc["peak"] = max(acc["peak"], usage.get("input_tokens", 0))
 
 def dollars(a):
-    if not price: return ""
-    unc = max(a["input"] - a["cached"], 0)
-    return f"  ${(unc * price[0] + a['cached'] * price[1] + a['output'] * price[2]) / 1e6:6.2f}"
+    return f"  ${a['usd']:6.2f}" if price else ""
 
 def k(n): return f"{n/1000:,.0f}K" if n >= 1000 else str(n)
 
@@ -67,6 +103,7 @@ def row(a):
 HEAD = (f"{'calls':>5}  {'input':>7}  {'cach':>4}  {'output':>6}  {'reason':>6}  {'peak':>6}  {'big':>6}  {'cmpt':>4}"
         + ("  est.$" if price else ""))
 total = blank()
+print(f"{role} — {note}\n")
 print(f"{'':42}{HEAD}")
 print(f"{'':42}{'':>5}  {'tokens':>7}  {'ed':>4}  {'':>6}  {'':>6}  {'ctx':>6}  {'out*':>6}")
 for f in files:
@@ -100,7 +137,7 @@ for f in files:
     print(f"{sess['label']:42}{row(sess)}")
     if show_turns:
         for tr in turns: print(f"  {tr['label']:40}{row(tr)}")
-    for key in ("calls", "input", "cached", "output", "reasoning", "compactions"): total[key] += sess[key]
+    for key in ("calls", "input", "cached", "write", "output", "reasoning", "compactions", "usd"): total[key] += sess[key]
     total["peak"] = max(total["peak"], sess["peak"]); total["big_out"] = max(total["big_out"], sess["big_out"])
 print(f"{'total since ' + since:42}{row(total)}")
 print("\n* big out: the largest tool output, in tokens (about 4 characters each), re-sent on every later call.")

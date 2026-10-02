@@ -1,0 +1,25 @@
+# Provider prices for the metered crew models, in US dollars per million tokens.
+# Read by infrastructure/spark/bin/token-report.sh to turn token counts into an estimate.
+#
+# An estimate, not a bill: the provider's usage page is the record. Prices change, and a stale one
+# reads as authoritative, so each entry carries where and when it was checked, and the report says
+# so on every run and warns once an entry is old or its promotion has ended. Re-check, then edit
+# `checked`, rather than letting the warning become furniture.
+#
+# Output includes reasoning tokens (Codex's total_tokens = input + output). A request whose input
+# exceeds long_context_over is billed at long_context_input_x / long_context_output_x for the whole
+# request; compaction (codex_auto_compact_token_limit) keeps the crew well under it.
+
+version: 1
+models:
+  gpt-5.6-sol:
+    input: 4.00
+    cached_input: 0.40
+    cache_write: 5.00            # "1.25x the uncached input token rate"
+    output: 20.00
+    long_context_over: 272000
+    long_context_input_x: 2.0
+    long_context_output_x: 1.5
+    source: https://developers.openai.com/api/docs/models/gpt-5.6-sol
+    checked: 2026-10-02
+    promotional_until: 2026-11-21  # "available at least through November 21, 2026"
