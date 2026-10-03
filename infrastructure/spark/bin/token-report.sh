@@ -196,7 +196,9 @@ for f in files:
     total["models"] |= sess["models"]
 print(f"{'total since ' + since:42}{row(total)}")
 
-print("\n* big out: the largest tool output, in tokens (about 4 characters each), re-sent on every later call.")
+print("\n* big out: the largest tool output as logged, in tokens (about 4 characters each). Codex logs an output in full\n"
+      "  but sends the model at most codex_tool_output_token_limit of it: on 2026-10-03 a 41K-character output grew\n"
+      "  Ripley's next call by 931 tokens. Watch peak ctx for what was actually re-sent.")
 if not OVERRIDE:
     today = datetime.date.today()
     for m in sorted(total["models"]):
