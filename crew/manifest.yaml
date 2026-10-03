@@ -302,8 +302,15 @@ agents:
     respond_to: allowlist
     # Read-only Navigator to start (2026-10-03, owner's choice): she drafts release notes, CHANGELOG
     # entries and material over closed work for review, from a read-only clone. GitHub write for the
-    # release-cut steps waits for a nostromo-lambert App and squad-ops boundaries. Gemini through the
-    # owner's existing Google subscription; the model is pinned once her first turn shows the default.
+    # release-cut steps waits for a nostromo-lambert App and squad-ops boundaries.
+    # DEFERRED 2026-10-03, on the owner's call. Google no longer serves the Gemini CLI to individual
+    # plans: the owner's Google AI Pro account gets no paid tier in Code Assist, and its free tier is
+    # refused as UNSUPPORTED_CLIENT ("migrate to the Antigravity suite"). The successor, the
+    # Antigravity CLI (`agy`), has a headless `-p` mode but no ACP mode, and buzz-acp drives only ACP
+    # agents. Her unit stays disabled; she left #nostromo, so she is off the owner's Desktop. Her
+    # persona, base prompt, read-only clone and the launcher's gemini-acp support remain. To bring her
+    # back: a harness that speaks ACP (agy if it gains it, or a local model, or a capped API key), the
+    # owner adds her to #nostromo in Desktop, then sign-in.sh and install-units.sh as for Ash.
     workdir: ~/src/squad-ops
     requires_clone: true
     max_rounds: 30
