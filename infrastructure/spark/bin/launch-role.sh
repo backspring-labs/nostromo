@@ -376,6 +376,13 @@ case "$HARNESS" in
     # protection as the file it came from, but a second copy to remember when rotating a key.
     if [[ "$PROVIDER" == "anthropic" ]]; then
       export ANTHROPIC_API_KEY="$(cat "$PROVIDER_KEY")"
+      # The model, set where Claude Code itself reads it. buzz-acp's --model switches only to an id the
+      # adapter lists at session/new, and claude-agent-acp 0.79.0 lists Claude Code's aliases (opus,
+      # opus[1m], ...), not full ids — so "claude-opus-5-5" matched nothing, no switch was made, and
+      # Dallas ran the adapter's default, claude-opus-5, from 2026-09-18 until this line (found
+      # 2026-10-03 by token-report.sh, which prints the model the API recorded). ANTHROPIC_MODEL does
+      # not depend on the adapter's list.
+      if [[ -n "$PINNED" ]]; then export ANTHROPIC_MODEL="$PINNED"; fi
     else
       export OPENAI_API_KEY="$(cat "$PROVIDER_KEY")"
       # codex-acp advertises two ACP auth methods — `api-key` and `chat-gpt` — and the key is only
