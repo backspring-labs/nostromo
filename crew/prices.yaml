@@ -23,3 +23,27 @@ models:
     source: https://developers.openai.com/api/docs/models/gpt-5.6-sol
     checked: 2026-10-02
     promotional_until: 2026-11-21  # "available at least through November 21, 2026"
+
+  # Anthropic, for Dallas (claude-agent-acp). The report prices each Claude call by the model the API
+  # recorded, so the model Dallas actually ran is the one billed here. A 1-hour cache write is 2x
+  # input; US-only inference (inference_geo "us") is 1.1x everything; fast mode is priced below.
+  claude-opus-5-5:
+    input: 4.00
+    cached_input: 0.20             # "0.05x the base input price" on Opus 5.5
+    cache_write: 5.00              # 5-minute
+    cache_write_1h: 8.00
+    output: 20.00
+    fast_input_x: 2.0              # fast mode $8 / $40
+    fast_output_x: 2.0
+    source: https://platform.claude.com/docs/en/about-claude/pricing
+    checked: 2026-10-03
+  claude-opus-5:
+    input: 5.00
+    cached_input: 0.50
+    cache_write: 6.25              # 5-minute
+    cache_write_1h: 10.00
+    output: 25.00
+    fast_input_x: 2.0              # fast mode $10 / $50
+    fast_output_x: 2.0
+    source: https://platform.claude.com/docs/en/about-claude/pricing
+    checked: 2026-10-03

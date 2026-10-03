@@ -148,13 +148,13 @@ def test_metered_codex_roles_cap_their_context(agents):
         assert isinstance(compact, int) and 20000 <= compact <= 200000, f"{name}: compaction limit {compact!r}"
 
 
-def test_metered_codex_models_have_a_dated_price(agents):
+def test_metered_models_have_a_dated_price(agents):
     # token-report.sh turns tokens into dollars from crew/prices.yaml; a model with no entry would
     # report no cost at all, and an entry without a check date could not warn when it went stale.
     import datetime
     prices = yaml.safe_load((CREW / "prices.yaml").read_text())["models"]
     for name, agent in agents.items():
-        if agent["harness"] != "codex-acp" or agent["provider"] != "openai":
+        if (agent["harness"], agent["provider"]) not in {("codex-acp", "openai"), ("claude-agent-acp", "anthropic")}:
             continue
         entry = prices.get(agent["model"])
         assert entry, f"{name}: no price for {agent['model']} in crew/prices.yaml"
