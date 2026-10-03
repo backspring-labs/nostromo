@@ -240,6 +240,17 @@ case "$PROVIDER" in
     [[ "$kmode" == "600" ]] || die "$PROVIDER_KEY is mode $kmode, must be 600"
     [[ -n "$PINNED" ]] || die "no model for $ROLE in the manifest — a metered role must pin one"
     ;;
+  chatgpt)
+    # A flat-rate ChatGPT subscription (Ash). No API key: Codex holds the owner's one-time sign-in
+    # in ~/.codex/auth.json, which it refreshes itself. Interactive once, by the owner, through an SSH
+    # tunnel: infrastructure/spark/bin/sign-in.sh <role>, from the Mac. Never by this script, which
+    # must not wait on a login.
+    [[ "$HARNESS" == codex-acp ]] || die "provider chatgpt needs the codex-acp harness, not $HARNESS"
+    AUTH_JSON="$HOME/.codex/auth.json"
+    [[ -r "$AUTH_JSON" ]] || die "no ChatGPT sign-in at $AUTH_JSON — from the Mac: infrastructure/spark/bin/sign-in.sh $ROLE"
+    amode="$(stat -c '%a' "$AUTH_JSON")"
+    [[ "$amode" == "600" ]] || die "$AUTH_JSON is mode $amode, must be 600"
+    ;;
   *)
     die "unsupported provider '$PROVIDER' for $ROLE"
     ;;
@@ -384,13 +395,18 @@ case "$HARNESS" in
       # not depend on the adapter's list.
       if [[ -n "$PINNED" ]]; then export ANTHROPIC_MODEL="$PINNED"; fi
     else
-      export OPENAI_API_KEY="$(cat "$PROVIDER_KEY")"
       # codex-acp advertises two ACP auth methods — `api-key` and `chat-gpt` — and the key is only
       # "the fallback API key used when the API-key auth method is selected". Setting the key alone
       # leaves the adapter unauthenticated: it answered every prompt with
       # "Agent reported error (code -32000): Authentication required" and buzz-acp requeued with
       # backoff forever. DEFAULT_AUTH_REQUEST selects the method without a client round-trip.
-      export DEFAULT_AUTH_REQUEST='{"methodId":"api-key"}'
+      if [[ "$PROVIDER" == "chatgpt" ]]; then
+        # The subscription sign-in in ~/.codex/auth.json; no key in the environment at all.
+        export DEFAULT_AUTH_REQUEST='{"methodId":"chat-gpt"}'
+      else
+        export OPENAI_API_KEY="$(cat "$PROVIDER_KEY")"
+        export DEFAULT_AUTH_REQUEST='{"methodId":"api-key"}'
+      fi
       # Nothing here has a browser, and a role must never be waiting on an interactive login.
       export NO_BROWSER=1
       # Pin the mode rather than inherit it. `agent` is already codex-acp's built-in default, so
@@ -461,7 +477,8 @@ esac
 # can fully read. Turn it on to diagnose a turn, off again afterwards.
 # buzz-agent reads its model from the environment; the ACP adapters take it from buzz-acp.
 MODEL_ARG=()
-[[ "$HARNESS" != "buzz-agent" && "$HARNESS" != "goose" && -n "$PINNED" ]] && MODEL_ARG=(--model "$PINNED")
+[[ "$HARNESS" != "buzz-agent" && "$HARNESS" != "goose" && -n "$PINNED" && "$PINNED" != "subscription-backed" ]] \
+  && MODEL_ARG=(--model "$PINNED")
 # Optional, and only meaningful for adapters that implement session/set_config_option. Left unset
 # unless the manifest asks for it, because buzz-acp's own default is bypass-permissions and
 # guessing at an adapter's permission semantics is how a role ends up unable to read anything.

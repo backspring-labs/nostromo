@@ -57,6 +57,21 @@ agents:
     budget_profile: chatgpt-plus
     workspace_profile: research
     respond_to: allowlist
+    # Read-only research on a flat-rate subscription (2026-10-03). No GitHub identity: squad-ops is
+    # public, so reading needs none, and Ash changes no repository. Full access, as Ripley has, because
+    # Codex's sandboxed mode blocks the network that research needs; Ash's reach is his own Unix
+    # account. The context caps bound usage-limited subscription turns, as they bound paid ones.
+    agent_mode: agent-full-access
+    workdir: ~/src/squad-ops
+    requires_clone: true
+    max_rounds: 30
+    max_turns_per_session: 12
+    max_turn_duration: 3600
+    session_policy: thread
+    effort_level: medium
+    codex_tool_output_token_limit: 4000
+    codex_auto_compact_token_limit: 100000
+    capability_note: research, reading and ideation, read-only
     buzz_pubkey: e5a173a7e5ce83c5c228398711659f49262b1b768cea33832e78435709317697
     buzz_auth_tag: '["auth","508cd1c7dbcddcc93b8168923cac49ef28bb02f0e60de549e44b01000d2bce5f","","0c5f6eff4782e55ddd197435064956aa600e1c1d42049928aa5ccf90eee19c63a82c7f0faaca15ce5121cfdd0aa00b78ea043c4ad7c2bd6323c7b3d089226f80"]'
     buzz_private_key: spark:~ash/.config/nostromo/secrets/buzz.key
