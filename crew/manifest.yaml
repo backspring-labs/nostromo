@@ -168,6 +168,10 @@ agents:
     # default, so a long-lived session gets more expensive the longer it lives. Dallas carried
     # every turn since a restart 28 hours earlier, each one dragging a full thinking block.
     max_turns_per_session: 6
+    # One session per thread (2026-10-03), as Ripley has since 2026-09-22: with #squadops-dev and
+    # #squadops-campaigns each carrying a thread per item, a channel-wide session would make
+    # every item one conversation (Bootstrap Plan §16.6's prerequisite).
+    session_policy: thread
     max_turn_duration: 3600
     # Unset, he runs Opus at its default thinking depth on every turn including trivial ones.
     # Thinking bills as output. Measured against Ripley over the same window: fewer turns, under
@@ -234,6 +238,10 @@ agents:
     # Metered. The ACP session transcript is re-sent every turn and never rotated by
     # default, so a long-lived session gets more expensive the longer it lives.
     max_turns_per_session: 10
+    # One session per thread (2026-10-03), as Ripley has since 2026-09-22: with #squadops-dev and
+    # #squadops-campaigns each carrying a thread per item, a channel-wide session would make
+    # every item one conversation (Bootstrap Plan §16.6's prerequisite).
+    session_policy: thread
     max_turn_duration: 5400
     effort_level: medium
     # Codex context controls; launch-role.sh writes ~/.codex/config.toml from these at every start.
