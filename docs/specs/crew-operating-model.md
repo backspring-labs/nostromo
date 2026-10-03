@@ -2045,6 +2045,73 @@ happen on the Spark. The Spark boots to `graphical.target` with Chromium availab
 forwarded session handles it; a device-code flow is the fallback. Node is not yet installed on the Spark and
 both harnesses need it, which is already a WP-4 item in the source baseline.
 
+
+### 35.5 Spend is measured, and the crew optimises its own
+
+> **Added 2026-10-03** on the owner's direction: a campaign's outcome includes the crew analysing what it
+> spent and reducing frontier tokens wherever that costs no quality. Proposed, like the rest of this
+> document; the controls listed as in force are.
+
+**What a frontier token buys, measured.** Ripley's review of squad-ops PR 1798 on 2026-10-01 made 93 model
+calls in one session and read 10.3M input tokens, 96% of them cache hits — about $6.77 at GPT-5.6 Sol's
+prices (`crew/prices.yaml`). Output, reasoning included, was about 13% of that; re-sending the session's
+context was the rest. Every call re-sends everything so far, so **cost tracks calls × context, not the
+length of the answer**. The levers are fewer calls and smaller context. Lowering effort is not one: thinking
+is the cheap part.
+
+**Frontier spend is for judgement.** Everything else goes to the cheapest role that can do it and be
+checked:
+
+| Work | Who | Cost |
+|---|---|---|
+| Watching, triggers, pointers, the canvas | the bridge, deterministic | none |
+| First pass: symptoms with citations | the squad | local |
+| The facts packet — CLI facts, citations, related and duplicate issues, reproductions | Brett, between cycles under the Spark lease | local |
+| Bulk reading off the Spark — weekly trends, research, a proposal's evidence and scope sections, summaries of long PRs and SIPs | Ash | fixed subscription |
+| Docs and the knowledge surface | Lambert | existing subscription |
+| The verdict (app, framework, variance), the hypothesis, the prediction, the decision requested | Ripley | metered |
+| The challenge | Dallas | metered |
+| Code | Parker, with Brett on bounded cards | metered |
+
+Brett selects and cites; he never paraphrases evidence, because a lossy summary would buy a wrong verdict at
+frontier price. His turn limit is shorter than a lease. The reading is his rather than Mother's because he
+runs the squad's own resident model. Reading on the same model family as the judge is fine; independence
+matters at the challenge, which stays with Dallas.
+
+**Controls in force.** For the Codex roles, `codex_tool_output_token_limit: 4000` and
+`codex_auto_compact_token_limit: 100000` (manifest, written into `~/.codex/config.toml` by the launcher).
+Ripley keeps a thread's session for 12 turns. The prompts read diffs file by file and publish status only
+when it earns a context re-send. budget-watch pauses a role at exhaustion. Prices are dated and sourced in
+`crew/prices.yaml`, and `infrastructure/spark/bin/token-report.sh` prices every turn from the role's own
+session logs.
+
+**The crew analyses its own spend.**
+
+1. **Every campaign night,** the morning report carries the crew's cost — per role, per engagement — from
+   `token-report.sh`. That is deterministic: no model is paid to count tokens.
+2. **Weekly,** with Loop 3, Ash reads the week's cost records, on his subscription, so the analysis costs no
+   frontier tokens, and drafts candidate savings. Ripley turns at most one or two into proposals in the
+   charter's schema: the evidence, the hypothesis, the change, a prediction written before the change, how
+   it will be measured, the risk, and the decision requested. Dallas challenges any that touch the depth of a
+   review or a challenge.
+3. **The owner approves.** Nostromo implements through its normal flow — manifest, prompts, launcher — and
+   the next week's numbers confirm or refute the prediction, recorded either way.
+4. **Pacing,** in the bridge: a metered role is engaged only while its month-to-date spend stays under the
+   campaign nights run so far times its per-night allowance, plus one engagement of slack. budget-watch acts
+   at exhaustion; pacing keeps a role from reaching it on the twentieth.
+
+**What may not be optimised away.** The measure stays §35.3's: paid tokens per passing change — for
+campaigns, per accepted finding and per validated improvement — at equal or better silent-failure count. A
+saving that skips a risk-triggered challenge, drops a citation, or admits one more silent failure is a worse
+result, not a cheaper one. No optimisation lowers a role's verification bar, and who challenges what remains
+the owner's decision.
+
+**Gaps.** `token-report.sh` reads Codex logs only, so Dallas, on Claude Code, is not yet measured. The
+subscription roles have usage caps, not dollar caps, and budget-watch does not yet recognise their refusals.
+A local role's cost is GPU time under the lease, which is not measured at all yet. And the provider's usage
+page has not yet confirmed whether cache writes are billed: if they are not, every estimate above is about
+30% high.
+
 ---
 
 # Part VIII — The Spark Interlock
@@ -2598,6 +2665,9 @@ Every row names the actual current file. `R` = required before commissioning. `F
 > - **Supervisor is systemd, not Herdr.** Where the rows below say `supervisor: herdr`, the Bootstrap Plan's WP-6
 >   amendment (2026-09-15) overrides them.
 > - **Lambert is the Navigator** (§10A): `capability: navigation`.
+> - **Cost controls** (§35.5, 2026-10-02/03): the Codex roles' tool-output cap and compaction, Ripley's 12-turn
+>   sessions, publish-when-it-earns-it prompts, and `token-report.sh` with dated prices in `crew/prices.yaml`.
+>   The weekly self-analysis loop in §35.5 is proposed, not running.
 >
 > **Partly done:**
 >
