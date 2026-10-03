@@ -35,12 +35,12 @@ def returned(error: str) -> str:
 
 def test_the_real_refusal_pauses_until_the_stated_reset():
     v = bw.classify(bw.text(list(REAL.encode())), NOW)  # journald's byte-array form
-    assert v == {"provider": "anthropic", "reset": dt.datetime(2026, 10, 1, tzinfo=UTC), "stated": True}
+    assert v == {"kind": "budget", "provider": "anthropic", "reset": dt.datetime(2026, 10, 1, tzinfo=UTC), "stated": True}
 
 
 def test_a_refusal_without_a_stated_reset_waits_for_the_next_month():
     v = bw.classify(returned("API Error: 429 You exceeded your current quota (insufficient_quota)"), NOW)
-    assert v == {"provider": "openai", "reset": dt.datetime(2026, 10, 1, tzinfo=UTC), "stated": False}
+    assert v == {"kind": "budget", "provider": "openai", "reset": dt.datetime(2026, 10, 1, tzinfo=UTC), "stated": False}
     december = dt.datetime(2026, 12, 20, tzinfo=UTC)
     assert bw.classify(returned("Your credit balance is too low"), december)["reset"] == dt.datetime(2027, 1, 1, tzinfo=UTC)
 
@@ -94,3 +94,44 @@ def test_a_saved_pause_is_reapplied_after_a_reboot(tmp_path, monkeypatch):
     bw.enforce_saved(NOW)
     assert ("stop", "--no-block", "nostromo@dallas") in calls
     assert not any(c[0] == "stop" and c[-1] == "nostromo@ripley" for c in calls), "an expired pause must not stop anything"
+
+
+# Verbatim from `journalctl -u nostromo@dallas`, 2026-10-03, after the model was set where Claude Code
+# reads it and the bundled Claude Code turned out too old for it. buzz-acp retried this with backoff.
+REAL_MODEL = (
+    "2026-10-03T14:24:31.804959Z  WARN buzz_acp: agent_returned (application error — pipe intact) agent=0 "
+    'outcome="error" configured_model=claude-opus-5-5 pid=428642 error=Agent reported error (code -32603): '
+    "Internal error: API Error: 400 Claude Code 2.1.274 does not support this model; version 2.1.280 or "
+    "newer is required."
+)
+
+
+def test_an_unsupported_model_pauses_until_the_configuration_changes():
+    assert bw.classify(REAL_MODEL, NOW) == {"kind": "model", "provider": "model", "reset": None, "stated": False}
+    # "model not found" stays excluded: buzz-acp dead-letters it at once, without the retries.
+    assert bw.classify(returned("model not found"), NOW) is None
+
+
+def test_a_model_pause_lifts_only_when_the_configuration_changes(tmp_path, monkeypatch):
+    import json
+    state = tmp_path / "dallas.json"
+    state.write_text(json.dumps({"role": "dallas", "paused_for": "model", "paused_until": None,
+                                 "config_fingerprint": "before-the-fix"}))
+    calls = []
+
+    class R:
+        returncode, stderr = 0, ""
+        def __init__(self, out): self.stdout = out
+
+    def fake(*args):
+        calls.append(args)
+        return R("enabled\n" if args[0] == "is-enabled" else "inactive\n")
+
+    monkeypatch.setattr(bw, "STATE", tmp_path)
+    monkeypatch.setattr(bw, "systemctl", fake)
+    monkeypatch.setattr(bw, "fingerprint", lambda: "before-the-fix")
+    bw.resume_due()
+    assert state.exists() and not any(c[0] == "start" for c in calls), "an unchanged configuration must stay paused"
+    monkeypatch.setattr(bw, "fingerprint", lambda: "after-the-fix")
+    bw.resume_due()
+    assert ("start", "--no-block", "nostromo@dallas") in calls and not state.exists()

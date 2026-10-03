@@ -24,6 +24,17 @@ without this, the only thing that re-paused Dallas was the journal scan below, w
 cold boot, so he was online for a minute with his budget spent. Then it re-reads the last seven days of journal: a refusal whose reset is still
 ahead, with no successful turn after it, pauses that role again.
 
+Model refusals. On 2026-10-03 Dallas's model was set where Claude Code reads it, and the API refused
+every turn: "Claude Code 2.1.274 does not support this model; version 2.1.280 or newer is required".
+buzz-acp retried that, too, with backoff, so the asker saw three minutes of silence and would have
+seen half an hour. A model refusal has no reset time: it lasts until someone changes the role's
+configuration. So the pause records a fingerprint of crew/manifest.yaml, versions.lock and
+launch-role.sh, and the role is started again once that fingerprint moves — the fix landing through
+push-repo.sh is the signal. If the fix was wrong, its first turn pauses the role again. The journal
+catch-up at start ignores model refusals: the saved state is their record, and an old refusal must
+not re-pause a role whose configuration has since been fixed. Only the refusal buzz-acp retries is
+matched; "model not found" it already dead-letters at once.
+
 Override. Delete a role's state file (or raise the limit and delete it) and `crewctl start <role>`.
 
 Usage: budget-watch                      run as the service
@@ -56,6 +67,12 @@ EXHAUSTED = [
     ("anthropic", re.compile(r"credit balance is too low", re.I)),
     ("openai", re.compile(r"insufficient_quota|exceeded your current quota", re.I)),
 ]
+# Refusals that last until the role's configuration changes, not until a date. Measured, verbatim.
+MODEL_REFUSED = [
+    re.compile(r"does not support this model", re.I),  # Claude Code older than the model needs
+]
+CONFIG_FILES = [MANIFEST, MANIFEST.parents[1] / "infrastructure/spark/bin/versions.lock",
+                MANIFEST.parents[1] / "infrastructure/spark/bin/launch-role.sh"]
 STATED_RESET = re.compile(r"regain access on (\d{4}-\d{2}-\d{2}) at (\d{2}:\d{2}) UTC", re.I)
 
 
@@ -77,7 +94,9 @@ def next_month(now: dt.datetime) -> dt.datetime:
 
 
 def classify(message: str, now: dt.datetime | None = None):
-    """Return {"provider", "reset", "stated"} for a budget refusal, None for anything else."""
+    """Return {"kind", "provider", "reset", "stated"} for a refusal that should pause a role, None for
+    anything else. kind "budget" resumes at `reset`; kind "model" has no reset and resumes when the
+    role's configuration changes."""
     now = now or dt.datetime.now(dt.timezone.utc)
     if "agent_returned" not in message or 'outcome="error"' not in message:
         return None
@@ -86,9 +105,26 @@ def classify(message: str, now: dt.datetime | None = None):
             m = STATED_RESET.search(message)
             if m:
                 reset = dt.datetime.fromisoformat(f"{m.group(1)}T{m.group(2)}:00+00:00")
-                return {"provider": provider, "reset": reset, "stated": True}
-            return {"provider": provider, "reset": next_month(now), "stated": False}
+                return {"kind": "budget", "provider": provider, "reset": reset, "stated": True}
+            return {"kind": "budget", "provider": provider, "reset": next_month(now), "stated": False}
+    for pattern in MODEL_REFUSED:
+        if pattern.search(message):
+            return {"kind": "model", "provider": "model", "reset": None, "stated": False}
     return None
+
+
+def fingerprint() -> str:
+    """What a model refusal waits on: the files that decide which model a role runs, and with what."""
+    import hashlib
+    h = hashlib.sha256()
+    for f in CONFIG_FILES:
+        h.update(f.read_bytes() if f.exists() else b"")
+    return h.hexdigest()
+
+
+def active(role: str) -> bool:
+    # "activating" counts as running, defensively: at boot this unit and the role start together.
+    return systemctl("is-active", f"nostromo@{role}").stdout.strip() in ("active", "activating")
 
 
 def succeeded(message: str) -> bool:
@@ -114,14 +150,31 @@ def systemctl(*args) -> subprocess.CompletedProcess:
 def pause(role: str, verdict: dict, detail: str) -> None:
     STATE.mkdir(parents=True, exist_ok=True)
     path = STATE / f"{role}.json"
+    saved = json.loads(path.read_text()) if path.exists() else {}
+    if verdict["kind"] == "model":
+        fp = fingerprint()
+        if saved.get("paused_for") == "model" and saved.get("config_fingerprint") == fp and not active(role):
+            return  # already paused on this configuration
+        path.write_text(json.dumps({
+            "role": role,
+            "paused_for": "model",
+            "paused_until": None,
+            "config_fingerprint": fp,
+            "paused_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+            "refusal": detail[:300],
+        }, indent=2) + "\n")
+        r = systemctl("stop", "--no-block", f"nostromo@{role}")
+        log(f"paused {role}: the API refuses its model; resumes when crew/manifest.yaml, versions.lock or "
+            f"launch-role.sh changes{'' if r.returncode == 0 else ' — STOP FAILED: ' + r.stderr.strip()}")
+        return
     reset = verdict["reset"]
-    if path.exists():
-        known = dt.datetime.fromisoformat(json.loads(path.read_text())["paused_until"])
-        # "activating" counts as running, defensively: at boot this unit and the role start together.
-        if known >= reset and systemctl("is-active", f"nostromo@{role}").stdout.strip() not in ("active", "activating"):
+    if saved.get("paused_until"):
+        known = dt.datetime.fromisoformat(saved["paused_until"])
+        if known >= reset and not active(role):
             return  # already paused through at least this long
     path.write_text(json.dumps({
         "role": role,
+        "paused_for": "budget",
         "paused_until": reset.isoformat(),
         "reset_stated_by_provider": verdict["stated"],
         "provider": verdict["provider"],
@@ -139,8 +192,15 @@ def enforce_saved(now: dt.datetime | None = None) -> None:
     now = now or dt.datetime.now(dt.timezone.utc)
     for path in sorted(STATE.glob("*.json")) if STATE.exists() else []:
         state = json.loads(path.read_text())
-        role, until = state["role"], dt.datetime.fromisoformat(state["paused_until"])
-        if until > now and systemctl("is-active", f"nostromo@{role}").stdout.strip() in ("active", "activating"):
+        role = state["role"]
+        if state.get("paused_for") == "model":
+            if state.get("config_fingerprint") == fingerprint() and active(role):
+                r = systemctl("stop", "--no-block", f"nostromo@{role}")
+                log(f"re-applied the model pause on {role}: its configuration has not changed"
+                    f"{'' if r.returncode == 0 else ' — STOP FAILED: ' + r.stderr.strip()}")
+            continue
+        until = dt.datetime.fromisoformat(state["paused_until"])
+        if until > now and active(role):
             r = systemctl("stop", "--no-block", f"nostromo@{role}")
             log(f"re-applied pause on {role} until {until.isoformat()} (it was running again)"
                 f"{'' if r.returncode == 0 else ' — STOP FAILED: ' + r.stderr.strip()}")
@@ -151,6 +211,20 @@ def resume_due() -> None:
     for path in sorted(STATE.glob("*.json")) if STATE.exists() else []:
         state = json.loads(path.read_text())
         role = state["role"]
+        if state.get("paused_for") == "model":
+            if state.get("config_fingerprint") == fingerprint():
+                continue
+            if systemctl("is-enabled", f"nostromo@{role}").stdout.strip() != "enabled":
+                log(f"{role}'s configuration changed after a model refusal, but its unit is disabled — leaving it stopped")
+                path.unlink()
+                continue
+            r = systemctl("start", "--no-block", f"nostromo@{role}")
+            if r.returncode == 0:
+                path.unlink()
+                log(f"resumed {role}: its configuration changed since the model refusal; a wrong fix pauses it again")
+            else:
+                log(f"could not start {role}, will retry: {r.stderr.strip()}")
+            continue
         if now < dt.datetime.fromisoformat(state["paused_until"]) + GRACE:
             continue
         if systemctl("is-enabled", f"nostromo@{role}").stdout.strip() != "enabled":
@@ -196,7 +270,7 @@ def catch_up(skip: set[str], dry: bool = False) -> None:
         if not role or role in skip:
             continue
         verdict = classify(msg)
-        if verdict:
+        if verdict and verdict["kind"] == "budget":  # a model refusal's record is its saved state
             latest[role] = (verdict, msg)
         elif succeeded(msg):
             latest.pop(role, None)
@@ -216,13 +290,13 @@ def catch_up(skip: set[str], dry: bool = False) -> None:
 def main() -> int:
     if len(sys.argv) == 3 and sys.argv[1] == "--classify":
         v = classify(sys.argv[2])
-        print(json.dumps(v and {**v, "reset": v["reset"].isoformat()}))
+        print(json.dumps(v and {**v, "reset": v["reset"] and v["reset"].isoformat()}))
         return 0
     skip = local_roles()
     if sys.argv[1:] == ["--dry-run"]:
         catch_up(skip, dry=True)
         return 0
-    log(f"watching nostromo@* for provider budget refusals; never pausing local roles {sorted(skip)}")
+    log(f"watching nostromo@* for provider budget and model refusals; never pausing local roles {sorted(skip)}")
     enforce_saved()
     catch_up(skip)
     resume_due()

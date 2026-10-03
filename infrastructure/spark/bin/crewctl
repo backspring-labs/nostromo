@@ -209,17 +209,23 @@ BUDGET_STATE = Path("/opt/nostromo/state/budget")
 
 
 def budget_pause(role):
-    """The time budget-watch will resume this role, when it has paused it; None otherwise."""
+    """(paused_until, paused_for) when budget-watch has paused this role, else (None, None).
+    paused_for "budget" resumes at paused_until; "model" has no time and resumes when the role's
+    configuration changes, so paused_until is None and a rollout is free to restart it."""
     path = BUDGET_STATE / f"{role}.json"
     try:
-        return json.loads(path.read_text()).get("paused_until")
+        state = json.loads(path.read_text())
     except (OSError, ValueError):
-        return None
+        return None, None
+    return state.get("paused_until"), state.get("paused_for", "budget")
 
 
 def cmd_status(args, roles):
     want = [args.role] if args.role else list(roles)
-    rows = [{"role": r, **unit_state(r), "paused_until": budget_pause(r)} for r in want]
+    rows = []
+    for r in want:
+        until, why = budget_pause(r)
+        rows.append({"role": r, **unit_state(r), "paused_until": until, "paused_for": why})
     if args.json:
         print(json.dumps({"crew": rows}, indent=2))
         return 0
@@ -227,7 +233,9 @@ def cmd_status(args, roles):
     for r in rows:
         print(f"{r['role']:<9}{r['active']:<10}{r['enabled']:<10}"
               f"{(r['pid'] or '-'):>8}{r['restarts']:>10}  {(r['since'] or '-')[:24]}"
-              + (f"  paused by budget-watch until {r['paused_until']}" if r["paused_until"] else ""))
+              + (f"  paused by budget-watch until {r['paused_until']}" if r["paused_until"] else "")
+              + ("  paused by budget-watch: the API refused its model — until its configuration changes"
+                 if r["paused_for"] == "model" else ""))
     return 0
 
 
