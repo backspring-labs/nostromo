@@ -41,16 +41,18 @@ MSG
     ;;
   gemini-acp/gemini)
     # The Gemini CLI's "Login with Google" needs no tunnel: with NO_BROWSER it prints a URL, the owner
-    # signs in on the Mac, and pastes the authorization code back here. One tiny prompt then proves it.
+    # signs in on the Mac, and pastes the authorization code back. It does this only in its interactive
+    # mode — `gemini -p` refuses with "Manual authorization is required but the current session is
+    # non-interactive" (measured 2026-10-03) — so this starts the full CLI, and the owner quits it.
     cat <<MSG
 == signing $ROLE in to Google (Gemini) — no tunnel needed
-   1. The Gemini CLI prints a sign-in URL below. Open it in a browser on this Mac.
-   2. Sign in with the Google account whose subscription $ROLE should use, and allow access.
-   3. Google shows an authorization code. Paste it here at "Enter the authorization code:".
-   4. Gemini answers one line, which proves the sign-in. Then this exits.
+   1. The Gemini CLI starts. If it asks how to authenticate, choose "Login with Google".
+   2. It prints a sign-in URL. Open it in a browser on this Mac, sign in with the Google account
+      whose subscription $ROLE should use, and allow access.
+   3. Google shows an authorization code. Paste it into the CLI where it asks for it.
+   4. When the CLI shows its prompt, type /quit. This then checks the saved sign-in.
 MSG
-    ssh -t "$ROLE@spark" ". /opt/nostromo/runtime/env.sh; cd ~; NO_BROWSER=true GOOGLE_GENAI_USE_GCA=true \
-      gemini -p 'Reply with exactly: signed in.'"
+    ssh -t "$ROLE@spark" ". /opt/nostromo/runtime/env.sh; cd ~; NO_BROWSER=true GEMINI_CLI_TRUST_WORKSPACE=true gemini"
     echo "== check:"
     ssh "$ROLE@spark" "chmod 600 ~/.gemini/oauth_creds.json 2>/dev/null; stat -c '%a %n' ~/.gemini/oauth_creds.json"
     ;;

@@ -393,6 +393,10 @@ case "$HARNESS" in
     # Use the cached Google sign-in non-interactively; never wait on a browser.
     export GOOGLE_GENAI_USE_GCA=true
     export NO_BROWSER=true
+    # The CLI refuses to work in a folder it has not been told to trust ("not running in a trusted
+    # directory", 2026-10-03). This is the role's own read-only clone, so trust it — the documented
+    # switch for headless use.
+    export GEMINI_CLI_TRUST_WORKSPACE=true
     # Settings, written whole at every start like the Codex config: the manifest is the record.
     # Auto-update off, because a CLI that updates itself is not pinned (versions.lock); usage
     # statistics to Google off, because a crew role's work is not the vendor's telemetry.
