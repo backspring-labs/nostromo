@@ -2719,6 +2719,16 @@ Do not create the entire roadmap structure before the operating pattern is prove
 >
 > Still **proposed**, pending the owner's answer on whether to follow `#squadops-dev` day to day, and
 > none of these channels is created before its first use.
+>
+> **Created 2026-10-03**, at the owner's request, which settles the layout; whether to follow
+> `#squadops-dev` day to day is now only a notification preference. Private stream channels, with the
+> members above: `#squadops-planning` `d6eb31a3-a79a-42cb-b812-21101736b1f1`, `#squadops-campaigns`
+> `60cf6624-62d1-4c37-9522-f6dbf884fd25`, `#squadops-dev` `d31a788c-23dd-46db-989e-f8eebb478ca0`.
+> Created through the CLI as Mother, so she is co-owner with the owner — the relay refuses an owner
+> changing their own role ("missing p tag") — and the owner may demote her in Desktop. Every crew member
+> is a `member`, never a `bot`: Desktop counts a bot as an agent and would hide it from the @-mention
+> picker again. Parker and Dallas moved to thread sessions first (`c9fe623`); Ash joined planning, and
+> Lambert, deferred, is in none.
 
 ---
 
