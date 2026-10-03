@@ -71,7 +71,7 @@ for f in "$MANIFEST" "$ALLOWFILE" "$PERSONA" "$INSTRUCTIONS" "$BASE_PROMPT"; do
 done
 
 [[ -n "$HARNESS" ]] || HARNESS="$(yaml_agent harness)"
-case "$HARNESS" in buzz-agent|goose|claude-agent-acp|codex-acp) ;; *) die "unsupported harness '$HARNESS'" ;; esac
+case "$HARNESS" in buzz-agent|goose|claude-agent-acp|codex-acp|gemini-acp) ;; *) die "unsupported harness '$HARNESS'" ;; esac
 
 for b in buzz-acp "$HARNESS" buzz-dev-mcp buzz; do
   command -v "$b" >/dev/null 2>&1 || die "$b is not on PATH after sourcing $ENV_SH"
@@ -240,6 +240,16 @@ case "$PROVIDER" in
     [[ "$kmode" == "600" ]] || die "$PROVIDER_KEY is mode $kmode, must be 600"
     [[ -n "$PINNED" ]] || die "no model for $ROLE in the manifest — a metered role must pin one"
     ;;
+  gemini)
+    # The owner's existing Google subscription (Lambert), through the Gemini CLI's "Login with Google".
+    # Signed in once by the owner — infrastructure/spark/bin/sign-in.sh <role>, from the Mac — and
+    # cached in ~/.gemini/oauth_creds.json, which the CLI refreshes itself. No key anywhere.
+    [[ "$HARNESS" == gemini-acp ]] || die "provider gemini needs the gemini-acp harness, not $HARNESS"
+    GEMINI_CREDS="$HOME/.gemini/oauth_creds.json"
+    [[ -r "$GEMINI_CREDS" ]] || die "no Google sign-in at $GEMINI_CREDS — from the Mac: infrastructure/spark/bin/sign-in.sh $ROLE"
+    gmode="$(stat -c '%a' "$GEMINI_CREDS")"
+    [[ "$gmode" == "600" ]] || die "$GEMINI_CREDS is mode $gmode, must be 600"
+    ;;
   chatgpt)
     # A flat-rate ChatGPT subscription (Ash). No API key: Codex holds the owner's one-time sign-in
     # in ~/.codex/auth.json, which it refreshes itself. Interactive once, by the owner, through an SSH
@@ -378,6 +388,24 @@ case "$HARNESS" in
     # Goose has no equivalent of BUZZ_AGENT_REQUIRE_REPLY and cannot: it knows nothing about Buzz.
     # A turn ending without `buzz messages send` is silently lost — observed, not theorised.
     HARNESS_ARGS="acp"
+    ;;
+  gemini-acp)
+    # Use the cached Google sign-in non-interactively; never wait on a browser.
+    export GOOGLE_GENAI_USE_GCA=true
+    export NO_BROWSER=true
+    # Settings, written whole at every start like the Codex config: the manifest is the record.
+    # Auto-update off, because a CLI that updates itself is not pinned (versions.lock); usage
+    # statistics to Google off, because a crew role's work is not the vendor's telemetry.
+    install -d -m 700 "$HOME/.gemini"
+    cat > "$HOME/.gemini/settings.json.new" <<'GEMINI'
+{
+  "security": { "auth": { "selectedType": "oauth-personal" } },
+  "privacy": { "usageStatisticsEnabled": false },
+  "general": { "enableAutoUpdate": false, "enableAutoUpdateNotification": false }
+}
+GEMINI
+    mv -f "$HOME/.gemini/settings.json.new" "$HOME/.gemini/settings.json"
+    HARNESS_ARGS=""
     ;;
   claude-agent-acp|codex-acp)
     # Metered harnesses take their credential from the provider's standard variable. Read from the

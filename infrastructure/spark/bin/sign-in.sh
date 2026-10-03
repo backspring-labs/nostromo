@@ -4,6 +4,8 @@
 #
 #   sign-in.sh <role>        e.g. sign-in.sh ash
 #
+# Gemini roles (provider gemini): see the case below — a URL and a pasted code, no tunnel.
+#
 # Codex roles (provider chatgpt): Codex's ChatGPT sign-in finishes by redirecting the browser to
 # http://localhost:1455 on the machine running Codex — the Spark, which has no browser. So this opens
 # an SSH tunnel from the Mac's port 1455 to the Spark's, runs `codex login` as the role there, and the
@@ -36,6 +38,21 @@ MSG
     ssh -t -o ExitOnForwardFailure=yes -L 1455:localhost:1455 "$ROLE@spark" "$CODEX login"
     echo "== check:"
     ssh "$ROLE@spark" "$CODEX login status; stat -c '%a %n' ~/.codex/auth.json"
+    ;;
+  gemini-acp/gemini)
+    # The Gemini CLI's "Login with Google" needs no tunnel: with NO_BROWSER it prints a URL, the owner
+    # signs in on the Mac, and pastes the authorization code back here. One tiny prompt then proves it.
+    cat <<MSG
+== signing $ROLE in to Google (Gemini) — no tunnel needed
+   1. The Gemini CLI prints a sign-in URL below. Open it in a browser on this Mac.
+   2. Sign in with the Google account whose subscription $ROLE should use, and allow access.
+   3. Google shows an authorization code. Paste it here at "Enter the authorization code:".
+   4. Gemini answers one line, which proves the sign-in. Then this exits.
+MSG
+    ssh -t "$ROLE@spark" ". /opt/nostromo/runtime/env.sh; cd ~; NO_BROWSER=true GOOGLE_GENAI_USE_GCA=true \
+      gemini -p 'Reply with exactly: signed in.'"
+    echo "== check:"
+    ssh "$ROLE@spark" "chmod 600 ~/.gemini/oauth_creds.json 2>/dev/null; stat -c '%a %n' ~/.gemini/oauth_creds.json"
     ;;
   *)
     echo "sign-in: $ROLE runs $HARNESS with provider $PROVIDER — no sign-in procedure for that yet" >&2

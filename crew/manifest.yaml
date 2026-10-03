@@ -300,6 +300,16 @@ agents:
     budget_profile: existing-subscription
     workspace_profile: knowledge
     respond_to: allowlist
+    # Read-only Navigator to start (2026-10-03, owner's choice): she drafts release notes, CHANGELOG
+    # entries and material over closed work for review, from a read-only clone. GitHub write for the
+    # release-cut steps waits for a nostromo-lambert App and squad-ops boundaries. Gemini through the
+    # owner's existing Google subscription; the model is pinned once her first turn shows the default.
+    workdir: ~/src/squad-ops
+    requires_clone: true
+    max_rounds: 30
+    max_turns_per_session: 12
+    max_turn_duration: 3600
+    session_policy: thread
     buzz_pubkey: d17abac99a72f16b48e4548eb1f9220f6de040125e4c1cf05672fafc766085b7
     buzz_auth_tag: '["auth","508cd1c7dbcddcc93b8168923cac49ef28bb02f0e60de549e44b01000d2bce5f","","3a1161c714371e08634d5757f4e17ee7abd4a9de4999c985ff0881d42146e513268c3127c3ad5611e327f23c36540cfa1897b87a1b16913215bf8f35fa201015"]'
     buzz_private_key: spark:~lambert/.config/nostromo/secrets/buzz.key

@@ -130,6 +130,23 @@ if [[ "$("$BIN/codex-acp" --version 2>/dev/null | tr -d '[:space:]')" != "$CODEX
   ln -sfn "$ROOT/npm/bin/codex-acp" "$BIN/codex-acp"
 fi
 
+# --- Gemini CLI -------------------------------------------------------------------------------
+# Lambert's harness. The CLI speaks ACP itself with --acp, so `gemini-acp` is a two-line wrapper
+# that the launcher can name like any other harness. Pinned, and its own auto-update is switched off
+# in the role's settings by launch-role.sh: a CLI that updates itself is not pinned.
+if [[ "$("$BIN/gemini" --version 2>/dev/null | tr -d '[:space:]')" != "$GEMINI_CLI_VERSION" ]]; then
+  [[ $CHECK_ONLY == 1 ]] && { echo "MISSING gemini-cli ${GEMINI_CLI_VERSION}"; exit 1; }
+  say "installing gemini-cli ${GEMINI_CLI_VERSION}"
+  npm_config_prefix="$ROOT/npm" "$node_dir/bin/npm" install -g --no-fund --no-audit \
+    "@google/gemini-cli@${GEMINI_CLI_VERSION}"
+  ln -sfn "$ROOT/npm/bin/gemini" "$BIN/gemini"
+fi
+if [[ ! -x "$BIN/gemini-acp" ]]; then
+  [[ $CHECK_ONLY == 1 ]] && { echo "MISSING gemini-acp wrapper"; exit 1; }
+  printf '#!/bin/sh\n# Written by install-base.sh: the Gemini CLI in ACP mode, nameable as a harness.\nexec "$(dirname "$0")/gemini" --acp "$@"\n' > "$BIN/gemini-acp"
+  chmod 755 "$BIN/gemini-acp"
+fi
+
 # --- gh ----------------------------------------------------------------------------------------
 # Every role that touches GitHub goes through this, so it belongs in the lockfile like everything
 # else. It was the exception: the distro package, unpinned, and old enough that `pr view --json`
