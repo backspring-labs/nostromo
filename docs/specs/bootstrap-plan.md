@@ -239,7 +239,7 @@ waived by default.
 | WP-11 | partly done early | pinning in `docs/source-baseline.md`; tested backup and restore for the relay (`infrastructure/jetson/bin/{upgrade,rehearse-upgrade}.sh`) and for Desktop (`infrastructure/buzz/bin/desktop-upgrade.sh`) | see the amendment in §18 |
 
 Amendments in this plan, each dated at the section it changes: §13 (WP-6, 2026-09-15), §14 (WP-7),
-§15 (WP-8), §16.6 (channels) and §18 (WP-11), all 2026-09-23; §16.6 again on 2026-09-28 (campaigns).
+§15 (WP-8), §16.6 (channels) and §18 (WP-11), all 2026-09-23; §16.6 again on 2026-09-28 (campaigns) and 2026-10-03 (the layout, named).
 
 ---
 
@@ -2673,6 +2673,52 @@ Do not create the entire roadmap structure before the operating pattern is prove
 > Still **proposed** as a whole, pending the other answer (whether the owner follows the line channel
 > day to day). Neither campaign channel is created before the first campaign exists, by this
 > section's own rule.
+
+> ## Amendment, 2026-10-03 — the layout, named
+>
+> The owner settled the names and one correction:
+>
+> ```text
+> #nostromo              govern the crew: presence, status, budget, escalations, the daily sweep
+> #squadops-planning     decide: roadmap, backlog, campaign definitions (one thread each)
+> #squadops-campaigns    run: one thread per campaign run; stalls; morning reports
+> #squadops-dev          develop: one thread per work item — Parker's PRs for approved changes,
+>                        Brett's cards, Dallas's reviews
+> ```
+>
+> - **`#squadops-campaigns`, plural**, replaces `#squadops-campaign` above: the channel holds many
+>   campaigns over its life, and the singular reads as "the current campaign" and would collide with a
+>   per-campaign channel if one is ever needed.
+> - **`#squadops-dev`** replaces the per-line `#squadops-1.8` of the 2026-09-23 proposal. The owner
+>   prefers *dev* to *build*, which reads as compiling. A stable name suits 2.0: campaigns feed fixes in
+>   continuously, so archiving the channel at each release would cut threads mid-flow; threads keep
+>   items apart, and GitHub stays the record.
+> - **Members.** Planning: owner, Mother, Ripley, Dallas, and Ash once signed in. Campaigns: owner,
+>   Mother, Ripley, Parker, Dallas and Brett. Dev: owner, Mother, Ripley, Parker, Brett, Dallas.
+> - **Brett joins campaigns**, replacing "Brett sits campaigns out" above. Campaign 2.0's Spark lease
+>   (owner, in design) lets local roles work between cycles, which retires the blanket rule that only
+>   cloud roles work while the squad runs. Brett takes the reading Ripley would otherwise pay for:
+>   pulling facts through the SquadOps CLI, collecting citations, finding related and duplicate issues,
+>   reproducing — so Ripley judges from a small packet. Three conditions: he **selects and cites,
+>   never paraphrases evidence** (the packet is mostly verbatim CLI output with pointers, so a lossy
+>   summary cannot buy a wrong verdict at frontier price); his **turn limit is shorter than a lease**,
+>   so no turn is cut mid-way; and the reading is **his rather than Mother's**, because he runs the
+>   squad's own resident model while hers is a separate 29 GB load. Mother keeps coordination, most of
+>   it the deterministic bridge's.
+> - **Correction to the amendment above:** a campaign's definition is not "a file in squad-ops that
+>   the owner merges". It is a SquadOps artifact, versioned like a PRD (`squadops cycles create --prd`
+>   ingests a PRD as an artifact), approved by the owner as a gate at campaign start; the campaign
+>   ledger in SquadOps is the record. GitHub holds only what is code. The Campaign SIP revision designs
+>   the entity.
+> - **Not yet**, each until something justifies it: alerts or incidents (when failures drown out
+>   `#nostromo`), research (when Ash produces enough to crowd planning), releases (when Lambert runs),
+>   and per-campaign channels (when one campaign outgrows its thread). Reviews never get a channel:
+>   they live on GitHub, with a thread per item in `#squadops-dev`.
+> - **Prerequisites for `#squadops-dev` and `#squadops-campaigns`:** thread-scoped sessions on Parker
+>   and Dallas (only Ripley has one), or every item in a channel shares one session.
+>
+> Still **proposed**, pending the owner's answer on whether to follow `#squadops-dev` day to day, and
+> none of these channels is created before its first use.
 
 ---
 
