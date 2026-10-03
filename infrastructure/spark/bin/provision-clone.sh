@@ -10,10 +10,13 @@
 # squad-ops is public, so cloning needs no credential. Only pushing does, and that uses the role's
 # own GitHub App token minted on demand by mint-token.sh — never a stored one.
 #
-# Usage:  provision-clone.sh            (as the role)
+# Usage:  provision-clone.sh              (as the role)
+#         provision-clone.sh --read-only  (as a role that never commits — Ash: no commit identity, no
+#                                         push URL, no venv. Reading a public repository needs none.)
 set -euo pipefail
 
 ROLE="$(id -un)"
+READ_ONLY=0; [[ "${1:-}" == "--read-only" ]] && READ_ONLY=1
 REPO="${NOSTROMO_REPO:-/opt/nostromo/nostromo-src}"
 MANIFEST="$REPO/crew/manifest.yaml"
 UPSTREAM="${SQUADOPS_URL:-https://github.com/backspring-labs/squad-ops.git}"
@@ -44,8 +47,10 @@ yaml_github() {  # yaml_github <key>  — under agents: <ROLE>: github:
 
 BOT_LOGIN="$(yaml_github bot_login)"
 BOT_UID="$(yaml_github bot_user_id)"
-[[ -n "$BOT_LOGIN" && -n "$BOT_UID" ]] \
-  || die "$ROLE has no github.bot_login / bot_user_id in the manifest — a commit would be attributed to nobody"
+if [[ $READ_ONLY == 0 ]]; then
+  [[ -n "$BOT_LOGIN" && -n "$BOT_UID" ]] \
+    || die "$ROLE has no github.bot_login / bot_user_id in the manifest — a commit would be attributed to nobody (a role that only reads: --read-only)"
+fi
 
 if [[ -d "$DEST/.git" ]]; then
   echo "provision-clone: $DEST already exists"
@@ -57,6 +62,17 @@ else
 fi
 
 cd "$DEST"
+if [[ $READ_ONLY == 1 ]]; then
+  # A reader cannot commit or push by accident: with useConfigOnly and no identity, git refuses to
+  # commit ("Please tell me who you are"), and the push URL is not a URL.
+  git config --unset-all user.name 2>/dev/null || true
+  git config --unset-all user.email 2>/dev/null || true
+  git config user.useConfigOnly true
+  git config remote.origin.pushurl "no-push://read-only-role"
+  git config credential.helper ""
+  echo "provision-clone: $DEST is read-only for $ROLE — fetch works; commit and push are refused"
+  exit 0
+fi
 # Attribution is the point of per-role accounts, so the checkout must not be able to commit as
 # anyone else. Repo-local config only: never touch the role's global git config.
 git config user.name  "$BOT_LOGIN"
