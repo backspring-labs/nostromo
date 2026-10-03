@@ -5,7 +5,8 @@ UV_VERSION=0.12.13
 HERDR_VERSION=v0.9.0
 OPENCODE_VERSION=1.18.30
 CODEX_ACP_VERSION=1.12.0   # Ripley, Parker. npm @agentclientprotocol/codex-acp
-CLAUDE_AGENT_ACP_VERSION=0.79.0   # Dallas. npm @agentclientprotocol/claude-agent-acp
+CLAUDE_AGENT_ACP_VERSION=0.81.2   # Dallas. npm @agentclientprotocol/claude-agent-acp. Bundles claude-agent-sdk
+# 0.3.280 = Claude Code 2.1.280, the oldest the API accepts for claude-opus-5-5 (0.79.0's 2.1.274 got a 400).
 
 # Ripley, Parker, Dallas and Brett all reach GitHub through this, and it was the one load-bearing
 # tool in the runtime that was not pinned — whatever Ubuntu shipped, which was 2.45.0 from February
