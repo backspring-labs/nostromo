@@ -432,6 +432,9 @@ case "$HARNESS" in
         echo "# Written by launch-role.sh from crew/manifest.yaml at every start. Edits here are overwritten."
         [[ -n "$CODEX_TOOL_LIMIT" ]] && echo "tool_output_token_limit = $CODEX_TOOL_LIMIT"
         [[ -n "$CODEX_COMPACT_LIMIT" ]] && echo "model_auto_compact_token_limit = $CODEX_COMPACT_LIMIT"
+        # The model in Codex's own setting too, not only buzz-acp's --model, which switches only to an
+        # id the adapter lists — the gap that kept Dallas on the wrong model for two weeks.
+        [[ -n "$PINNED" && "$PINNED" != "subscription-backed" ]] && echo "model = \"$PINNED\""
         true
       } > "$HOME/.codex/config.toml.new"
       mv -f "$HOME/.codex/config.toml.new" "$HOME/.codex/config.toml"

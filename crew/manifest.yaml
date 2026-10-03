@@ -52,8 +52,10 @@ agents:
     supervisor: systemd
     harness: codex-acp
     provider: chatgpt
-    model: subscription-backed
-    model_label: OpenAI ChatGPT (subscription)
+    # Pinned 2026-10-03 to what the plan's default turned out to be (Codex recorded gpt-6-astra on
+    # Ash's first turn), so a change of default cannot move him silently. Codex's own config carries it.
+    model: gpt-6-astra
+    model_label: OpenAI GPT-6 Astra (subscription)
     budget_profile: chatgpt-plus
     workspace_profile: research
     respond_to: allowlist

@@ -15,9 +15,10 @@
 # then rode along on every later call. Each session row also names the model the API actually ran —
 # which is how Dallas was found running claude-opus-5 while the manifest said claude-opus-5-5.
 #
-# Dollars come from crew/prices.yaml, priced call by call: by the manifest's model for Codex, by the
-# model the API recorded for Claude, with long-context, US-only (1.1x) and fast-mode rates where they
-# apply. Every run prints where and when the prices were checked, and warns once they are stale: an
+# Dollars come from crew/prices.yaml, priced call by call by the model each log recorded, with
+# long-context, US-only (1.1x) and fast-mode rates where they apply. A flat-rate subscription (Ash)
+# has no per-token cost; its report shows the plan's 5-hour and weekly usage windows instead, which
+# are shared with any other use of the same account. Every run prints where and when the prices were checked, and warns once they are stale: an
 # estimate, not the provider's bill.
 #
 # Reads as the role (ssh <role>@spark): the logs live in its 700 home, and nothing is copied off.
@@ -45,6 +46,8 @@ role, since, show_turns, usd = sys.argv[1], sys.argv[2], sys.argv[3] == "1", sys
 REPO = "/opt/nostromo/nostromo-src/crew"
 agent = yaml.safe_load(open(f"{REPO}/manifest.yaml"))["agents"].get(role, {})
 harness, pinned = agent.get("harness", "?"), agent.get("model", "?")
+# A flat-rate subscription has no per-token cost; what it spends is the plan's usage windows.
+SUBSCRIPTION = agent.get("provider") in ("chatgpt", "gemini")
 try: PRICES = yaml.safe_load(open(f"{REPO}/prices.yaml"))["models"]
 except FileNotFoundError: PRICES = {}
 OVERRIDE = None
@@ -58,6 +61,8 @@ def price_for(model):
     return OVERRIDE or PRICES.get(model)
 
 def call_cost(c):
+    if SUBSCRIPTION and not OVERRIDE:
+        return 0.0
     p = price_for(c["model"])
     if not p:
         unpriced.add(c["model"]); return 0.0
@@ -74,7 +79,8 @@ def call_cost(c):
 
 def blank(label=""):
     return {"label": label, "calls": 0, "input": 0, "cached": 0, "output": 0, "reasoning": 0,
-            "peak": 0, "big_out": 0, "compactions": 0, "usd": 0.0, "models": set()}
+            "peak": 0, "big_out": 0, "compactions": 0, "usd": 0.0, "models": set(),
+            "limits_first": None, "limits_last": None}
 
 def add(acc, c):
     acc["calls"] += 1; acc["input"] += c["input"]; acc["cached"] += c["cached"]
@@ -96,12 +102,14 @@ def size_of(o):
     return len(o if isinstance(o, str) else json.dumps(o))
 
 def parse_codex(f):
-    sess, turns, cur = blank(), [], None
+    sess, turns, cur, model = blank(), [], None, pinned
     for line in open(f, errors="replace"):
         try: d = json.loads(line)
         except ValueError: continue
         t, p = d.get("type"), d.get("payload") or {}
         if not isinstance(p, dict): p = {}
+        if t == "turn_context" and p.get("model"):
+            model = p["model"]  # what Codex actually ran, recorded per turn
         if t == "compacted":
             for a in (sess, cur):
                 if a is not None: a["compactions"] += 1
@@ -112,9 +120,13 @@ def parse_codex(f):
         elif t == "response_item" and p.get("type") in ("custom_tool_call_output", "function_call_output"):
             for a in (sess, cur):
                 if a is not None: a["big_out"] = max(a["big_out"], size_of(p.get("output")) // 4)
+        elif t == "event_msg" and p.get("type") == "token_count" and p.get("rate_limits") and not p.get("info"):
+            sess["limits_first"] = sess["limits_first"] or p["rate_limits"]; sess["limits_last"] = p["rate_limits"]
         elif t == "event_msg" and p.get("type") == "token_count" and p.get("info"):
+            if p.get("rate_limits"):
+                sess["limits_first"] = sess["limits_first"] or p["rate_limits"]; sess["limits_last"] = p["rate_limits"]
             u = p["info"].get("last_token_usage") or {}
-            c = {"model": pinned, "input": u.get("input_tokens", 0), "cached": u.get("cached_input_tokens", 0),
+            c = {"model": model, "input": u.get("input_tokens", 0), "cached": u.get("cached_input_tokens", 0),
                  "write5": u.get("cache_write_input_tokens", 0) or 0, "write1h": 0,
                  "output": u.get("output_tokens", 0), "reasoning": u.get("reasoning_output_tokens", 0)}
             add(sess, c)
@@ -174,13 +186,30 @@ files = sorted((f for f in glob.glob(os.path.expanduser(pattern)) if os.path.get
 if not files:
     print(f"no {harness} sessions for {role} since {since}"); sys.exit(0)
 
+def limits_line(first, last):
+    """How much of the plan's usage windows a session moved, from Codex's own rate-limit readings."""
+    def window(name, label):
+        a, b = (first or {}).get(name) or {}, (last or {}).get(name) or {}
+        if not b: return None
+        at = b.get("resets_at")
+        when = dt_utc(at).strftime("%m-%d %H:%M UTC") if at else "?"
+        return f"{label} {a.get('used_percent', '?')}% -> {b.get('used_percent', '?')}% (resets {when})"
+    parts = [w for w in (window("primary", "5-hour window"), window("secondary", "weekly")) if w]
+    return f"plan {(last or {}).get('plan_type', '?')}: " + ", ".join(parts)
+
+def dt_utc(epoch): return datetime.datetime.fromtimestamp(epoch, datetime.timezone.utc)
+
 def k(n): return f"{n/1000:,.0f}K" if n >= 1000 else str(n)
 def row(a):
     pct = f"{100 * a['cached'] / a['input']:.0f}%" if a["input"] else "-"
     return (f"{a['calls']:>5}  {k(a['input']):>7}  {pct:>4}  {k(a['output']):>6}  {k(a['reasoning']):>6}"
             f"  {k(a['peak']):>6}  {k(a['big_out']):>6}  {a['compactions']:>4}  ${a['usd']:6.2f}")
 
-print(f"{role} — {harness}, manifest model {pinned}" + ("; prices from --usd" if OVERRIDE else "") + "\n")
+print(f"{role} — {harness}, manifest model {pinned}" + ("; prices from --usd" if OVERRIDE else ""))
+if SUBSCRIPTION and not OVERRIDE:
+    print("  flat-rate subscription: no per-token cost. What it spends is the plan's usage windows, shown per\n"
+          "  session — shared with any other use of the same account, so a session's change can include yours.")
+print()
 print(f"{'':42}{'calls':>5}  {'input':>7}  {'cach':>4}  {'output':>6}  {'reason':>6}  {'peak':>6}  {'big':>6}  {'cmpt':>4}  {'est.$':>7}")
 print(f"{'':42}{'':>5}  {'tokens':>7}  {'ed':>4}  {'':>6}  {'':>6}  {'ctx':>6}  {'out*':>6}")
 total = blank()
@@ -189,6 +218,8 @@ for f in files:
     models = ",".join(sorted(sess["models"])) or "no calls"
     label = f"session {start}, {len(turns)} turn{'s' if len(turns) != 1 else ''}"
     print(f"{label:42}{row(sess)}  [{models}]")
+    if SUBSCRIPTION and sess["limits_last"]:
+        print("  " + limits_line(sess["limits_first"], sess["limits_last"]))
     if show_turns:
         for tr in turns: print(f"  {tr['label']:40}{row(tr)}")
     for key in ("calls", "input", "cached", "output", "reasoning", "compactions", "usd"): total[key] += sess[key]
@@ -199,7 +230,7 @@ print(f"{'total since ' + since:42}{row(total)}")
 print("\n* big out: the largest tool output as logged, in tokens (about 4 characters each). Codex logs an output in full\n"
       "  but sends the model at most codex_tool_output_token_limit of it: on 2026-10-03 a 41K-character output grew\n"
       "  Ripley's next call by 931 tokens. Watch peak ctx for what was actually re-sent.")
-if not OVERRIDE:
+if not OVERRIDE and not SUBSCRIPTION:
     today = datetime.date.today()
     for m in sorted(total["models"]):
         p = PRICES.get(m)
