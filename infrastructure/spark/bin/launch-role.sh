@@ -467,6 +467,27 @@ GEMINI
         # The model in Codex's own setting too, not only buzz-acp's --model, which switches only to an
         # id the adapter lists — the gap that kept Dallas on the wrong model for two weeks.
         [[ -n "$PINNED" && "$PINNED" != "subscription-backed" ]] && echo "model = \"$PINNED\""
+        # No Responses WebSocket for the API-key roles. The built-in `openai` provider opens one
+        # (wss://api.openai.com/v1/responses) and keeps it open between turns. On 2026-10-03 Ripley's
+        # sat idle for 12 hours, something on the path dropped it without either end noticing, and
+        # the next request went into it: nothing came back (`ss`: lastrcv 44,036 s, unacked,
+        # retransmitting) until stream_idle_timeout_ms, 300 s by default, gave up and reconnected.
+        # Codex sets no TCP keepalive on that socket, so the kernel's keepalive cannot catch it, and
+        # the built-in provider cannot be overridden ("reserved built-in provider IDs"). So: the same
+        # endpoint as a provider of our own, over plain HTTPS, whose pooled connections expire on
+        # their own; and a 120 s idle timeout as the backstop. Measured the same night on Parker's
+        # key: no WebSocket, and a three-call turn read 22,587 of 34,017 input tokens from the cache.
+        # `name` stays the built-in's. ChatGPT sign-in (Ash) needs the built-in provider, and stays.
+        if [[ "$PROVIDER" == "openai" ]]; then
+          echo 'model_provider = "openai-http"'
+          echo '[model_providers.openai-http]'
+          echo 'name = "OpenAI"'
+          echo 'base_url = "https://api.openai.com/v1"'
+          echo 'env_key = "OPENAI_API_KEY"'
+          echo 'wire_api = "responses"'
+          echo 'supports_websockets = false'
+          echo 'stream_idle_timeout_ms = 120000'
+        fi
         true
       } > "$HOME/.codex/config.toml.new"
       mv -f "$HOME/.codex/config.toml.new" "$HOME/.codex/config.toml"

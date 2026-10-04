@@ -148,6 +148,44 @@ def test_metered_codex_roles_cap_their_context(agents):
         assert isinstance(compact, int) and 20000 <= compact <= 200000, f"{name}: compaction limit {compact!r}"
 
 
+def _codex_config_written_for(provider: str, model: str) -> dict:
+    """Run launch-role.sh's own config-writing block and parse the TOML it produces."""
+    try:
+        import tomllib as toml_parser  # Python 3.11+
+    except ImportError:
+        toml_parser = pytest.importorskip("tomli")
+    text = (ROOT / "infrastructure" / "spark" / "bin" / "launch-role.sh").read_text()
+    block = re.search(r'\n(\s*\{\n\s*echo "# Written by launch-role\.sh.*?\n\s*\}) > "\$HOME/\.codex/config\.toml\.new"',
+                      text, re.S)
+    assert block, "launch-role.sh's Codex config block was not found"
+    env = {"PATH": "/usr/bin:/bin", "PROVIDER": provider, "PINNED": model,
+           "CODEX_TOOL_LIMIT": "4000", "CODEX_COMPACT_LIMIT": "100000"}
+    out = subprocess.run(["bash", "-c", block.group(1)], env=env, capture_output=True, text=True, check=True)
+    return toml_parser.loads(out.stdout)
+
+
+def test_api_key_codex_roles_use_no_websocket():
+    # The built-in provider's Responses WebSocket stays open between turns; on 2026-10-03 Ripley's went
+    # stale after 12 idle hours and her next request hung for the full 300 s idle timeout. The fix is a
+    # provider of our own, over HTTPS, with a short idle timeout. Parsed rather than grepped: the block
+    # opens a TOML table, and a top-level key written after it would silently land inside the table.
+    config = _codex_config_written_for("openai", "gpt-5.6-sol")
+    assert config["model"] == "gpt-5.6-sol"
+    assert config["tool_output_token_limit"] == 4000
+    assert config["model_provider"] == "openai-http"
+    provider = config["model_providers"]["openai-http"]
+    assert provider["supports_websockets"] is False
+    assert provider["env_key"] == "OPENAI_API_KEY"
+    assert provider["base_url"] == "https://api.openai.com/v1"
+    assert provider["stream_idle_timeout_ms"] <= 120000
+
+
+def test_chatgpt_codex_role_keeps_the_builtin_provider():
+    # A ChatGPT sign-in is served through the built-in provider; a provider of our own would bypass it.
+    config = _codex_config_written_for("chatgpt", "gpt-6-astra")
+    assert "model_provider" not in config and "model_providers" not in config
+
+
 def test_metered_models_have_a_dated_price(agents):
     # token-report.sh turns tokens into dollars from crew/prices.yaml; a model with no entry would
     # report no cost at all, and an entry without a check date could not warn when it went stale.
