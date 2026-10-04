@@ -997,40 +997,54 @@ Non-secret logical names and cap amounts belong in git.
 >   `mother ALL=(broker) NOPASSWD: /usr/local/lib/nostromo/squadops-supervisor`. sudo's default
 >   `env_reset` stops Mother passing an environment through. Her `squadops-supervisor` on her PATH is
 >   a two-line caller that runs it with `sudo -n -u broker`.
-> - **Per call, it:**
->   1. checks the subcommand against its allowlist, and refuses anything else;
->   2. signs a JWT assertion, valid for a minute, and exchanges it at Keycloak's token endpoint;
->   3. runs the real `squadops` with the access token in `SQUADOPS_TOKEN`
->      (`src/squadops/cli/config.py`), and the API's address fixed, never read from the caller;
->   4. returns the CLI's output, and logs the call: caller, subcommand, allowed or refused, exit.
+> - **It offers task-level commands, not the raw CLI.** Each command runs one runbook procedure
+>   deterministically (squad-ops `docs/ops/CAMPAIGN_RUNBOOK.md`), so Mother never assembles a
+>   multi-flag `squadops` command. There is no pass-through: anything not listed is refused.
 >
->   **Files travel on stdin and stdout.** The broker cannot read or write Mother's 700 home, and
->   must not be able to. So the change request a ruling binds to reaches it on stdin, and a
->   downloaded artifact comes back on stdout.
+>   | command | what it does |
+>   |---|---|
+>   | `help` | lists every command with one example |
+>   | `status <campaign>` | the campaign's state, any open gate, and the lease, in one reading |
+>   | `log`, `ledger`, `digest <campaign>` | the control log, the proposal ledger, the digest |
+>   | `proposal <campaign>` | prints the open gate's change request |
+>   | `lease take <campaign>` | acquires the lease, for the campaign's `lease_expiry_s` |
+>   | `lease give <campaign>` | releases the lease. It is the last command of Mother's turn: her model is still loaded while she runs it, and unloads only after the turn ends |
+>   | `rule <campaign> approve\|revise\|reject` | finds the open increment gate, fetches the change request it is bound to, and rules with the runbook's idempotency key (`<campaign>-rule-<proposal>-v<version>`). Refused when no gate is open |
+>   | `answer <campaign>` | answers an open plan gate. A blank answer is refused, because it answers nothing |
+>   | `pause`, `start <campaign>` | as named |
+>   | `abort <campaign> --confirm <campaign>` | terminal, so the id is given twice |
+>   | `resume <campaign>` | only a pause the supervisor made, read from the control-log row that holds it; never with an action. Once #1940 lands, SquadOps refuses the rest too; the broker refuses it first |
+>   | `create <name>` | only `/opt/nostromo/campaigns/approved/<name>.yaml`, in a directory only the owner can write, with links refused. A name, never a path. How a definition gets there, the owner's approval, is settled with the campaign definition's design (§16.6). This makes the IDEA's §6 boundary code rather than a prompt |
+>
+>   **Every command that changes state takes `--reason` and `--decision <link>`.** The link is the
+>   Buzz message in which Ripley or the owner made the decision; for `create`, the owner's approval
+>   in planning. Both go into the control log's reason, so every action traces back to whoever
+>   decided it. The broker checks only that the link is well formed.
+>
+>   **Refusals explain themselves.** A refusal says what was refused and why, and names the command
+>   that would be allowed.
+> - **Per call, it:**
+>   1. maps the command to the `squadops` calls it makes, or refuses it;
+>   2. signs a JWT assertion, valid for a minute, and exchanges it at Keycloak's token endpoint;
+>   3. runs those calls with the access token in `SQUADOPS_TOKEN` (`src/squadops/cli/config.py`).
+>      The API's address is fixed, never read from the caller;
+>   4. returns their output, and logs the call: caller, command, allowed or refused, exit.
+>
+>   **It never touches Mother's files.** It cannot read or write her 700 home, and must not be able
+>   to. It fetches what a ruling binds to itself, and prints what it reads to stdout.
 >
 >   It writes no token cache and never prints the key or a token. A process's environment is
 >   readable only by its own uid, and the key never touches a command line. That matters here: on the
 >   Spark `/proc` is mounted without `hidepid` (measured 2026-10-03), so every crew account can read
 >   another process's arguments while it runs.
-> - **The allowlist:**
->   - reads: campaigns, their control logs, ledgers, digests and leases; cycles, runs and artifacts;
->   - the increment gate's rulings and plan-gate answers;
->   - the lease, acquired and released;
->   - pause and abort;
->   - start;
->   - **create, only from a definition in a directory only the owner can write**
->     (`/opt/nostromo/campaigns/approved/`, links refused). How a definition gets there, the owner's
->     approval, is settled with the campaign definition's design (§16.6). This makes the IDEA's §6
->     boundary code rather than a prompt;
->   - **resume, only of a pause the supervisor made**, never with `--action`. Once #1940 lands,
->     SquadOps refuses the rest too; the broker refuses it first.
-> - **Tested like `budget-watch`.** The allowlist is a pure function with its own tests, covering
->   every allowed form and every refused one, plus a test that no output carries the key or a token.
+> - **Tested like `budget-watch`.** The mapping from a command to its `squadops` calls is a pure
+>   function with its own tests. They cover every allowed form and every refused one, and check that
+>   no output carries the key or a token.
 >
 > **Mother's model runs the broker. It cannot read the key.** That is enforced by the operating
-> system, not by her harness. The broker bounds what she can do, not whether she judges well: each
-> ruling carries its reason, and the control log records it. Holding everything on the Spark also
-> keeps the credential out of every cloud provider's context.
+> system, not by her harness. The broker bounds what she can do. The judgement is Ripley's or the
+> owner's, and each action's `--decision` link says whose. Holding everything on the Spark also keeps
+> the credential out of every cloud provider's context.
 >
 > The other crew credentials (§8.10, the Buzz keys, the GitHub App keys) still live in their own
 > agent's account, where its model could read them. Moving them behind brokers is a separate decision.
@@ -1038,8 +1052,11 @@ Non-secret logical names and cap amounts belong in git.
 > **When her model may run is a matter of the box, not the credential.** Her model runs on the
 > Spark's Ollama, and the squad does not declare it.
 > - **Between campaigns:** freely. A create and a start are hers to make there.
-> - **At an increment gate:** under the lease she takes first, which is what the lease is for. She
->   unloads her model before she releases it.
+> - **At an increment gate:** under the lease she takes first, which is what the lease is for.
+>   Releasing it is the last command of her turn. Her model is still loaded then and cannot be
+>   unloaded mid-turn, so the squad's next run waits, queued, until it unloads (SIP-0109 §24an).
+>   How long that is depends on her Ollama keep-alive, which is measured and shortened at
+>   commissioning without touching the squad's.
 > - **Mid-cycle:** only for a pause or an abort. The squad's next launch or run start then waits
 >   until her model unloads.
 >
@@ -1052,9 +1069,29 @@ Non-secret logical names and cap amounts belong in git.
 > - This corrects §16.6's 2026-10-03 amendment, which expected the lease to let local roles work
 >   between any two cycles.
 >
+> **What Mother is taught, and how it is proven.** Today she knows none of this. Her persona makes
+> her a router whose one command is `buzz`, and it never mentions SquadOps. Commissioning adds two
+> things, after the broker above, because the tool is the authority and the prompt comes last (§36):
+> - **A "campaign controls" section in her prompt.**
+>   - She executes decisions and makes none: Ripley's ruling or the owner's, linked from the thread.
+>   - She runs her model only as the box allows (above).
+>   - She reports each result in the campaign's thread.
+>   - On a refusal she reports it and stops. She never tries a variant.
+> - **A commissioning probe**, like §13.5's permission probes, on a test campaign. Mother must:
+>   - carry out an approved ruling correctly;
+>   - refuse an action with no decision behind it;
+>   - report a refusal without retrying.
+>
+> She runs a local model with 3B parameters active per token, which held up worst under sustained
+> multi-step tool use on 2026-09-15 (`crew/manifest.yaml`, Brett's entry). The task-level commands
+> exist for that reason: each action is one command. **If the probe shows she cannot operate them
+> reliably, the deterministic bridge executes the actions and Mother only relays them.**
+>
 > **Not yet.** Nothing here is created until the owner commissions the crew: not the client, the
-> `broker` account, the key, the installer nor the sudoers line. Until then Claude Code holds the seat
-> as the owner's delegate (the 2.0 set's pre-registration, §3a).
+> `broker` account, the key, the broker, the installer, the sudoers line, her prompt section nor the
+> probe. Every probe runs a real campaign on the Spark, so none runs while the squad needs the box.
+> Until then Claude Code holds the seat as the owner's delegate (the 2.0 set's pre-registration,
+> §3a).
 
 ---
 
