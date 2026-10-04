@@ -949,6 +949,115 @@ Non-secret logical names and cap amounts belong in git.
 
 ---
 
+# 8.14 SquadOps — the campaign supervisor, held by Mother
+
+> ## Added 2026-10-03, on the owner's rulings — not provisioned until the crew is commissioned
+>
+> **Mother holds SquadOps's campaign supervisor role.** The crew reaches SquadOps as a Keycloak
+> account with a campaign role, never as SquadOps agents: no crew member is a squad member, an agent
+> instance or a holder of the `agent` service role. SquadOps sees one supervisor, and SIP-0109 §24al's
+> single seat records only an actor, so nothing in SquadOps names Nostromo.
+>
+> **What the role does.** The realm already defines `campaign-supervisor`: read cycles and
+> campaigns, rule at the increment gate, take and release the box lease, and pause
+> (`squad-ops` `src/squadops/auth/models.py`). The owner ruled that it should also create, start and
+> abort campaigns and materialize their evidence packages. That is squad-ops **#1940**, placed in
+> 2.1.0; until it lands the role cannot create a campaign. Two powers stay the owner's alone (`admin`):
+> **resuming an escalated campaign, and resuming a pause a limit caused** (SIP-0109 §9.5, unchanged).
+>
+> **Mother creates a campaign only from a definition the owner approved** in its
+> `#squadops-planning` thread. A create carries the objective's allowed scope and every policy limit,
+> and SquadOps cannot tell an approved definition from any other. So this rule is Nostromo's to keep
+> (the Framework Optimization IDEA, §6: the crew never extends budget or scope without the owner), and
+> the broker below enforces it.
+>
+> **The credential is held by a broker, not by Mother.** Mother's model must never be able to read
+> it: she reads PRs, artifacts and threads, and she can post to Buzz, so text planted in something she
+> reads could otherwise have her post it. A harness rule cannot keep it from her, because the
+> harness and the file would share her uid; `buzz-agent` has no path-level deny in any case (checked
+> 2026-10-03). So the key lives in a separate account, and Mother may run exactly one command as it.
+>
+> | | |
+> |---|---|
+> | identity | a Keycloak **service account**: a confidential client with only the client-credentials grant, holding the `campaign-supervisor` realm role. Not a password user: the OAuth security BCP (RFC 9700) retires the password grant. |
+> | client authentication | **a signed JWT** (`private_key_jwt`, RFC 7523; Keycloak's "Signed JWT" authenticator). The broker signs a short assertion with a private key, and Keycloak holds only the public key, so no shared secret exists anywhere. It is the shape of §8.8's GitHub Apps: a key signs a JWT, which buys a short-lived token. |
+> | name | neutral, e.g. `campaign-supervisor`. The control log records the actor from the token, so the name is what SquadOps's record shows. |
+> | key | generated on the Spark by the broker account, and never leaving it: a 600 file in the broker's 700 home. No crew account and no model can read it. Never in git. |
+> | created by | the owner: the client in the Keycloak admin console, with the broker's public key uploaded to it. Realm management is owner-reserved. |
+> | network path | localhost on the Spark: the runtime API and Keycloak run there, and so does the broker. 2.0 plan decision 6, the path from the cloud roles, does not arise for this credential. |
+> | revoked by | the owner, by disabling the client. Rotation is a new key pair and one public-key upload. |
+>
+> **The broker.**
+> - **A dedicated system account,** `broker`: no login shell, no sudo, in no crew group. It holds this
+>   one key and runs nothing else.
+> - **One root-owned command,** installed by the owner's sudo installer (as `install-budget-watch.sh`
+>   is): `/usr/local/lib/nostromo/squadops-supervisor`. Root-owned because a caller who could edit it
+>   could make it print the key. Neither `nostromo` nor any crew account can write it.
+> - **One sudoers line,** checked with `visudo -c`:
+>   `mother ALL=(broker) NOPASSWD: /usr/local/lib/nostromo/squadops-supervisor`. sudo's default
+>   `env_reset` stops Mother passing an environment through. Her `squadops-supervisor` on her PATH is
+>   a two-line caller that runs it with `sudo -n -u broker`.
+> - **Per call, it:**
+>   1. checks the subcommand against its allowlist, and refuses anything else;
+>   2. signs a JWT assertion, valid for a minute, and exchanges it at Keycloak's token endpoint;
+>   3. runs the real `squadops` with the access token in `SQUADOPS_TOKEN`
+>      (`src/squadops/cli/config.py`), and the API's address fixed, never read from the caller;
+>   4. returns the CLI's output, and logs the call: caller, subcommand, allowed or refused, exit.
+>
+>   **Files travel on stdin and stdout.** The broker cannot read or write Mother's 700 home, and
+>   must not be able to. So the change request a ruling binds to reaches it on stdin, and a
+>   downloaded artifact comes back on stdout.
+>
+>   It writes no token cache and never prints the key or a token. A process's environment is
+>   readable only by its own uid, and the key never touches a command line. That matters here: on the
+>   Spark `/proc` is mounted without `hidepid` (measured 2026-10-03), so every crew account can read
+>   another process's arguments while it runs.
+> - **The allowlist:**
+>   - reads: campaigns, their control logs, ledgers, digests and leases; cycles, runs and artifacts;
+>   - the increment gate's rulings and plan-gate answers;
+>   - the lease, acquired and released;
+>   - pause and abort;
+>   - start;
+>   - **create, only from a definition in a directory only the owner can write**
+>     (`/opt/nostromo/campaigns/approved/`, links refused). How a definition gets there, the owner's
+>     approval, is settled with the campaign definition's design (§16.6). This makes the IDEA's §6
+>     boundary code rather than a prompt;
+>   - **resume, only of a pause the supervisor made**, never with `--action`. Once #1940 lands,
+>     SquadOps refuses the rest too; the broker refuses it first.
+> - **Tested like `budget-watch`.** The allowlist is a pure function with its own tests, covering
+>   every allowed form and every refused one, plus a test that no output carries the key or a token.
+>
+> **Mother's model runs the broker. It cannot read the key.** That is enforced by the operating
+> system, not by her harness. The broker bounds what she can do, not whether she judges well: each
+> ruling carries its reason, and the control log records it. Holding everything on the Spark also
+> keeps the credential out of every cloud provider's context.
+>
+> The other crew credentials (§8.10, the Buzz keys, the GitHub App keys) still live in their own
+> agent's account, where its model could read them. Moving them behind brokers is a separate decision.
+>
+> **When her model may run is a matter of the box, not the credential.** Her model runs on the
+> Spark's Ollama, and the squad does not declare it.
+> - **Between campaigns:** freely. A create and a start are hers to make there.
+> - **At an increment gate:** under the lease she takes first, which is what the lease is for. She
+>   unloads her model before she releases it.
+> - **Mid-cycle:** only for a pause or an abort. The squad's next launch or run start then waits
+>   until her model unloads.
+>
+> **What holding the lease means.** The lease can be taken only at an open increment gate, with no
+> run in flight, and for at most `lease_expiry_s` (SIP-0109 §9.3, §24ai).
+> - That is the crew's only Spark window during a campaign. Brett's reading for a ruling happens
+>   under Mother's lease at the gate, and stops before she releases it.
+> - Brett runs the squad's own model, so the quiet-box check cannot see him, and only the lease
+>   keeps him from running beside a cycle.
+> - This corrects §16.6's 2026-10-03 amendment, which expected the lease to let local roles work
+>   between any two cycles.
+>
+> **Not yet.** Nothing here is created until the owner commissions the crew: not the client, the
+> `broker` account, the key, the installer nor the sudoers line. Until then Claude Code holds the seat
+> as the owner's delegate (the 2.0 set's pre-registration, §3a).
+
+---
+
 # 9. WP-2 — Jetson Orin Nano Super: Buzz Server
 
 **Execution surface:** Jetson Orin Nano Super  
