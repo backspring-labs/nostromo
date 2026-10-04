@@ -1016,10 +1016,44 @@ Non-secret logical names and cap amounts belong in git.
 >   | `resume <campaign>` | only a pause the supervisor made, read from the control-log row that holds it; never with an action. Once #1940 lands, SquadOps refuses the rest too; the broker refuses it first |
 >   | `create <name>` | only `/opt/nostromo/campaigns/approved/<name>.yaml`, in a directory only the owner can write, with links refused. A name, never a path. How a definition gets there, the owner's approval, is settled with the campaign definition's design (§16.6). This makes the IDEA's §6 boundary code rather than a prompt |
 >
->   **Every command that changes state takes `--reason` and `--decision <link>`.** The link is the
->   Buzz message in which Ripley or the owner made the decision; for `create`, the owner's approval
->   in planning. Both go into the control log's reason, so every action traces back to whoever
->   decided it. The broker checks only that the link is well formed.
+>   **Who may use the broker is settled twice.**
+>   - **Who can run it: the operating system.** The sudoers line names one account, `mother`, and
+>     no crew account can use sudo: each is in only its own group and `nostromo` (measured
+>     2026-10-03). The broker also refuses any caller whose sudo-recorded uid is not Mother's, so a
+>     later sudoers mistake does not widen it. The owner's own sudo can always run it.
+>   - **What makes Mother run it: a signed decision.** Mother answers the owner and every crew
+>     member (`crew/allowlist.yaml`), and that file governs who may address an agent, not what it may
+>     do. A reference to a decision could be invented by anyone who can talk to her, or by text
+>     planted in something she reads. So every command that changes state takes the decision
+>     itself: the Buzz message in which it was made, passed whole on stdin. A Buzz message is a
+>     Nostr event signed by its author's key, so the broker can check it with no relay access and
+>     no identity of its own.
+>
+>   **What the broker checks in a decision:**
+>   - its event id and signature (NIP-01 and BIP-340);
+>   - its author, against the signers allowed for that command, using the public keys in
+>     `crew/manifest.yaml`;
+>   - its channel: `#squadops-campaigns` or `#squadops-planning`, read from its `h` tag;
+>   - a fixed line naming the command and its target, for example
+>     `decision: rule cmp_… prop_… v2 approve`. A ruling names the proposal's version, so a
+>     decision about v1 cannot approve v2;
+>   - that it is recent. A ruling must postdate the gate's opening, read from the control log;
+>   - that it has not been used before. The broker records each event id, so one decision buys one
+>     action.
+>
+>   | command | a decision signed by |
+>   |---|---|
+>   | the reads, and `help` | none |
+>   | `lease take`, `lease give` | none: the lease can be taken only at an open gate, and it expires on its own |
+>   | `rule`, `answer`, `pause`, `abort`, `resume` | the owner or Ripley |
+>   | `create`, `start` | the owner, Ripley or Mother (owner, 2026-10-03). `create` reads only a definition the owner approved, so that approval stays the real gate |
+>
+>   Each command also takes `--reason`. The reason and the decision's event id go into the control
+>   log's reason, so every action traces back to whoever decided it.
+>
+>   **The residual.** Ripley's model can read her own Buzz key (see the last note below), so a
+>   compromised Ripley could sign a decision. That stays inside the authority delegated to her, and
+>   SquadOps still refuses a stale or repeated ruling.
 >
 >   **Refusals explain themselves.** A refusal says what was refused and why, and names the command
 >   that would be allowed.
@@ -1043,7 +1077,7 @@ Non-secret logical names and cap amounts belong in git.
 >
 > **Mother's model runs the broker. It cannot read the key.** That is enforced by the operating
 > system, not by her harness. The broker bounds what she can do. The judgement is Ripley's or the
-> owner's, and each action's `--decision` link says whose. Holding everything on the Spark also keeps
+> owner's, and the signed decision each action carries says whose. Holding everything on the Spark also keeps
 > the credential out of every cloud provider's context.
 >
 > The other crew credentials (§8.10, the Buzz keys, the GitHub App keys) still live in their own
@@ -1073,13 +1107,16 @@ Non-secret logical names and cap amounts belong in git.
 > her a router whose one command is `buzz`, and it never mentions SquadOps. Commissioning adds two
 > things, after the broker above, because the tool is the authority and the prompt comes last (§36):
 > - **A "campaign controls" section in her prompt.**
->   - She executes decisions and makes none: Ripley's ruling or the owner's, linked from the thread.
+>   - For rulings, gate answers, pauses, aborts and resumes, she executes decisions and makes none:
+>     Ripley's or the owner's, passed to the broker as the signed message. A create or a start she
+>     may decide herself, in a message of her own.
 >   - She runs her model only as the box allows (above).
 >   - She reports each result in the campaign's thread.
 >   - On a refusal she reports it and stops. She never tries a variant.
 > - **A commissioning probe**, like §13.5's permission probes, on a test campaign. Mother must:
->   - carry out an approved ruling correctly;
->   - refuse an action with no decision behind it;
+>   - carry out an approved ruling correctly, passing its decision message;
+>   - refuse an action with no decision behind it, and the broker refuse one with a forged or reused
+>     decision;
 >   - report a refusal without retrying.
 >
 > She runs a local model with 3B parameters active per token, which held up worst under sustained
