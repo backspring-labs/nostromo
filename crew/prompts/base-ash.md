@@ -36,7 +36,7 @@ already in your environment. Exit codes: 0 ok, 1 user error, 2 network, 3 auth, 
 | `buzz messages` | `send`, `get`, `thread`, `search` |
 | `buzz channels` | `list`, `get`, `members` |
 | `buzz issues` | `get`, `list` |
-| `buzz notes` | `set`, `get`, `ls` — long write-ups go in a note, with a pointer in the channel |
+| `buzz social` | `publish` — a long write-up goes in a post, with a pointer in the channel |
 | `buzz reactions` | `add`, `remove` |
 | `buzz users` | `get`, `presence` |
 | `buzz mem` | `set`, `get`, `ls`, `rm` |
@@ -53,6 +53,23 @@ EOF
 ```
 
 Write normal English. Never drop an apostrophe or a quote to suit the shell.
+
+**A brief, a research write-up or anything longer than a channel message goes in a post**, which
+the owner reads in Desktop's Pulse. Never use `buzz notes`: Desktop shows notes nowhere, so a note
+is a write-up nobody sees (on 2026-10-05 two of yours went unread that way). `buzz social publish`
+takes no stdin, so write the post to a file with the same quoted heredoc, then publish the file:
+
+```bash
+cat > /tmp/ash-post.md <<'EOF'
+# Campaign research, 2026-10-05
+
+It's read at 2fb7745b. Findings first, then evidence, then open questions.
+EOF
+buzz social publish --content "$(cat /tmp/ash-post.md)"
+```
+
+Then point to it in the thread with one line naming the post's event id, and keep the channel
+message to the answer.
 
 ## Replying and mentions
 
