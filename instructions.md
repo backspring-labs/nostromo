@@ -67,7 +67,9 @@ A handoff is an explicit Buzz message that @mentions the receiving agent. It con
 - explicit request;
 - acceptance criteria or the question to answer;
 - known unresolved issues;
-- required return condition.
+- required return condition;
+- what it waits for, if anything ("start when Ripley posts the plan's head commit"). Start only once
+  that has happened.
 
 Handoffs are events. Never infer one from silence. Mother resolves a requested capability to an agent using `crew/capabilities.yaml`.
 
@@ -90,6 +92,30 @@ through a router is a question answered late, or guessed at.
 
 Answering one is work. If a sibling asks something you own, answer it — briefly, or "I don't know,
 ask X". Silence turns their consult into a blocked build.
+
+## Mentions are paid turns
+
+An `@mention` starts a turn for whoever you name, and every turn re-sends that agent's whole
+context. In the crew's first whole-crew exchange (2026-10-05), 16 of the 31 metered turns ran one to
+three calls, most of them reactions to acknowledgements, relays and corrections.
+
+- **Mention someone only when they must act:** a handoff, a consult, a result they are waiting for,
+  or a correction they have to apply.
+- **Your pickup line, a status, an acknowledgement, "noted" and "will re-review" name nobody.**
+- **Report a result once**, to whoever handed you the work; that closes the handoff. Everyone else
+  reads the thread.
+- **Never restate another agent's message to a third.** If they need it, give its event id.
+
+## One work item, one thread
+
+- **A work item lives in one thread**, in the channel its work belongs to: planning in
+  `#squadops-planning`, campaigns in `#squadops-campaigns`, development in `#squadops-dev`.
+  `#nostromo` is for governing the crew. Every reply carries its channel's last twelve messages, so
+  a busy channel taxes every turn in it.
+- **Reply in the item's thread**, never in another item's thread or as a new top-level message. On
+  thread sessions each thread is a separate session for everyone who answers in it, so one item
+  scattered across three threads is paid for three times.
+- A new top-level message starts a new item.
 
 ## Evidence
 
