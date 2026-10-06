@@ -168,6 +168,20 @@ SESSION_POLICY="${NOSTROMO_SESSION_POLICY:-$(yaml_agent session_policy)}"
 SESSION_POLICY_ARG=()
 [[ -n "$SESSION_POLICY" ]] && SESSION_POLICY_ARG=(--session-policy "$SESSION_POLICY")
 
+# A fresh session once the role has sat idle this long. buzz-acp keeps each conversation's session
+# only in its worker's memory and never reloads one (no session/load anywhere in it), and
+# --idle-pool-sleep tears the worker pool down after that many seconds with nothing in flight and
+# nothing queued. So the next message, in any thread or DM, starts a new session. Without it, a DM
+# that arrives the morning after resumes yesterday's session: on 2026-10-04 Ripley's #1941 review
+# re-sent the previous day's #1908 review on every one of its 11 calls ($0.90, peak 92K, one
+# compaction), where a fresh session starts near 18K. Inside a working conversation nothing changes:
+# the clock runs only while the role is wholly idle. It also ends the harness process overnight, so
+# no connection is left open to go stale. 0 or unset disables it.
+IDLE_POOL_SLEEP="${NOSTROMO_IDLE_POOL_SLEEP:-$(yaml_agent idle_pool_sleep_s)}"
+IDLE_POOL_ARG=()
+[[ -n "$IDLE_POOL_SLEEP" && "$IDLE_POOL_SLEEP" != 0 ]] \
+  && IDLE_POOL_ARG=(--lazy-pool --idle-pool-sleep "$IDLE_POOL_SLEEP")
+
 
 # ---- §13.2.5 relay, §13.2.6/7 inbound gate --------------------------------------------------
 RELAY_URL="$(yaml_top relay url)"
@@ -324,6 +338,7 @@ launch-$ROLE: resolved configuration
   session         $([[ "$TURNS_PER_SESSION" == 0 ]] && echo "never rotates" || echo "rotates every $TURNS_PER_SESSION turns")
   effort          ${EFFORT_LEVEL:-adapter default}
   session scope   ${SESSION_POLICY:-channel (one session for every topic)}
+  idle reset      $([[ ${#IDLE_POOL_ARG[@]} -gt 0 ]] && echo "new sessions after ${IDLE_POOL_SLEEP}s wholly idle" || echo "none")
   mid-turn events $EVENT_HANDLING
   workdir         $WORKDIR
   logs            $LOGDIR
@@ -634,4 +649,5 @@ exec buzz-acp \
   --idle-timeout "$IDLE_TIMEOUT" \
   --max-turns-per-session "$TURNS_PER_SESSION" \
   ${EFFORT_ARG[@]+"${EFFORT_ARG[@]}"} \
-  ${SESSION_POLICY_ARG[@]+"${SESSION_POLICY_ARG[@]}"}
+  ${SESSION_POLICY_ARG[@]+"${SESSION_POLICY_ARG[@]}"} \
+  ${IDLE_POOL_ARG[@]+"${IDLE_POOL_ARG[@]}"}

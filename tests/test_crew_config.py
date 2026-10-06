@@ -148,6 +148,16 @@ def test_metered_codex_roles_cap_their_context(agents):
         assert isinstance(compact, int) and 20000 <= compact <= 200000, f"{name}: compaction limit {compact!r}"
 
 
+def test_metered_roles_start_fresh_after_idle(agents):
+    # buzz-acp never reloads a session, so tearing the idle pool down is what gives the next message a
+    # fresh one. Without it, a DM the next morning re-sends yesterday's whole session on every call.
+    for name, agent in agents.items():
+        if (agent["harness"], agent["provider"]) not in {("codex-acp", "openai"), ("claude-agent-acp", "anthropic")}:
+            continue
+        idle = agent.get("idle_pool_sleep_s")
+        assert isinstance(idle, int) and 600 <= idle <= 86400, f"{name}: idle_pool_sleep_s {idle!r}"
+
+
 def _codex_config_written_for(provider: str, model: str) -> dict:
     """Run launch-role.sh's own config-writing block and parse the TOML it produces."""
     try:

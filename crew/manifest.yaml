@@ -127,6 +127,9 @@ agents:
     # cost of all of it. Thread scoping gives each thread its own session. Continuity survives
     # because context_message_limit still injects recent channel messages into thread replies.
     session_policy: thread
+    # A fresh session after two hours wholly idle, so the first message of a day does not
+    # re-send yesterday's session (launch-role.sh: --lazy-pool --idle-pool-sleep).
+    idle_pool_sleep_s: 7200
     effort_level: medium
     # Codex context controls; launch-role.sh writes ~/.codex/config.toml from these at every start.
     # Every model call re-sends the session so far: on 2026-10-01 one Ripley review made 93 calls
@@ -172,6 +175,7 @@ agents:
     # #squadops-campaigns each carrying a thread per item, a channel-wide session would make
     # every item one conversation (Bootstrap Plan §16.6's prerequisite).
     session_policy: thread
+    idle_pool_sleep_s: 7200
     max_turn_duration: 3600
     # Unset, he runs Opus at its default thinking depth on every turn including trivial ones.
     # Thinking bills as output. Measured against Ripley over the same window: fewer turns, under
@@ -242,6 +246,7 @@ agents:
     # #squadops-campaigns each carrying a thread per item, a channel-wide session would make
     # every item one conversation (Bootstrap Plan §16.6's prerequisite).
     session_policy: thread
+    idle_pool_sleep_s: 7200
     max_turn_duration: 5400
     effort_level: medium
     # Codex context controls; launch-role.sh writes ~/.codex/config.toml from these at every start.
