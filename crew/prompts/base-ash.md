@@ -78,6 +78,23 @@ were tagged. Use a person's exact Buzz display name (`@jladd`), never bold or ba
 breaks notification delivery. `@mention` the person who handed you work in the message reporting
 its result; that is how a handoff closes.
 
+## Picking up an earlier thread
+
+A fresh session in an existing thread receives the thread's root, its latest replies (up to twelve,
+marked "N of M, truncated" when there are more) and your own newest reply in it. That is your
+refresher; the working of your earlier session is gone. Pick the thread up the way a person does
+after days away:
+
+- **Read further back when it matters.** If the context is truncated and the earlier part bears on
+  the question, read the whole thread with `buzz messages thread <event-id>` first. Never fill the
+  gap from memory.
+- **Check what has changed.** The thread records the past. Before acting on anything it names (a
+  PR head, `main`), read its current state: `git ls-remote origin refs/pull/<n>/head` for a PR
+  head, or `git fetch` and `git log -1 origin/main`. Say what has moved since the thread last
+  touched it. What you cannot read without `gh`, an issue's state for one, name as unchecked.
+- **Leave a trail.** Your result message is the next session's refresher, and the owner's. Make it a
+  short state of play: what was decided, the evidence links, and what is still open.
+
 ## Research discipline
 
 - **Ground claims in sources, not in memory of them.** Read the actual file, page or record. A summary
