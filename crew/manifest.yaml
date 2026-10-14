@@ -14,6 +14,18 @@ owner:
   github_login: jasonLadd
   nip05: jason@nano.tailc69e7d.ts.net
   buzz_pubkey: 508cd1c7dbcddcc93b8168923cac49ef28bb02f0e60de549e44b01000d2bce5f
+# The Spark's local inference engine for the local roles (Mother, Brett). SquadOps moved the box from
+# Ollama to TensorFold on 2026-10-13 (squad-ops docs/ops/inference_engine.md): OpenAI-shaped, key
+# required, one engine resident at a time, the squad's frozen recipe. The crew reads it on the host's
+# loopback with a key of its own ($SECRETS/tensorfold.key, mode 600), never the squad's.
+tensorfold:
+  url: http://127.0.0.1:8090/v1
+  health: http://127.0.0.1:8090/health
+  # The recipe's --context. A request's prompt plus its max_completion_tokens must fit inside it, or
+  # TensorFold refuses it with a 400 before any token: buzz-agent's own default output cap is 65,536,
+  # the whole window, so launch-role.sh always sets both limits below for a TensorFold role.
+  context_tokens: 65536
+  max_output_tokens: 12288
 agents:
   mother:
     display_name: Mother
@@ -26,13 +38,16 @@ agents:
     # still unbuilt: today Mother and Brett are a setsid nohup, which is neither.
     supervisor: systemd
     harness: buzz-agent
-    provider: ollama
-    model: qwen3.6-35b-a3b
+    # TensorFold since 2026-10-13. One engine is resident on the Spark, and it serves one model, so
+    # Mother shares the squad's served 27B rather than her own 35B-A3B on Ollama (owner: "keep Mother
+    # local"). Rollback, if the box returns to Ollama: provider: ollama, and ollama_tag below.
+    provider: tensorfold
+    model: qwen3.8-27b-tf-nvfp4
     # Shown on the Buzz profile — about line "<capability> · <label>" and the status beside the
-    # name — by infrastructure/buzz/bin/sync-profiles.sh. Provider first; "Local" for Ollama. Change it
-    # with the model, then run sync-profiles.sh. Never put it in display_name: crew @mentions resolve
-    # on the exact display name.
-    model_label: Local Qwen 3.6 35B-A3B
+    # name — by infrastructure/buzz/bin/sync-profiles.sh. Provider first; "Local" for a local engine.
+    # Change it with the model, then run sync-profiles.sh. Never put it in display_name: crew
+    # @mentions resolve on the exact display name.
+    model_label: Local Qwen 3.8 27B (TensorFold)
     ollama_tag: qwen3.6:35b-a3b
     budget_profile: local
     workspace_profile: control
@@ -266,13 +281,12 @@ agents:
     host: spark
     supervisor: systemd
     harness: buzz-agent
-    provider: ollama
-    # Dense, not the MoE Mother runs. Brett's work is sustained multi-step tool use — run the
-    # suite, read output, edit, re-run — which is the adherence-under-load axis where a 3B-active
-    # MoE was weakest on 2026-09-15. It is also already resident for other work on this box, so
-    # it costs no additional VRAM beside Mother's model.
-    model: qwen3.8-27b
-    model_label: Local Qwen 3.8 27B
+    # The squad's own served model, on TensorFold since 2026-10-13: it costs no memory beyond what the
+    # squad already holds. Dense, which suits Brett's sustained multi-step tool use (the axis where a
+    # 3B-active MoE was weakest on 2026-09-15). Rollback: provider: ollama, and ollama_tag below.
+    provider: tensorfold
+    model: qwen3.8-27b-tf-nvfp4
+    model_label: Local Qwen 3.8 27B (TensorFold)
     ollama_tag: qwen3.8:27b
     budget_profile: local
     workspace_profile: verification

@@ -42,7 +42,7 @@ check "cannot write the shared runtime"        fail "touch /opt/nostromo/.probe"
 check "can write its own home"                 pass "touch ~/.probe && rm ~/.probe"
 check "can write its own secret directory"     pass "touch ~/.config/nostromo/secrets/.p && rm ~/.config/nostromo/secrets/.p"
 check "can READ the shared runtime"            pass "test -x /opt/nostromo/runtime/bin/node"
-check "can reach Ollama"                       pass "curl -fsS http://localhost:11434/api/version"
+check "can reach TensorFold"                       pass "curl -fsS http://127.0.0.1:8090/health"
 exit \$f
 EOF
 }

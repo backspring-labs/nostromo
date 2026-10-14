@@ -124,7 +124,7 @@ def test_display_names_are_unique(agents):
 # The provider named first on the Buzz profile's model label (sync-profiles.sh), so a provider
 # change that forgets the label fails here rather than showing a wrong model to the owner.
 LABEL_PREFIX = {"anthropic": "Anthropic ", "openai": "OpenAI ", "chatgpt": "OpenAI ",
-                "gemini": "Google ", "ollama": "Local "}
+                "gemini": "Google ", "ollama": "Local ", "tensorfold": "Local "}
 
 
 def test_every_agent_labels_its_model_under_its_provider(agents):
@@ -351,17 +351,34 @@ def test_every_agent_has_its_own_unix_account(agents):
 # --- Model and harness bindings (NSTR-MOD-001 .. NSTR-MOD-007, D-013) ---------------
 
 
-def test_local_agents_use_ollama_via_buzz_agent(agents):
+def test_local_agents_use_local_inference_via_buzz_agent(agents):
     """Mother and Brett moved from OpenCode ACP to buzz-agent on 2026-09-16.
 
     An A/B with everything but the harness held constant showed the delivery defect was the harness
     (wp6-mother-launch-adapter-2026-09-16.md). crew/opencode/ is kept as the record of the profiles
     WP-4 §11.11 probed; the launcher does not read it, so those profiles are not what bounds either role.
+    Local inference is the Spark's engine, TensorFold since 2026-10-13, with Ollama the rollback.
     """
     for name in LOCAL_AGENTS:
-        assert agents[name]["provider"] == "ollama", name
+        assert agents[name]["provider"] in ("ollama", "tensorfold"), name
         assert agents[name]["harness"] == "buzz-agent", name
         assert agents[name]["budget_profile"] == "local", name
+        # Each keeps an Ollama tag, so a rollback is a one-line provider change.
+        assert agents[name].get("ollama_tag"), name
+
+
+def test_tensorfold_roles_fit_the_served_window(manifest, agents):
+    # The squad's recipe serves a 65,536-token window, and TensorFold refuses a request whose prompt
+    # plus max_completion_tokens overflow it. launch-role.sh sets the output cap from here and the
+    # context budget from what remains, so the cap must leave a usable prompt.
+    tf = manifest["tensorfold"]
+    assert tf["url"].startswith("http://127.0.0.1:") and tf["url"].endswith("/v1")
+    assert tf["health"].startswith("http://127.0.0.1:")
+    assert 1024 <= tf["max_output_tokens"] <= tf["context_tokens"] // 4
+    for name, agent in agents.items():
+        if agent["provider"] == "tensorfold":
+            assert agent.get("model"), f"{name}: a TensorFold role names the served id"
+            assert agent["harness"] == "buzz-agent", name
 
 
 def test_ripley_and_parker_use_openai_with_distinct_boundaries(agents):

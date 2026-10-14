@@ -221,13 +221,31 @@ PROVIDER="$(yaml_agent provider)"
 # debug and nothing at info, so at the default level a metered role's activity is invisible — which
 # is how a day's spend becomes a surprise. Metered roles default to debug; local roles cost nothing
 # per turn and stay quiet.
-if [[ -z "${NOSTROMO_LOG_LEVEL:-}" && "$PROVIDER" != "ollama" ]]; then
+[[ -n "$PROVIDER" ]] || die "no provider for $ROLE in the manifest"
+LOCAL_PROVIDER=""
+case "$PROVIDER" in ollama|tensorfold) LOCAL_PROVIDER=1 ;; esac
+if [[ -z "${NOSTROMO_LOG_LEVEL:-}" && -z "$LOCAL_PROVIDER" ]]; then
   NOSTROMO_LOG_LEVEL=debug
 fi
-[[ -n "$PROVIDER" ]] || die "no provider for $ROLE in the manifest"
+
+# ---- the Spark's mode (Operating Model §36) -------------------------------------------------------
+# Crew local inference and counted SquadOps work never share the box. `crewctl mode counted` records
+# the mode here and stops the local roles; this keeps them down through a restart or a reboot. Exit 75
+# is the unit's do-not-restart status (nostromo@.service), so systemd leaves the role stopped instead
+# of retrying it. Metered roles are unaffected: they run no inference on the box.
+SPARK_MODE_FILE=/opt/nostromo/state/spark-mode
+SPARK_MODE="$(cat "$SPARK_MODE_FILE" 2>/dev/null || echo development)"
+if [[ -n "$LOCAL_PROVIDER" && "$SPARK_MODE" == counted ]]; then
+  echo "launch-$ROLE: the Spark is in counted mode ($SPARK_MODE_FILE), so a local role stays down" >&2
+  echo "launch-$ROLE: until \`crewctl mode development\`" >&2
+  exit 75
+fi
+
 OLLAMA_URL="http://localhost:11434"
 OLLAMA_TAG="$(yaml_agent ollama_tag)"
 PROVIDER_KEY=""
+MODEL_ID="$PINNED"
+MODEL_VIA=""
 
 case "$PROVIDER" in
   ollama)
@@ -240,6 +258,40 @@ case "$PROVIDER" in
     python3 -c 'import json,sys; ms=[m["name"] for m in json.load(open(sys.argv[1]))["models"]]; sys.exit(0 if sys.argv[2] in ms else 1)' \
       /tmp/.nostromo-tags.$$ "$OLLAMA_TAG" || { rm -f /tmp/.nostromo-tags.$$; die "Ollama has no model tagged $OLLAMA_TAG"; }
     rm -f /tmp/.nostromo-tags.$$
+    MODEL_ID="$OLLAMA_TAG"
+    MODEL_VIA="$OLLAMA_URL/v1"
+    ;;
+  tensorfold)
+    # Local inference on the squad's TensorFold (since 2026-10-13; squad-ops docs/ops/inference_engine.md).
+    # OpenAI-shaped and keyed: the crew's key is its own labelled one, in the role's 600 file, never the
+    # squad's deploy key ("Never borrow another agent's credential"). Assert that the server is up, that it
+    # accepts the key, and that it serves the pinned id, or the first turn fails inside a live channel.
+    TF_URL="$(yaml_top tensorfold url)"
+    TF_HEALTH="$(yaml_top tensorfold health)"
+    TF_CONTEXT="$(yaml_top tensorfold context_tokens)"
+    TF_MAX_OUT="$(yaml_top tensorfold max_output_tokens)"
+    [[ -n "$TF_URL" && -n "$TF_HEALTH" && -n "$TF_CONTEXT" && -n "$TF_MAX_OUT" ]] \
+      || die "the manifest's tensorfold: block is incomplete (url, health, context_tokens, max_output_tokens)"
+    [[ -n "$PINNED" ]] || die "no model for $ROLE in the manifest: a TensorFold role names the served id"
+    PROVIDER_KEY="$SECRETS/tensorfold.key"
+    [[ -r "$PROVIDER_KEY" ]] || die "no TensorFold key at $PROVIDER_KEY"
+    kmode="$(stat -c '%a' "$PROVIDER_KEY")"
+    [[ "$kmode" == "600" ]] || die "$PROVIDER_KEY is mode $kmode, must be 600"
+    curl -sf --max-time 5 "$TF_HEALTH" >/dev/null || die "TensorFold is not answering on $TF_HEALTH"
+    # The key reaches curl on stdin, never its command line: on this box every crew account can read
+    # another process's arguments (/proc is mounted without hidepid). printf is a builtin, so the key
+    # is never in an argv either.
+    TF_REPLY="$(printf 'header = "Authorization: Bearer %s"\n' "$(cat "$PROVIDER_KEY")" \
+      | curl -s --max-time 10 --config - -w '\n%{http_code}' "$TF_URL/models")" \
+      || die "TensorFold did not answer $TF_URL/models"
+    TF_CODE="${TF_REPLY##*$'\n'}"
+    [[ "$TF_CODE" == 200 ]] || die "TensorFold refused $ROLE's key at $TF_URL/models (HTTP $TF_CODE)"
+    printf '%s' "${TF_REPLY%$'\n'*}" | python3 -c 'import json,sys
+ids=[m.get("id") for m in json.load(sys.stdin).get("data",[])]
+sys.exit(0 if sys.argv[1] in ids else 1)' "$PINNED" \
+      || die "TensorFold does not serve $PINNED (it lists another model, so the squad may have switched recipes)"
+    MODEL_ID="$PINNED"
+    MODEL_VIA="$TF_URL"
     ;;
   anthropic|openai)
     # Metered. The key is bytes on disk in the role's own 600 file — the same shape as its Nostr
@@ -333,7 +385,7 @@ launch-$ROLE: resolved configuration
   instructions    $INSTRUCTIONS ($(wc -c <"$INSTRUCTIONS") bytes)
   harness         $HARNESS + buzz-dev-mcp (shell, read_file, str_replace, todo, view_image)
   provider        $PROVIDER${PROVIDER_KEY:+  (key: $PROVIDER_KEY, contents never shown)}
-  model           ${PINNED:-$OLLAMA_TAG}${OLLAMA_TAG:+  via $OLLAMA_URL/v1}
+  model           ${MODEL_ID}${MODEL_VIA:+  via $MODEL_VIA}
   turn limits     $([[ "$HARNESS" == "buzz-agent" ]] && echo "${NOSTROMO_MAX_ROUNDS:-$MAX_ROUNDS} rounds, " )${TURN_DURATION}s wall clock, ${IDLE_TIMEOUT}s idle
   session         $([[ "$TURNS_PER_SESSION" == 0 ]] && echo "never rotates" || echo "rotates every $TURNS_PER_SESSION turns")
   effort          ${EFFORT_LEVEL:-adapter default}
@@ -379,9 +431,27 @@ install -d -m 2770 "$XDG_DATA_HOME" 2>/dev/null || true
 case "$HARNESS" in
   buzz-agent)
     export BUZZ_AGENT_PROVIDER=openai
-    export OPENAI_COMPAT_BASE_URL="$OLLAMA_URL/v1"
-    export OPENAI_COMPAT_MODEL="$OLLAMA_TAG"
-    export OPENAI_COMPAT_API_KEY=ollama-local-no-auth
+    case "$PROVIDER" in
+      tensorfold)
+        export OPENAI_COMPAT_BASE_URL="$TF_URL"
+        export OPENAI_COMPAT_MODEL="$PINNED"
+        export OPENAI_COMPAT_API_KEY="$(cat "$PROVIDER_KEY")"
+        # Both limits, always. buzz-agent asks for 65,536 completion tokens by default, the whole
+        # window, and TensorFold refuses a prompt plus completion that overflow it with a 400 before
+        # any token. The output cap is the squad agents' own (12,288). The context budget, where
+        # buzz-agent hands off to a summary, leaves the rest of the window less a margin.
+        export BUZZ_AGENT_MAX_OUTPUT_TOKENS="$TF_MAX_OUT"
+        export BUZZ_AGENT_MAX_CONTEXT_TOKENS="$(( TF_CONTEXT - TF_MAX_OUT - 1248 ))"
+        # The checkpoint's template defaults to its highest effort (xhigh) when none is named; the
+        # squad's recipe runs at medium (parity_effort). Same here, unless overridden for a run.
+        export BUZZ_AGENT_THINKING_EFFORT="${NOSTROMO_THINKING_EFFORT:-medium}"
+        ;;
+      *)
+        export OPENAI_COMPAT_BASE_URL="$OLLAMA_URL/v1"
+        export OPENAI_COMPAT_MODEL="$OLLAMA_TAG"
+        export OPENAI_COMPAT_API_KEY=ollama-local-no-auth
+        ;;
+    esac
     # The reason for this harness. buzz-agent reminds the model when a turn is about to end with
     # no recognized `buzz messages send` — the failure that lost a third of Mother's answers under
     # OpenCode, and that reproduced on Goose. Advisory: two reminders, then the turn ends.
@@ -394,6 +464,7 @@ case "$HARNESS" in
     HARNESS_ARGS=""
     ;;
   goose)
+    [[ "$PROVIDER" == ollama ]] || die "the goose harness is wired for Ollama only, not $PROVIDER"
     export GOOSE_PROVIDER=ollama
     export GOOSE_MODEL="$OLLAMA_TAG"
     export OLLAMA_HOST="$OLLAMA_URL"
@@ -616,7 +687,7 @@ before you started; they are correct, and a path you derive yourself is not.
 | | |
 |---|---|
 | Your role | \`$ROLE\` |
-| Your model | $MODEL_LABEL (\`${OLLAMA_TAG:-$PINNED}\`) |
+| Your model | $MODEL_LABEL (\`${MODEL_ID}\`) |
 | Your Unix account | \`$ROLE\` — you are not root, and \`~\` is \`$HOME\` |
 | Your working directory | \`$WORKDIR\` — your shell already starts here |
 | Crew configuration (read-only) | \`$REPO/crew/\` |

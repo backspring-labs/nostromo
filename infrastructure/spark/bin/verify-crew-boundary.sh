@@ -45,7 +45,7 @@ echo
 echo "must be permitted:"
 check "write its own home"                 pass "touch ~/.nostromo-probe && rm ~/.nostromo-probe"
 check "write the runtime root"             pass "touch $RUNTIME_ROOT/.probe && rm $RUNTIME_ROOT/.probe"
-check "reach Ollama over HTTP"             pass "curl -fsS http://localhost:11434/api/version"
+check "reach TensorFold over HTTP"             pass "curl -fsS http://127.0.0.1:8090/health"
 check "reach github.com"                   pass "curl -fsS -o /dev/null https://api.github.com"
 
 echo

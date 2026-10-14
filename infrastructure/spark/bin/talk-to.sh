@@ -40,6 +40,10 @@ while [[ $# -gt 0 ]]; do
     *) die "unknown argument: $1" ;;
   esac
 done
+# A bench on Goose's Ollama provider. The Spark serves TensorFold since 2026-10-13, and Ollama only
+# after a rollback (`engine_switch.py to-ollama`), so say so rather than fail on a refused socket.
+curl -sf --max-time 3 http://localhost:11434/api/version >/dev/null \
+  || die "Ollama is not serving on this box (the Spark runs TensorFold); this bench needs Ollama"
 [[ -n "$MODEL" ]] || MODEL="$(yaml_agent ollama_tag)"
 [[ -n "$MODEL" ]] || die "no ollama_tag for $ROLE in the manifest and no --model given"
 [[ -r "$PERSONA" ]] || die "no persona at $PERSONA"

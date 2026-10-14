@@ -135,3 +135,11 @@ def test_a_model_pause_lifts_only_when_the_configuration_changes(tmp_path, monke
     monkeypatch.setattr(bw, "fingerprint", lambda: "after-the-fix")
     bw.resume_due()
     assert ("start", "--no-block", "nostromo@dallas") in calls and not state.exists()
+
+
+def test_tensorfold_roles_count_as_local(monkeypatch):
+    # Mother and Brett moved to TensorFold on 2026-10-13. budget-watch must still see them as local:
+    # a local role never hits a provider budget, so it is never paused on a pattern match.
+    monkeypatch.setattr(bw, "MANIFEST", ROOT / "crew/manifest.yaml")
+    assert {"mother", "brett"} <= bw.local_roles()
+    assert not {"ripley", "parker", "dallas"} & bw.local_roles()

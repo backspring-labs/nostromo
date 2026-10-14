@@ -2174,6 +2174,18 @@ Each local-inference launcher calls `check` at startup and refuses to start in t
 it before routing any repository-mutating work. This is a deterministic guard, not a convention, which is the
 whole point: what a test enforces stays true.
 
+> **Built, minimally (2026-10-13).** The Spark moved from Ollama to SquadOps's TensorFold, and Mother and
+> Brett with it (`provider: tensorfold`, the squad's served 27B, a crew key of its own).
+> - **The mode file:** `/opt/nostromo/state/spark-mode`, `development` or `counted`.
+> - **Switching it:** `crewctl mode counted` stops the local roles, and `crewctl mode development` starts
+>   them again. `crewctl start` refuses a local role in counted mode without `--force`.
+> - **Keeping them down:** `launch-role.sh` keeps a local role down in counted mode (exit 75, which the
+>   unit never restarts), so a reboot cannot bring it back mid-set.
+> - **What it does not do yet:** the transition checks above (no crew work item mutating, memory
+>   recorded) are not built. Who flips the mode is the owner or the owner's session.
+> - **The longer fix:** an operator lease in SquadOps, so a crew window is recorded and launches wait for
+>   it, is proposed upstream as a squad-ops issue.
+
 ### 36.4 What this does not solve
 
 Memory containment on the host is a prerequisite, not a consequence — `earlyoom` is installed and its

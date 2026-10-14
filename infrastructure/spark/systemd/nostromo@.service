@@ -40,6 +40,11 @@ ExecStart=/opt/nostromo/nostromo-src/infrastructure/spark/bin/launch-role.sh %i
 # stops a genuinely broken role from restarting forever.
 Restart=always
 RestartSec=10s
+# 75 is the launcher's "this role is meant to be down" exit: a local role while the Spark is in counted
+# mode (`crewctl mode counted`, Operating Model §36). Clean, and never restarted, so the role stays
+# stopped through a reboot instead of looping into the start limit.
+SuccessExitStatus=75
+RestartPreventExitStatus=75
 
 # journald replaces the flat harness.log, which lived in a directory the role owned and could
 # therefore erase. A role cannot touch its own journal.

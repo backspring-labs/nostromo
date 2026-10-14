@@ -11,6 +11,7 @@ cannot wrap a UI."
   crewctl check [role]         preflight: would this role start?
   crewctl start|stop|restart <role>...   one role or several
   crewctl logs [role] [-f] [-n N]
+  crewctl mode [development|counted]     the Spark's mode (Operating Model §36): show it, or switch it
 
   --json                       machine-readable output, on every subcommand
 
@@ -36,6 +37,11 @@ BIN = REPO / "infrastructure" / "spark" / "bin"
 LOGROOT = Path("/opt/nostromo/logs")
 RUNTIME_BIN = Path(os.environ.get("NOSTROMO_RUNTIME_BIN", "/opt/nostromo/runtime/bin"))
 OLLAMA = os.environ.get("OLLAMA_URL", "http://localhost:11434")
+# The Spark's mode (Operating Model §36). launch-role.sh reads the same file and keeps a local role down
+# in counted mode; the unit treats that exit (75) as done, so the role stays stopped through a reboot.
+MODE_FILE = Path("/opt/nostromo/state/spark-mode")
+MODES = ("development", "counted")
+LOCAL_PROVIDERS = ("ollama", "tensorfold")
 
 
 def die(msg, as_json=False):
@@ -84,6 +90,36 @@ def agents():
         if m and in_github:
             out[role].setdefault("github", {})[m.group(1)] = m.group(2).strip("'\"")
     return out
+
+
+def top_value(section, key):
+    """A value under a top-level section, e.g. top_value("tensorfold", "health")."""
+    m = re.search(rf"^{section}:\n((?:[ #].*\n|\n)*)", manifest_text(), re.M)
+    if not m:
+        return ""
+    km = re.search(rf"^  {key}:\s*(\S+)", m.group(1), re.M)
+    return km.group(1).strip("'\"") if km else ""
+
+
+def spark_mode():
+    try:
+        mode = MODE_FILE.read_text().strip()
+    except OSError:
+        return "development"
+    return mode if mode in MODES else "development"
+
+
+def is_local(cfg):
+    return cfg.get("provider") in LOCAL_PROVIDERS
+
+
+def tensorfold_up():
+    url = top_value("tensorfold", "health") or "http://127.0.0.1:8090/health"
+    try:
+        with urllib.request.urlopen(url, timeout=5) as r:
+            return r.status == 200, url
+    except Exception:
+        return False, url
 
 
 def owner_pubkey():
@@ -177,6 +213,15 @@ def check_role(role, cfg, tags_cache):
             add("ollama reachable", True, OLLAMA)
             if tag:
                 add("model resident", tag in tags_cache, tag)
+    elif cfg.get("provider") == "tensorfold":
+        add("manifest model", bool(cfg.get("model")), cfg.get("model") or "missing")
+        up, url = tensorfold_up()
+        add("tensorfold reachable", up, url if up else f"no answer from {url}")
+        # The key, and whether the server serves this model, need the key: the launcher asserts both.
+    if is_local(cfg):
+        mode = spark_mode()
+        add("spark mode", mode == "development",
+            mode if mode == "development" else "counted: a local role stays down (crewctl mode development)")
 
     add("owner attestation", bool(cfg.get("buzz_auth_tag")),
         "present" if cfg.get("buzz_auth_tag") else "absent — core memory will not persist")
@@ -250,7 +295,7 @@ def cmd_describe(args, roles):
         "supervisor": cfg.get("supervisor"),
         "harness": cfg.get("harness"),
         "provider": cfg.get("provider"),
-        "model": cfg.get("ollama_tag") or cfg.get("model"),
+        "model": cfg.get("ollama_tag") if cfg.get("provider") == "ollama" else cfg.get("model"),
         "respond_to": cfg.get("respond_to"),
         "capability": cfg.get("capability"),
         # §13.10: the PATH a secret lives at, never its contents.
@@ -300,7 +345,14 @@ def cmd_unitop(args, roles):
     failed, so a script still sees it.
     """
     op, failed = args.command, []
+    mode = spark_mode()
     for role in args.role:
+        if (op in ("start", "restart") and mode == "counted" and is_local(roles[role])
+                and not getattr(args, "force", False)):
+            failed.append({"role": role, "op": op, "error":
+                           "the Spark is in counted mode, so a local role stays down. "
+                           "`crewctl mode development` first, or --force to start it anyway."})
+            continue
         r = systemctl(op, unit(role))
         if r.returncode != 0:
             msg = (r.stderr or r.stdout).strip()
@@ -320,6 +372,47 @@ def cmd_unitop(args, roles):
             print(json.dumps(f, indent=2))
         else:
             print(f"{f['role']}: {op} FAILED — {f['error']}", file=sys.stderr)
+    return 1 if failed else 0
+
+
+def cmd_mode(args, roles):
+    """Show the Spark's mode, or switch it. Counted: every local role stopped, and kept down by the
+    launcher. Development: every enabled local role started again. Metered roles are never touched."""
+    local = [r for r, cfg in roles.items() if is_local(cfg)]
+    if not args.mode:
+        out = {"mode": spark_mode(), "local_roles": local, "file": str(MODE_FILE)}
+        print(json.dumps(out, indent=2) if args.json else f"{out['mode']}  (local roles: {', '.join(local)})")
+        return 0
+    MODE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = MODE_FILE.with_suffix(".tmp")
+    tmp.write_text(args.mode + "\n")
+    tmp.chmod(0o644)
+    tmp.replace(MODE_FILE)
+    results, failed = [], 0
+    for role in local:
+        state = unit_state(role)
+        if args.mode == "counted":
+            if state["active"] in ("active", "activating"):
+                r = systemctl("stop", unit(role))
+                failed += r.returncode != 0
+                results.append((role, "stopped" if r.returncode == 0 else f"stop FAILED: {r.stderr.strip()}"))
+            else:
+                results.append((role, f"already {state['active']}"))
+        else:
+            if state["enabled"] != "enabled":
+                results.append((role, f"left alone: unit is {state['enabled']}"))
+            elif state["active"] in ("active", "activating"):
+                results.append((role, "already active"))
+            else:
+                r = systemctl("start", unit(role))
+                failed += r.returncode != 0
+                results.append((role, "started" if r.returncode == 0 else f"start FAILED: {r.stderr.strip()}"))
+    if args.json:
+        print(json.dumps({"mode": args.mode, "roles": dict(results)}, indent=2))
+    else:
+        print(f"mode -> {args.mode}")
+        for role, what in results:
+            print(f"  {role}: {what}")
     return 1 if failed else 0
 
 
@@ -348,6 +441,10 @@ def main():
     for op in ("start", "stop", "restart"):
         o = sub.add_parser(op, help=f"{op} one or more roles' units")
         o.add_argument("role", nargs="+", metavar="role")
+        if op != "stop":
+            o.add_argument("--force", action="store_true", help="start a local role even in counted mode")
+    md = sub.add_parser("mode", help="the Spark's mode: development (local roles may run) or counted")
+    md.add_argument("mode", nargs="?", choices=MODES)
     lg = sub.add_parser("logs", help="journal for a role, or the whole crew")
     lg.add_argument("role", nargs="?")
     lg.add_argument("-f", "--follow", action="store_true")
@@ -367,6 +464,7 @@ def main():
     return {
         "status": cmd_status, "describe": cmd_describe, "check": cmd_check,
         "start": cmd_unitop, "stop": cmd_unitop, "restart": cmd_unitop, "logs": cmd_logs,
+        "mode": cmd_mode,
     }[args.command](args, roles)
 
 

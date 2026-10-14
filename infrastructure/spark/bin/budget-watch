@@ -138,7 +138,7 @@ def local_roles() -> set[str]:
         m = re.match(r"^  ([a-z]+):$", line)
         if m:
             role = m.group(1)
-        elif role and re.match(r"^    provider:\s*ollama\s*$", line):
+        elif role and re.match(r"^    provider:\s*(ollama|tensorfold)\s*$", line):
             out.add(role)
     return out
 
