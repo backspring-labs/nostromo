@@ -125,6 +125,50 @@ The Tailscale name is the bootstrap value. Before WP-5 mints identities the rela
 
 The commit that performs the switch changes the four `buzz.env` URL lines and `BUZZ_DOMAIN`, `relay.hostname` in `crew/manifest.yaml`, and the handles in the manifest, together. The natural moment is WP-3, when the real owner pubkey replaces the placeholder, since that also wants a reset.
 
+## Other apps on the Nano
+
+The relay's Caddy is the host's only front door. It holds `:443` on the tailnet address, and a second
+app sits behind it as a separate site, never as a relay hostname. The relay binds a community to the
+Host header, so a name in `RELAY_HOSTNAMES` becomes a Buzz community. `edge-lab.backspring.xyz` is the
+first (2026-10-14), set up before the app exists. Until the app runs, the site answers 502 and
+nothing else changes.
+
+**The contract an app meets:**
+- **DNS:** an A record to the tailnet address (`100.98.252.95`), DNS-only, like `nostromo`. The
+  certificate comes from the same DNS-01 token and needs nothing from the app.
+- **Its own compose project,** for example under `/mnt/ssd/edge-lab`, with a private network for its
+  database and anything else. It never joins `buzz-net`.
+- **One shared network,** `edge-net`, owned by `compose.caddy.yml` so the relay never depends on the
+  app. The app's front service joins it as external, under the alias its site proxies to:
+  ```yaml
+  services:
+    web:
+      networks:
+        edge-net:
+          aliases: [edge-lab]   # the Caddyfile proxies to edge-lab:8000
+        default: {}
+      mem_limit: 2g
+      cpus: 2
+  networks:
+    edge-net:
+      external: true
+  ```
+- **Listens on 8000** inside its container. It publishes nothing on the host. If something must be
+  published, bind it to `127.0.0.1`, never `3000` or `8080` (the relay) and never `443` (Caddy).
+- **Memory and CPU limits.** The Nano has 7.6 GB, shared with its GPU. The relay stack uses about
+  0.4 GB, and the host's own Ollama grows when it loads a model.
+- **Its own volumes on the NVMe, without the `com.buzz.volume` label.** That label means relay data
+  to `probe.sh` and `backup.sh`. Give the app a backup of its own.
+
+**Adding another site** is a block in `caddy/Caddyfile`, validated in the running container first,
+then `install.sh`:
+```bash
+scp caddy/Caddyfile nano:/tmp/Caddyfile.new
+ssh nano 'docker cp /tmp/Caddyfile.new buzz-prod-caddy-1:/tmp/ && docker exec buzz-prod-caddy-1 caddy validate --config /tmp/Caddyfile.new --adapter caddyfile'
+```
+A Caddyfile change alone is a graceful `caddy reload`. A change to Caddy's networks recreates the
+container, which drops the relay's connections for a few seconds, and the crew reconnects on its own.
+
 ## Known constraints on the Jetson
 
 - `sudo` prompts for a password, so anything needing root (a reboot, changing the Tailscale operator) is an owner action typed at the prompt with the `!` prefix. Serve itself no longer needs root because `jladd` is the Tailscale operator.

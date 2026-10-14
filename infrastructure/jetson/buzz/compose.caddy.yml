@@ -30,6 +30,15 @@ services:
     # embedded DNS cannot resolve "relay" and every request returns 502 behind a valid certificate.
     networks:
       - buzz-net
+      - edge-net
+
+networks:
+  # The one network an app on this host shares with Caddy, and none of the relay's others. Owned here,
+  # so the relay never depends on an app being installed: an app joins it as external, under the alias
+  # its site proxies to (README, "Other apps on the Nano"). Named, so it is "edge-net" and not
+  # "buzz-prod_edge-net".
+  edge-net:
+    name: edge-net
 
 volumes:
   # Labelled so probe.sh's "volumes on NVMe" check covers the certificate and account key too.

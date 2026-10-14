@@ -38,3 +38,16 @@
 		}
 	}
 }
+
+# A second app on this host (infrastructure/jetson/README.md, "Other apps on the Nano"). Its own site,
+# never a RELAY_HOSTNAMES entry: the relay binds a community to the Host header, so a name on that list
+# becomes a Buzz community. The app joins edge-net under the alias edge-lab and listens on 8000. Until
+# it exists this site answers 502 and nothing else changes: Caddy resolves an upstream per request.
+edge-lab.backspring.xyz {
+	tls {
+		dns cloudflare {$CLOUDFLARE_API_TOKEN}
+		resolvers 1.1.1.1 8.8.8.8
+	}
+
+	reverse_proxy edge-lab:8000
+}
