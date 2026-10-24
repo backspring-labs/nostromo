@@ -66,6 +66,9 @@ def main():
     import yaml
     manifest = yaml.safe_load((ROOT/"crew/manifest.yaml").read_text())
     config["watcher_auth_tag"] = manifest["agents"]["mother"]["buzz_auth_tag"]
+    if manifest["agents"]["mother"]["model"] != manifest["agents"]["brett"]["model"]:
+        raise SystemExit("shared inference requires matching pinned Mother/Brett models")
+    config["shared_model"] = manifest["agents"]["mother"]["model"]
     for role, entry in manifest["agents"].items():
         config["public_keys"][role] = entry["buzz_pubkey"]
         config["callers"][str(pwd.getpwnam(role).pw_uid)] = role

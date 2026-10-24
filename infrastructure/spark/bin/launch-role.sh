@@ -701,8 +701,13 @@ when you need a decision only the owner can make.
 RESOLVED
 } > "$RESOLVED_PROMPT"
 
+# A local role never expands to multiple workers through an inherited environment override.
+LOCAL_WORKER_ARG=()
+[[ -n "$LOCAL_PROVIDER" ]] && LOCAL_WORKER_ARG=(--agents 1)
+
 # exec, so the process this script starts is the process a supervisor will later watch and signal.
 exec buzz-acp \
+  ${LOCAL_WORKER_ARG[@]+"${LOCAL_WORKER_ARG[@]}"} \
   --agent-command "$AGENT_CMD" ${AGENT_ARGS[@]+"${AGENT_ARGS[@]}"} \
   --mcp-command buzz-dev-mcp \
   --agent-owner "$OWNER_PUB" \

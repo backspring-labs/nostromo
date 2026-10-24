@@ -9,7 +9,7 @@ import pytest
 
 from runtime.campaigns.core import Broker, Refused, Store, canonical, digest
 from runtime.campaigns.decisions import helpers, verifier
-from runtime.campaigns.watch import Watcher, report
+from runtime.campaigns.watch import Watcher, report, publication_result
 
 
 def test_large_closing_record_keeps_runtime_references_and_bounded_buzz_content():
@@ -21,12 +21,23 @@ def test_large_closing_record_keeps_runtime_references_and_bounded_buzz_content(
     assert "Pending" in body and "cmp_test" in body
 
 
+def test_notes_cli_reference_table_is_accepted_but_unaccepted_messages_are_not():
+    command = ["notes", "set", "--name", "closing-cmp_test"]
+    output = "event_id   "+"a"*64+"\nnaddr      naddr1fixture\ncoordinate 30023:"+"b"*64+":closing-cmp_test\nslug       closing-cmp_test\ntitle      Campaign closing record\n"
+    assert publication_result(command, output)["coordinate"].endswith(":closing-cmp_test")
+    with pytest.raises(RuntimeError):
+        publication_result(command, output.replace("slug       closing-cmp_test", "slug       another"))
+    with pytest.raises(RuntimeError):
+        publication_result(["messages", "send"], '{"accepted":false}')
+    assert publication_result(["messages", "send"], '{"accepted":true}')["accepted"] is True
+
+
 DEFINITION = {
     "project_id": "group_run",
     "objective": {"statement": "commission one local calibration", "allowed_scope": ["backend/**", "frontend/**"],
                   "measurement": "one calibration closes", "target_accepted_increments": 1},
     "policy": {"max_cycles": 1, "max_elapsed_s": 3600, "budget_tokens": 1000000},
-    "crew": {"require_dallas": True, "paid_dispatches": 0},
+    "crew": {"require_dallas": True, "paid_dispatches": 0, "inference_mode": "exclusive"},
 }
 
 
@@ -105,6 +116,99 @@ def test_log_and_observer_packet_use_deployed_control_log_route(setup):
     packet = broker.handle("mother", {"command": "packet", "args": args})
     assert packet["log"] == [{"operation": "create"}]
     assert packet["ledger"] == packet["escalations"] == []
+
+
+def test_legacy_approval_migrates_exclusive_and_is_not_reinterpreted(tmp_path):
+    path = tmp_path/"legacy.sqlite3"
+    legacy = copy.deepcopy(DEFINITION)
+    legacy["crew"].pop("inference_mode")
+    args = {"name": "legacy", "definition": legacy, "channel": "channel", "thread": "thread"}
+    old = sqlite3.connect(path)
+    old.execute("CREATE TABLE definitions(name TEXT PRIMARY KEY, body TEXT, sha TEXT)")
+    old.execute("INSERT INTO definitions VALUES(?,?,?)", ("legacy", canonical(args), digest(legacy)))
+    old.commit(); old.close()
+    store = Store(path)
+    assert store.inference_mode("legacy") == "exclusive"
+    broker = Broker(store, World(), {}, lambda *args: None)
+    broker.approve(args)
+    assert store.inference_mode("legacy") == "exclusive"
+
+
+def test_new_ordinary_approval_defaults_shared_but_accepts_explicit_exclusive(setup):
+    broker, _, _ = setup
+    definition = copy.deepcopy(DEFINITION)
+    definition["crew"].pop("inference_mode")
+    broker.approve({"name": "ordinary", "definition": definition, "channel": "channel", "thread": "thread"})
+    assert broker.store.inference_mode("ordinary") == "shared"
+    assert broker.store.inference_mode("calibration-1") == "exclusive"
+    definition["crew"]["inference_mode"] = "unknown"
+    with pytest.raises(Refused, match="shared or exclusive"):
+        broker.approve({"name": "bad", "definition": definition, "channel": "channel", "thread": "thread"})
+
+
+@pytest.mark.parametrize("command", ["start", "plan", "increment", "lease-give"])
+def test_shared_operations_keep_local_roles_online(setup, command):
+    broker, api, _ = setup
+    broker.store.db.execute("UPDATE definitions SET inference_mode='shared'")
+    broker.store.save()
+    def must_stay_online():
+        raise AssertionError("shared operation stopped the local crew")
+    broker.window = SimpleNamespace(close=must_stay_online, check_shared=lambda: None)
+    req = gate_request(command) if command in {"plan", "increment"} else request(command, campaign="cmp_test", reason="ordinary campaign")
+    broker.handle("ripley" if command in {"plan", "increment"} else "mother", req)
+    assert api.calls[-1][1] == "POST"
+
+
+def test_shared_start_cannot_bypass_a_closed_exclusive_window(setup):
+    broker, api, _ = setup
+    broker.store.db.execute("UPDATE definitions SET inference_mode='shared'")
+    broker.store.save()
+    def closed():
+        raise Refused("exclusive window closed")
+    broker.window = SimpleNamespace(check_shared=closed)
+    with pytest.raises(Refused, match="exclusive window"):
+        broker.handle("mother", request("start", campaign="cmp_test", reason="test"))
+    assert not any(c[1] == "POST" for c in api.calls)
+    assert broker.store.db.execute("SELECT count(*) FROM receipts").fetchone()[0] == 0
+
+
+def test_shared_review_window_does_not_take_an_exclusive_box_lease(setup):
+    broker, api, _ = setup
+    broker.store.db.execute("UPDATE definitions SET inference_mode='shared'")
+    broker.store.save()
+    broker.window = SimpleNamespace()
+    result = broker.handle("mother", {"command": "open-window", "args": {"campaign": "cmp_test"}})
+    assert result["window"] == "shared"
+    assert not any(c[1] == "POST" or c[2].endswith("lease") for c in api.calls)
+
+
+@pytest.mark.parametrize("blocker", ["open", "busy", "lease", "different_model", "other_engine"])
+def test_restore_shared_refuses_until_all_work_and_engine_checks_pass(setup, blocker):
+    broker, api, _ = setup
+    api.campaign["state"] = "running" if blocker == "open" else "completed"
+    host = {"box": {"quiet": blocker != "busy", "lease": {"holder": "supervisor" if blocker == "lease" else "squad"}},
+            "engines": [{"engine": "ollama" if blocker == "other_engine" else "tensorfold",
+                         "loaded": ["different" if blocker == "different_model" else "qwen3.8-27b-tf-nvfp4"]}]}
+    api.host = lambda: host
+    called = []
+    broker.window = SimpleNamespace(restore_shared=lambda: called.append(True))
+    with pytest.raises(Refused):
+        broker.handle("owner", {"command": "restore-shared", "args": {"campaign": "cmp_test"}})
+    assert called == []
+
+
+def test_only_owner_restores_shared_after_completion_and_global_quiet(setup):
+    broker, api, _ = setup
+    api.campaign["state"] = "completed"
+    api.host = lambda: {"box": {"quiet": True, "lease": {"holder": "squad"}},
+                        "engines": [{"engine": "tensorfold", "loaded": ["qwen3.8-27b-tf-nvfp4"]}]}
+    calls = []
+    broker.window = SimpleNamespace(restore_shared=lambda: calls.append(True))
+    req = {"command": "restore-shared", "args": {"campaign": "cmp_test"}}
+    with pytest.raises(Refused, match="owner"):
+        broker.handle("mother", req)
+    assert broker.handle("owner", req)["window"] == "shared"
+    assert calls == [True]
 
 
 def test_owner_approval_is_immutable_and_does_not_expand_a_running_envelope(setup):

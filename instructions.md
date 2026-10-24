@@ -38,7 +38,7 @@ Escalate decisions, not chores. Do not ask permission for routine mechanical wor
 - Ripley owns plan and increment gate decisions, submits them through `campaignctl`, and adds the closing analysis. Dallas independently reviews the exact proposed decision; Brett supplies deterministic evidence; Parker owns implementation; Ash and Lambert contribute within their capabilities.
 - The broker enforces Unix caller identity and verifies signed Buzz decisions. Credentials stay outside model sessions. Never use a raw API, another identity, or an owner override to bypass a refusal.
 - Automatic paid review dispatch is disabled. An owner request must authorize metered crew work. Missing reviews or owner decisions remain pending rather than being inferred from silence.
-- Mother and Brett stop before squad execution. A local evidence window requires a live broker-held Spark lease at an increment gate. Never start a local harness manually while that window is closed; never unload the shared TensorFold engine.
+- Ordinary campaigns share the pinned TensorFold model with Mother and bounded Brett work. New approvals default to shared inference; counted verification explicitly uses exclusive mode. Earlier approvals retain their original exclusive behavior. In exclusive mode, local harnesses stop and a leased evidence window is required. Never bypass a closed window or unload the shared TensorFold engine. Repository changes still follow the task-card, branch, review, and owner-acceptance rules independently of inference sharing.
 - Read `/usr/local/share/nostromo/campaign-control.md` for the installed protocol and failure handling. The factual closing record and Ripley's interpretation are distinct; an absent analysis is explicitly pending.
 
 ## Images in messages

@@ -3,6 +3,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sqlite3
 import subprocess
 import time
@@ -10,6 +11,22 @@ from pathlib import Path
 
 from .cli import call
 from .core import canonical, digest
+
+
+def publication_result(command, stdout):
+    # notes set deliberately prints durable references, even with the CLI's global JSON format.
+    if command[:2] == ["notes", "set"]:
+        fields = dict(line.split(None, 1) for line in stdout.splitlines() if len(line.split(None, 1)) == 2)
+        name = command[command.index("--name")+1]
+        if (not re.fullmatch(r"[0-9a-f]{64}", fields.get("event_id", "")) or
+                fields.get("slug") != name or
+                not re.fullmatch(r"30023:[0-9a-f]{64}:"+re.escape(name), fields.get("coordinate", ""))):
+            raise RuntimeError("Buzz note publication references unreadable")
+        return fields
+    result = json.loads(stdout)
+    if result.get("accepted") is not True:
+        raise RuntimeError("Buzz message was not accepted")
+    return result
 
 
 def notice(campaign):
@@ -103,7 +120,7 @@ def main():
                                 text=True, capture_output=True, env=env, timeout=30)
         if result.returncode:
             raise RuntimeError("Buzz publication failed")
-        return json.loads(result.stdout)
+        return publication_result(command, result.stdout)
 
     def publish(item, text):
         # No @mentions: every named agent would start a paid turn. Humans can inspect the thread.
@@ -111,8 +128,11 @@ def main():
 
     def publish_report(cid, text):
         name = "closing-" + cid
-        run(["notes", "set", "--name", name, "--title", "Campaign closing record " + cid], text)
-        return "30023:" + helpers_pubkey(env["BUZZ_PRIVATE_KEY"]) + ":" + name
+        result = run(["notes", "set", "--name", name, "--title", "Campaign closing record " + cid], text)
+        expected = "30023:" + helpers_pubkey(env["BUZZ_PRIVATE_KEY"]) + ":" + name
+        if result["coordinate"] != expected:
+            raise RuntimeError("Buzz note was published under an unexpected coordinate")
+        return expected
 
     db = sqlite3.connect(args.state)
     watcher = Watcher(db, call, publish, publish_report)

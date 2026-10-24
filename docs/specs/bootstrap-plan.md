@@ -1,5 +1,11 @@
 # Initial Crew and Infrastructure Bootstrap Plan
 
+> **Shared inference amendment, 2026-10-24.** The owner approved shared ordinary campaigns
+> after the current diagnostic completes. New approvals default shared; earlier approvals remain
+> exclusive. Mother stays online, Brett is bounded, and counted verification remains isolated.
+> The deferred owner job validates two lanes before enabling them and restores the baseline if
+> validation fails. See [the implemented protocol](../runbooks/shared-inference.md).
+
 > **Campaign adapter amendment, 2026-10-24 (owner authorized).** The current implementation
 > contract is [Campaign control from Buzz](../runbooks/campaign-control.md). It supersedes the
 > earlier campaign broker sketches below: Unix peer credentials replace sudo caller checks;

@@ -29,6 +29,19 @@ done
 install -d -m 755 /usr/local/lib/nostromo /usr/local/lib/nostromo/campaigns /etc/nostromo
 install -d -m 700 -o nostromo-broker -g nostromo /etc/nostromo/secrets
 install -d -m 755 -o nostromo-broker -g nostromo /var/lib/nostromo-campaign-broker
+python3 - <<'PY'
+import datetime, os, pathlib, sqlite3
+path=pathlib.Path('/var/lib/nostromo-campaign-broker/control.sqlite3')
+if path.exists():
+    os.umask(0o077)
+    stamp=datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')
+    backup=path.with_name('control.pre-upgrade-'+stamp+'.sqlite3')
+    source=sqlite3.connect('file:'+str(path)+'?mode=ro',uri=True)
+    destination=sqlite3.connect(backup)
+    source.backup(destination)
+    destination.close(); source.close()
+    print('Saved campaign state backup: '+str(backup))
+PY
 for source in "$REPO"/runtime/campaigns/*.py; do
   install -m 644 -o root -g root "$source" /usr/local/lib/nostromo/campaigns/
 done
@@ -39,6 +52,7 @@ done
 install -m 755 "$REPO/infrastructure/spark/bin/campaignctl" /usr/local/bin/campaignctl
 install -d -m 755 /usr/local/share/nostromo
 install -m 644 "$REPO/docs/runbooks/campaign-control.md" /usr/local/share/nostromo/campaign-control.md
+install -m 644 "$REPO/docs/runbooks/shared-inference.md" /usr/local/share/nostromo/shared-inference.md
 for role in control review read; do
   if [[ -f "$STAGING/$role.pem" ]]; then
     install -m 600 -o nostromo-broker -g nostromo "$STAGING/$role.pem" "/etc/nostromo/secrets/campaign-$role.pem"
