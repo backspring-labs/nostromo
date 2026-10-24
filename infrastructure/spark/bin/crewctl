@@ -60,9 +60,11 @@ def manifest_text():
 
 
 def agents():
-    """{role: {key: value}} for every agent, in manifest order. Deliberately a flat reader:
-    the manifest is flat by design and a YAML dependency here would be one more thing to install
-    on a box where this tool needs to work when other things are broken."""
+    """Read role scalars and GitHub identity scalars in manifest order.
+
+    This is not a general YAML loader: nested lists/maps and multiline notes are not consumed by
+    crewctl. Keep it dependency-free so the operator tool also works on a damaged runtime.
+    """
     out, role, in_agents, in_github = {}, None, False, False
     for line in manifest_text().splitlines():
         if re.match(r"^agents:\s*$", line):
@@ -83,10 +85,14 @@ def agents():
         if re.match(r"^    github:\s*$", line):
             in_github = True
             continue
-        m = re.match(r"^    ([a-z_]+):\s*(.*?)\s*$", line)
-        if m and not in_github:
+        m = re.match(r"^    ([a-z_][a-z0-9_]*):\s*(.*?)\s*$", line)
+        if m:
+            # A sibling field ends the GitHub block. Ripley and Parker put their routing and
+            # identity fields after it; keeping in_github set made preflight call them missing.
+            in_github = False
             out[role][m.group(1)] = m.group(2).strip("'\"")
-        m = re.match(r"^      ([a-z_]+):\s*(.*?)\s*$", line)
+            continue
+        m = re.match(r"^      ([a-z_][a-z0-9_]*):\s*(.*?)\s*$", line)
         if m and in_github:
             out[role].setdefault("github", {})[m.group(1)] = m.group(2).strip("'\"")
     return out
