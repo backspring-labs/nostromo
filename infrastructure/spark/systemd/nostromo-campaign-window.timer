@@ -1,0 +1,11 @@
+[Unit]
+Description=Check campaign inference-window expiry every ten seconds
+
+[Timer]
+OnBootSec=5s
+OnUnitActiveSec=10s
+AccuracySec=1s
+Unit=nostromo-campaign-window.service
+
+[Install]
+WantedBy=timers.target

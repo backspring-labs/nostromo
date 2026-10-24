@@ -1,0 +1,29 @@
+[Unit]
+Description=Nostromo campaign command broker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=nostromo-broker
+Group=nostromo
+ExecStart=/usr/bin/python3 -I /usr/local/lib/nostromo/campaign-broker.py
+Restart=on-failure
+RestartSec=5
+RuntimeDirectory=nostromo-campaigns
+RuntimeDirectoryMode=0750
+StateDirectory=nostromo-campaign-broker
+StateDirectoryMode=0755
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadOnlyPaths=/etc/nostromo
+ReadWritePaths=/var/lib/nostromo-campaign-broker /run/nostromo-campaigns
+MemoryMax=256M
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -1,5 +1,15 @@
 # Initial Crew and Infrastructure Bootstrap Plan
 
+> **Campaign adapter amendment, 2026-10-24 (owner authorized).** The current implementation
+> contract is [Campaign control from Buzz](../runbooks/campaign-control.md). It supersedes the
+> earlier campaign broker sketches below: Unix peer credentials replace sudo caller checks;
+> Mother holds operations, Ripley submits gate decisions, Dallas signs independent review, and
+> a deterministic watcher maintains the Buzz closing post. Owner-approved definitions are
+> immutable broker records with canonical digests rather than owner-written YAML paths.
+> Automatic metered review dispatch is disabled. Mother and Brett are interlocked with campaign
+> execution through systemd and a lease-expiry guard; shared TensorFold is never unloaded. Root
+> installation and live commissioning checks remain required before campaign starts.
+
 **Status:** In execution — WP-0 to WP-5 closed; see §5.1  
 **Version:** 0.2  
 **Date:** 2026-09-06; last amended 2026-09-23  

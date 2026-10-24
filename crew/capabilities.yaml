@@ -9,6 +9,11 @@ version: 1
 
 capabilities:
   orchestration: mother
+  campaign_orchestration: mother
+  campaign_operations: mother
+  campaign_gate_decision: ripley
+  campaign_results_analysis: ripley
+  campaign_independent_review: dallas
   ideation_research: ash
   architecture: ripley
   adversarial_review: dallas

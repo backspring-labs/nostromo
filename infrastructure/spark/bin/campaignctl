@@ -1,0 +1,6 @@
+#!/usr/bin/python3 -I
+"""Thin installed client. Does not load any OIDC credential."""
+import sys
+sys.path.insert(0, "/usr/local/lib/nostromo")
+from campaigns.cli import main
+sys.exit(main())

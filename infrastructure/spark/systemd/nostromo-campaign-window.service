@@ -1,0 +1,13 @@
+[Unit]
+Description=Close a crew inference window before its campaign lease expires
+
+[Service]
+Type=oneshot
+User=nostromo-broker
+Group=nostromo
+ExecStart=/usr/bin/python3 -I /usr/local/lib/nostromo/campaign-window.py
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/nostromo-campaign-broker
