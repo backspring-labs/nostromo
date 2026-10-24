@@ -49,3 +49,22 @@ The single diagnostic was created and remains **draft**, with zero cycles starte
 definition and coordination record are in the broker and Buzz, not this GitHub repository.
 Root reinstallation of this correction and an installed packet check are required before start;
 the existing approval and draft must be reused. Noninteractive sudo still requires a password.
+
+## Corrected installation and launch checks
+
+The owner reran the installer with runtime source `fa33694`. The broker, watcher, and guard
+timer were active afterward. The installed evidence packet successfully returned the campaign,
+ledger, escalations, and control log. A one-shot run of the installed watcher published to Buzz
+and recorded a successful fingerprint with zero failures in its own state database.
+
+The existing single-use approval and draft were reused. Start was applied once through Mother's
+Unix identity and operational service principal. Before its runtime start record, the broker
+persisted the closed window and stopped both local harnesses; afterward both units were
+`inactive` with `MainPID=0`. The shared TensorFold engine remained loaded. Exactly one
+calibration cycle and its framing run were launched. The first data task completed inference
+through the deployed TensorFold adapter using the pinned 27B model.
+
+The start/interlock/observation checks passed. Calibration execution is still in progress;
+no terminal outcome, independent gate approval, closing interpretation, or unattended readiness
+is claimed by this evidence. No paid review was dispatched. The continuing diagnostic's
+coordination and outcome belong to its existing Buzz thread and SquadOps records.
