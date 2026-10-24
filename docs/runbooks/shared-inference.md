@@ -17,7 +17,10 @@ It does not replace the frozen counted-verification recipe. Use the latter for m
 ## Deferred owner job
 
 `infrastructure/spark/bin/apply-shared-inference.py` runs as the Spark owner in a transient
-user systemd service. It has no root permissions. The root-owned broker update must be installed
+user systemd scope started from a fresh owner SSH login. This preserves the owner's newly granted
+socket group; a long-lived desktop user manager may still have its old group list. The process
+uses `setpriv --no-new-privs`, a 1-GiB cgroup limit and a 25-hour scope lifetime. It has no root
+permissions. The root-owned broker update must be installed
 first; until `shared-ready` reports contract 1, the job waits without changing the engine.
 It also waits for the named campaign's explicit `completed` state. Unreadable status, pauses
 and escalations never count as completion. The wait expires after 24 hours without an engine
@@ -47,7 +50,7 @@ fails, or the box is no longer quiet, the crew stays stopped and the owner job r
 State and probe files are owner-only under `~/.config/nostromo/shared-inference/`. Inspect:
 
 ```bash
-systemctl --user status nostromo-shared-inference
+systemctl --user status nostromo-shared-inference-postcycle.scope
 cat ~/.config/nostromo/shared-inference/state.json
 ```
 
