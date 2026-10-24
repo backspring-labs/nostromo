@@ -45,6 +45,7 @@ grant. Keep its staging directory owner-only; it contains recovery copies of sig
 The root installer installs immutable executable files, keys, units, and a polkit rule allowing
 only the broker account to start/stop `nostromo@mother` and `nostromo@brett`. It grants no sudo
 or Docker access. An interactive sudo prompt must be completed by the owner.
+The owner is added to the `nostromo` group for socket access; use a fresh SSH login afterward.
 
 Deploy this source's constitution, capability table, and role prompts using the existing
 `push-repo.sh` workflow. Existing turns retain their old prompts until their next launch.
@@ -63,6 +64,8 @@ contains `project_id`, `objective`, `policy`, optional `scenario_suite`, and opt
 `crew: {"require_dallas":true,"paid_dispatches":0}`. Its positive cycle, elapsed, and token
 bounds and allowed scope are mandatory. A name's entire approved content is immutable. The
 canonical definition digest is recorded on creation. Approve a new name for any amendment.
+Each approval authorizes one campaign creation, including an unresolved creation attempt;
+Mother cannot multiply the authorization by using fresh request IDs.
 
 For remote owner approval, `campaignctl approve-definition --args approval.json --explain`
 prints the `campaign-definition: {...}` line. The owner publishes that exact line in an

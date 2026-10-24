@@ -46,6 +46,7 @@ class Store:
             CREATE TABLE IF NOT EXISTS observations(id TEXT PRIMARY KEY, fingerprint TEXT,
                 status TEXT, failures INTEGER DEFAULT 0, report TEXT);
             CREATE TABLE IF NOT EXISTS analyses(campaign TEXT PRIMARY KEY, body TEXT);
+            CREATE TABLE IF NOT EXISTS launches(definition TEXT PRIMARY KEY, request TEXT UNIQUE, campaign TEXT);
         """)
 
     def definition(self, name):
@@ -151,6 +152,10 @@ class Broker:
         principal, method, path, body, after = self.operation(command, args, rid, request)
         self.store.db.execute("INSERT INTO receipts VALUES(?,?,?,?,?,?)",
                              (rid, caller, fingerprint, "pending", None, time.time(),))
+        if command == "create":
+            # One owner approval buys one campaign, including an ambiguous creation attempt.
+            self.store.db.execute("INSERT INTO launches VALUES(?,?,?)",
+                                  (args["definition"], rid, body["campaign_id"]))
         self.store.save()
         try:
             if self.window is not None and (command == "start" or command in GATES or command == "lease-give"):
@@ -232,6 +237,8 @@ class Broker:
         if command == "create":
             exact(args, {"definition", "reason"})
             approved, sha = self.store.definition(args["definition"])
+            if self.store.db.execute("SELECT 1 FROM launches WHERE definition=?", (args["definition"],)).fetchone():
+                raise Refused("definition already reserved for one campaign; a new campaign needs fresh owner approval")
             spec = approved["definition"]
             cid = "cmp_" + hashlib.sha256(rid.encode()).hexdigest()[:24]
             body = {k: v for k, v in spec.items() if k != "crew"}

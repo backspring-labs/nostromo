@@ -111,6 +111,21 @@ def test_mother_creates_from_approved_bytes_and_replays_without_a_second_api_wri
     assert body["definition"]["sha256"] == digest(DEFINITION)
     with pytest.raises(Refused, match="different content"):
         broker.handle("mother", request("create", definition="calibration-1", reason="changed"))
+    with pytest.raises(Refused, match="fresh owner approval"):
+        broker.handle("mother", {**req, "request_id": "second-campaign"})
+    assert len(api.calls) == 1
+
+
+def test_ambiguous_creation_cannot_be_repeated_with_a_new_request_id(setup):
+    broker, api, _ = setup
+    def disconnected(*args):
+        raise OSError("response lost after possible commit")
+    broker.api = disconnected
+    req = request("create", definition="calibration-1", reason="commission")
+    with pytest.raises(OSError):
+        broker.handle("mother", req)
+    with pytest.raises(Refused, match="fresh owner approval"):
+        broker.handle("mother", {**req, "request_id": "new-attempt"})
 
 
 def gate_request(command="plan"):

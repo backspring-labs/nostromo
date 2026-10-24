@@ -7,6 +7,17 @@ STAGING="${2:?usage: install-campaign-control.sh REPO STAGING}"
 [[ $(id -u) == 0 ]] || { echo "run as root; no changes made" >&2; exit 1; }
 [[ -f "$STAGING/config.json" ]] || { echo "prepare-campaign-auth.py must succeed first" >&2; exit 1; }
 getent group nostromo >/dev/null
+OWNER_USER="$(python3 - "$STAGING/config.json" <<'PY'
+import json, pathlib, pwd, sys
+c=json.loads(pathlib.Path(sys.argv[1]).read_text())
+owners=[int(uid) for uid,role in c['callers'].items() if role=='owner']
+if len(owners)!=1 or owners[0]<1000:
+    raise SystemExit('expected exactly one non-root owner UID')
+print(pwd.getpwuid(owners[0]).pw_name)
+PY
+)"
+# The owner is a socket caller too. A fresh login picks up this supplementary group.
+usermod -aG nostromo "$OWNER_USER"
 if ! id nostromo-broker >/dev/null 2>&1; then
   useradd --system --no-create-home --shell /usr/sbin/nologin --gid nostromo nostromo-broker
 fi

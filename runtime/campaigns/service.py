@@ -56,7 +56,8 @@ def main():
     p.add_argument("--config", default="/etc/nostromo/campaign-broker.json")
     args = p.parse_args()
     config = json.loads(Path(args.config).read_text())
-    os.umask(0o007)
+    # Only the socket is shared. Definitions, receipts and SQLite WAL files must be broker-only.
+    os.umask(0o077)
     path = Path(config["socket"])
     if path.exists():
         path.unlink()
