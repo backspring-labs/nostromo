@@ -88,6 +88,25 @@ def test_unapproved_definition_cannot_be_created(setup):
     assert api.calls == []
 
 
+def test_log_and_observer_packet_use_deployed_control_log_route(setup):
+    broker, api, _ = setup
+    original = broker.api
+    def routes(principal, method, path, body):
+        if path.endswith("/log"):
+            raise AssertionError("SquadOps exposes /control-log, not /log")
+        if path.endswith("/control-log"):
+            return [{"operation": "create"}]
+        if path.endswith("/ledger") or path.endswith("/escalations"):
+            return []
+        return original(principal, method, path, body)
+    broker.api = routes
+    args = {"campaign": "cmp_test"}
+    assert broker.handle("mother", {"command": "log", "args": args}) == [{"operation": "create"}]
+    packet = broker.handle("mother", {"command": "packet", "args": args})
+    assert packet["log"] == [{"operation": "create"}]
+    assert packet["ledger"] == packet["escalations"] == []
+
+
 def test_owner_approval_is_immutable_and_does_not_expand_a_running_envelope(setup):
     broker, _, _ = setup
     args = {"name": "calibration-1", "definition": copy.deepcopy(DEFINITION), "channel": "channel", "thread": "thread"}

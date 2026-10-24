@@ -28,3 +28,24 @@ commissioning diagnostic. `sudo -n true` requires a password. No attempt was mad
 through Docker or to grant crew sudo. No campaign was launched during preparation.
 
 Runbook: [Campaign control from Buzz](../../../docs/runbooks/campaign-control.md).
+
+## Installed boundary checks
+
+After the owner's interactive installation, broker, watcher, and guard timer reported active.
+The owner was in the socket's `nostromo` group. The installed socket was broker-owned, group
+`nostromo`, mode 0660; the approval database was mode 0600; the secrets directory was mode 0700.
+
+Actual SSH role checks passed: Mother could not submit a gate; Ripley, Dallas, and Brett could
+not issue campaign operations; Ripley could not submit an unsigned gate decision. No gate
+writes were made by these probes. The deployed squad profile and all six squad agents were
+confirmed on TensorFold, with the 27B model loaded and the box reporting quiet.
+
+The pre-start packet check caught a broker route defect: its `log` read used `/log`, whereas
+the deployed API exposes `/control-log`. The correction maps both the direct log read and the
+watcher's packet read to that route, with a regression test. The installer now restarts active
+broker/watcher units so copied Python changes actually load on an upgrade.
+
+The single diagnostic was created and remains **draft**, with zero cycles started. Its
+definition and coordination record are in the broker and Buzz, not this GitHub repository.
+Root reinstallation of this correction and an installed packet check are required before start;
+the existing approval and draft must be reused. Noninteractive sudo still requires a password.

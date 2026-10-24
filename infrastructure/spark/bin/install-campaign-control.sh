@@ -67,6 +67,8 @@ UNIT
 done
 systemctl daemon-reload
 systemctl enable --now nostromo-campaign-broker.service nostromo-campaign-window.timer nostromo-campaign-watch.service
+# An upgrade must reload the copied Python modules, including when the units were already active.
+systemctl restart nostromo-campaign-broker.service nostromo-campaign-watch.service
 systemctl is-active nostromo-campaign-broker.service nostromo-campaign-window.timer nostromo-campaign-watch.service
 echo "Installed. Existing crew services need no restart; the startup condition applies at their next start."
 echo "Verify the socket's role refusals before approving any definition or starting a campaign."

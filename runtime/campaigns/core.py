@@ -66,6 +66,7 @@ class Store:
 
 
 READS = {"status", "log", "ledger", "package", "escalations", "lease"}
+READ_PATHS = {"log": "control-log"}
 OPERATIONS = {"create", "start", "pause", "resume", "abort", "materialize", "lease-take", "lease-give"}
 GATES = {"plan", "increment"}
 ROLES = {"mother", "ripley", "dallas", "parker", "brett", "ash", "lambert", "owner", "watcher"}
@@ -221,7 +222,7 @@ class Broker:
         if command == "packet":
             result = {"campaign": self.api("read", "GET", base, None)}
             for part in ("ledger", "escalations", "log"):
-                result[part] = self.api("read", "GET", f"{base}/{part}", None)
+                result[part] = self.api("read", "GET", f"{base}/{READ_PATHS.get(part, part)}", None)
             row = self.store.db.execute("SELECT body FROM analyses WHERE campaign=?", (cid,)).fetchone()
             result["analysis"] = json.loads(row["body"]) if row else None
             try:
@@ -231,7 +232,7 @@ class Broker:
             except Refused:
                 result["crew_policy"] = {"paid_dispatches": 0}
             return result
-        return self.api("read", "GET", base + ("" if command == "status" else f"/{command}"), None)
+        return self.api("read", "GET", base + ("" if command == "status" else f"/{READ_PATHS.get(command, command)}"), None)
 
     def operation(self, command, args, rid, request):
         if command == "create":
