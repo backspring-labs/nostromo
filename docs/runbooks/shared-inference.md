@@ -41,6 +41,9 @@ cancels validation. Reports contain hashes and statistics, not keys or prompt bo
 
 Only a passing probe enables two lanes. The subsequent `restore-shared` broker command
 checks global quiescence again, clears the old window and starts enabled Mother/Brett units.
+The Spark mode must be explicitly recorded. On an older installation that assumed development
+mode without a file, use the existing supervisor's `crewctl mode development` before guarded
+restoration; the campaign startup guard still prevents an early local launch.
 If engine switching, validation or deploy recording fails, the helper restores the unchanged
 one-lane TensorFold recipe and records the rollback. Once that baseline is verified and recorded,
 the crew returns to shared use with serialized requests, and the job records `complete_with_fallback`.
