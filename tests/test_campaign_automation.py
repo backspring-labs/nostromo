@@ -11,7 +11,7 @@ from runtime.campaigns.core import Broker, Refused, Store, canonical
 from runtime.campaigns.decisions import helpers, verifier
 from runtime.campaigns.evidence import Evidence, waiting_gates
 from runtime.campaigns.review import RESERVATION_MICROUSD, attestations, body, decode, timestamp
-from runtime.campaigns.worker import run
+from runtime.campaigns.worker import WorkerFailure, provider, run
 from runtime.campaigns.usage import observed
 
 NOW = timestamp("2026-10-25T00:00:00Z")
@@ -160,11 +160,31 @@ def test_worker_failure_never_repeats_provider_call(world, fault):
     def request(req):
         if fault == "return_lost" and req["command"] == "review-result": raise OSError("broker result lost")
         return broker.handle("ripley", req)
-    with pytest.raises(Refused): run("ripley", request, infer, post)
+    with pytest.raises(WorkerFailure) as caught: run("ripley", request, infer, post)
+    expected_stage = {"provider": "provider_request", "publication": "buzz_publication",
+                      "return_lost": "broker_result_submit"}[fault]
+    assert caught.value.diagnostic() == f"stage={expected_stage} error={'TimeoutError' if fault == 'provider' else 'OSError'}"
+    assert all(text not in caught.value.diagnostic() for text in
+               ("unknown outcome", "publication response lost", "broker result lost"))
     run("ripley", request, infer, post)
     assert len(calls) == 1
     assert store.db.execute("SELECT reserved,state FROM review_jobs").fetchone()[0] == RESERVATION_MICROUSD
     assert rpc(broker, "mother", "automation", {"campaign": "cmp_test"})["control"]["state"] == "parked"
+
+
+def test_provider_http_failure_logs_status_without_provider_body(monkeypatch):
+    from urllib.error import HTTPError
+
+    class FailedOpener:
+        def open(self, request, timeout):
+            raise HTTPError(request.full_url, 401, "denied TOP_SECRET", {}, None)
+
+    monkeypatch.setattr("runtime.campaigns.worker.secret", lambda name: "TOP_SECRET")
+    monkeypatch.setattr("runtime.campaigns.worker.urllib.request.build_opener", lambda redirect: FailedOpener())
+    with pytest.raises(WorkerFailure) as caught:
+        provider("ripley", {"model": "gpt-5.6-sol"}, 1)
+    assert caught.value.diagnostic() == "stage=provider_http error=HTTPError http_status=401"
+    assert "TOP_SECRET" not in caught.value.diagnostic()
 
 
 def test_dallas_objection_parks_without_gate_or_revision_loop(world):
