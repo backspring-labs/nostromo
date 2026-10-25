@@ -7,7 +7,6 @@ Requires=nostromo-campaign-broker.service
 Type=oneshot
 User=%i
 ExecStart=/usr/bin/python3 -I /usr/local/lib/nostromo/campaign-review.py %i
-RuntimeMaxSec=900
 TimeoutStartSec=900
 TimeoutStopSec=10
 KillMode=control-group

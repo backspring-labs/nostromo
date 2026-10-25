@@ -135,10 +135,20 @@ class Automation:
         packet["budget"] = self.status(cid)
         evidence = Evidence(self.b)
         progress = evidence.handle("progress", {"campaign": cid})
-        packet["cycles"] = progress["cycles"]
+        # Closing interpretation needs outcomes and interventions, not every historical
+        # planning document. Keep the current gate's full cycle and summarize prior cycles.
+        packet["cycles"] = []
+        for cycle in progress["cycles"]:
+            if gate and cycle["cycle_id"] == gate["cycle"]:
+                packet["cycles"].append(cycle)
+            else:
+                packet["cycles"].append({k: cycle.get(k) for k in
+                                         ("cycle_id", "kind", "status", "runs", "cycle_outcome")})
         packet["artifacts"] = []
         selected = {"interface_manifest", "verification_contract", "control_implementation_plan", "merge_decisions",
                     "change_request", "definition_of_done", "test_report", "accepted_tree"}
+        if gate is None:
+            selected = {"definition_of_done", "test_report", "accepted_tree"}
         for cycle in progress["cycles"]:
             for meta in evidence.listing(f"/api/v1/projects/{identifier(p['campaign']['project_id'])}/cycles/{cycle['cycle_id']}/artifacts"):
                 if gate and meta.get("run_id") != gate["run"]:
