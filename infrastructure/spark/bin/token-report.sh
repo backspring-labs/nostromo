@@ -183,7 +183,18 @@ else:
     sys.exit(0)
 files = sorted((f for f in glob.glob(os.path.expanduser(pattern)) if os.path.getmtime(f) >= cutoff),
                key=os.path.getmtime)
-if not files:
+entries = [(f, parse) for f in files]
+worker_files = sorted(f for f in glob.glob(os.path.expanduser("~/.local/state/nostromo-reviews/job_*.json"))
+                      if os.path.getmtime(f) >= cutoff)
+if worker_files:
+    sys.path.insert(0, os.path.dirname(REPO))
+    from runtime.campaigns.usage import observed
+    def parse_review(f):
+        sess = blank()
+        add(sess, observed(json.load(open(f))))
+        return "bounded review " + os.path.basename(f)[4:16], sess, []
+    entries.extend((f, parse_review) for f in worker_files)
+if not entries:
     print(f"no {harness} sessions for {role} since {since}"); sys.exit(0)
 
 def limits_line(first, last):
@@ -213,8 +224,8 @@ print()
 print(f"{'':42}{'calls':>5}  {'input':>7}  {'cach':>4}  {'output':>6}  {'reason':>6}  {'peak':>6}  {'big':>6}  {'cmpt':>4}  {'est.$':>7}")
 print(f"{'':42}{'':>5}  {'tokens':>7}  {'ed':>4}  {'':>6}  {'':>6}  {'ctx':>6}  {'out*':>6}")
 total = blank()
-for f in files:
-    start, sess, turns = parse(f)
+for f, parser in entries:
+    start, sess, turns = parser(f)
     models = ",".join(sorted(sess["models"])) or "no calls"
     label = f"session {start}, {len(turns)} turn{'s' if len(turns) != 1 else ''}"
     print(f"{label:42}{row(sess)}  [{models}]")
@@ -226,6 +237,8 @@ for f in files:
     total["peak"] = max(total["peak"], sess["peak"]); total["big_out"] = max(total["big_out"], sess["big_out"])
     total["models"] |= sess["models"]
 print(f"{'total since ' + since:42}{row(total)}")
+if worker_files:
+    print("  Includes observed bounded-review usage. Failed/unknown calls may have no usage record; inspect campaignctl automation retained reservations.")
 
 print("\n* big out: the largest tool output as logged, in tokens (about 4 characters each). Codex logs an output in full\n"
       "  but sends the model at most codex_tool_output_token_limit of it: on 2026-10-03 a 41K-character output grew\n"

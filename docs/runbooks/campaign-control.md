@@ -23,10 +23,9 @@ exposes only its command allowlist; no raw API, generic cycle write, admin role,
 override is exposed to the crew. OIDC keys are broker-only; access tokens stay in memory.
 The kernel's Unix peer UID determines the caller. No role impersonation field is accepted.
 
-The initial adapter never automatically dispatches paid reviews. A missing Ripley or Dallas
-review stays pending until an authorized human requests it. SquadOps policy token and elapsed
-limits are runtime boundaries, not a provider billing cap; use local-only recipes for the first
-probe and inspect usage afterward. No model or subscription is switched by this adapter.
+Definitions without an explicit automation opt-in never dispatch paid reviews. The bounded
+queue below requires a separate immutable owner allowance. SquadOps policy token and elapsed
+limits are runtime boundaries, not a provider billing cap. No model or subscription is switched.
 
 ## Install on Spark
 
@@ -59,6 +58,18 @@ the socket's live role refusals have been checked.
 `status`, `log`, `ledger`, `package`, `escalations`, `lease`, and `packet`, each with
 `{"campaign":"cmp_..."}`. `tracked` takes `{}`. No shell command is passed through.
 
+Additional read-only evidence commands:
+
+- `progress`: campaign ID → launched cycles, runs, verification outcomes and waiting gates.
+- `cycle`: campaign + cycle IDs; `run` and `checkpoints`: campaign + cycle + run IDs.
+- `artifacts`: campaign + cycle, optionally run; paginated internally, refuses oversized lists.
+- `artifact`: campaign + artifact IDs; complete UTF-8 bytes up to 256 KiB, checked against the
+  vault size/hash and campaign/project/cycle membership. Binary/oversized content is refused.
+- `automation`: campaign ID → durable control state, deadline, jobs, reservations and usage.
+
+The read principal does not expose the currently executing task. `progress` says so explicitly;
+run checkpoints describe completed work, and must not be presented as current-task telemetry.
+
 Owner `approve-definition` takes `name`, `definition`, `channel`, and `thread`. The definition
 contains `project_id`, `objective`, `policy`, optional `scenario_suite`, and optional
 `crew: {"require_dallas":true,"paid_dispatches":0,"inference_mode":"shared"}`. Its positive cycle, elapsed, and token
@@ -66,6 +77,74 @@ bounds and allowed scope are mandatory. A name's entire approved content is immu
 canonical definition digest is recorded on creation. Approve a new name for any amendment.
 Each approval authorizes one campaign creation, including an unresolved creation attempt;
 Mother cannot multiply the authorization by using fresh request IDs.
+
+## Bounded review opt-in
+
+Before commissioning, verify the provider projects have enough remaining headroom within the
+monthly owner budget. The role keys cannot read provider billing administration; local usage
+reports are estimates, not proof of remaining credits. No claim here extends to unrelated
+manual harness usage on the same provider project.
+
+The local owner first uses `approve-budget` with an object such as:
+
+```json
+{"name":"review-pilot-20261025","cap_microusd":5000000,"max_dispatches":8,"expires_at":"2026-10-26T12:00:00Z"}
+```
+
+This is an example, not an installed approval. A budget name is immutable. Both the attended
+test and later overnight definition should reference the **same** allowance so they cannot
+each spend its full value independently. First-pilot caps above $10 or twenty calls are refused.
+An opted-in definition adds:
+
+```json
+{"crew":{"require_dallas":true,"inference_mode":"shared","paid_dispatches":8,"automation":{"budget":"review-pilot-20261025","not_after":"2026-10-26T11:00:00Z"}}}
+```
+
+The earlier absolute `not_after` or start-intent time plus `policy.max_elapsed_s` is persisted
+before start. It cannot reset on restart. The no-model Mother timer checks it every thirty
+seconds and requests campaign abort (including active-cycle cancellation) through the existing
+API. API unavailability can delay abort; it is reported as unreadable, never safe completion.
+SquadOps' own token bound remains additional protection. The shared TensorFold engine stays up.
+
+Ripley and Dallas have separate timer-driven workers under their actual Unix UIDs. Each claims
+one durable job, which reserves **563,200 microdollars ($0.5632)** before accessing its private
+provider key. Accounting uses at most 65,536 serialized request bytes plus 4,096 framing tokens,
+8,192 output tokens including reasoning, $5/M input, $20/M output and 10% regional allowance.
+No tools, conversation history, automatic provider retry, premium service tier, model fallback,
+or additional agent mention is allowed. Actual usage is retained separately; reservations are
+never refunded automatically. One call's allowance is preserved for closing interpretation.
+
+The pinned models are `gpt-5.6-sol` and `claude-opus-5-5`; pricing was verified on October 24,
+2026 and this implementation refuses new calls after November 1 until reviewed. Sources:
+[OpenAI model pricing](https://developers.openai.com/api/docs/models/gpt-5.6-sol),
+[OpenAI token limits](https://developers.openai.com/api/docs/guides/token-counting),
+[Claude model pricing](https://platform.claude.com/docs/en/models/opus-5-5/overview), and
+[Claude Messages API](https://platform.claude.com/docs/en/api/messages/create).
+
+At a live gate, Ripley proposes a verdict citing packet evidence. Dallas reviews that exact
+decision and binding independently. Only a non-blocking, signed Dallas response permits
+Ripley's deterministic submission. There is no automatic disagreement/revision loop. Missing
+evidence, an oversized complete packet, a reserved owner choice, blocking review, provider
+failure, stale/uncertain writes or exhausted allowance parks the campaign for owner inspection.
+The remaining runtime cutoff still applies. Never resume around a parked control state.
+
+The review packet includes selected authoritative planning, proposal and verification records
+in full, with hashes, and discloses its selection. It does not include all source files. A
+proposal ruling authorizes implementation; it does not certify the resulting source or UI.
+Source requiring closer inspection is available via `artifact`. A reviewer must hold when the
+selected evidence is insufficient. No test result may be invented to fill that gap.
+
+Successful closure queues one signed Ripley interpretation and the watcher updates the canonical
+Buzz post. A late cutoff or parked/failed review can leave interpretation explicitly pending;
+the factual report still records the outcome and retained reservations. Provider responses
+survive in the role's private `~/.local/state/nostromo-reviews/job_*.json` recovery files.
+These records never authorize another provider call. Review workers add no sudo/polkit grant.
+
+Check `nostromo-campaign-advance.timer`, `nostromo-campaign-review@ripley.timer`, and
+`nostromo-campaign-review@dallas.timer` after installation. Existing zero-paid approvals retain
+their prior behavior. Passing unit tests is not live commissioning: exercise one attended
+feature increment, its independent review, actual implementation acceptance and closing analysis
+before enabling an unattended definition.
 
 For remote owner approval, `campaignctl approve-definition --args approval.json --explain`
 prints the `campaign-definition: {...}` line. The owner publishes that exact line in an

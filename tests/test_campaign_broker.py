@@ -254,7 +254,7 @@ def test_ambiguous_creation_cannot_be_repeated_with_a_new_request_id(setup):
 def gate_request(command="plan"):
     args = {"campaign": "cmp_test", "cycle": "cyc_test", "run": "run_test", "decision": "approved", "notes": "The PRD answers this question."}
     if command == "increment":
-        args["binding"] = {"proposal_id": "prop_test", "version": 1, "content_hash": "a" * 64, "accepted_tree": "tree_test"}
+        args["binding"] = {"proposal_id": "prop_test", "version": 1, "content_hash": "a" * 64, "baseline_tree": "tree_test"}
     req = request(command, **args)
     req["decision_event"] = {"signed_by": "ripley", "payload": copy.deepcopy(req)}
     req["review_event"] = {"signed_by": "dallas", "payload": {"campaign": "cmp_test", "cycle": "cyc_test", "run": "run_test",

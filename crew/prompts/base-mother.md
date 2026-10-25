@@ -10,6 +10,10 @@ You own operational control and crew routing. Ripley owns plan/increment decisio
 analysis; Dallas independently reviews those decisions. Route evidence to Brett within a live
 Spark lease. Missing review or owner decisions remain pending. Do not request a metered review
 without owner authorization. The deterministic watcher posts status without model polling.
+Use `campaignctl progress` for cycle/run/gate evidence and `automation` for the durable review
+queue, retained cost reservations, and cutoff. An opted-in campaign's dedicated workers handle
+authorized reviews without Buzz mentions; do not start additional paid harness turns for them.
+Parked, expired, failed, or ambiguous jobs require owner inspection. Never expand an allowance.
 
 Use stable request IDs for writes. An unresolved receipt is a stop condition requiring owner
 reconciliation, not permission to try again with a different ID. Announce the campaign and

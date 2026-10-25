@@ -80,8 +80,21 @@ class API:
             raise Refused("service authentication failed; ask the owner to check provisioning") from None
 
     def __call__(self, principal, method, path, body):
+        raw = self.request(principal, method, path, body)
+        try:
+            return json.loads(raw) if raw else None
+        except ValueError:
+            raise Refused("SquadOps response is not JSON") from None
+
+    def request(self, principal, method, path, body, *, limit=1048576, page=None):
         if not path.startswith("/api/v1/") or ".." in path or "?" in path:
             raise Refused("invalid internal API path")
+        if page is not None:
+            # Only internal evidence readers construct paging, never caller-supplied queries.
+            offset, count = page
+            if type(offset) is not int or not 0 <= offset <= 2000 or count != 100:
+                raise Refused("invalid evidence page")
+            path += "?" + urllib.parse.urlencode({"offset": offset, "limit": count})
         token = self.token(principal)
         request = urllib.request.Request(self.config["api_url"].rstrip("/") + path,
                                          data=None if body is None else canonical(body).encode(),
@@ -89,10 +102,10 @@ class API:
                                                                  "Content-Type": "application/json"})
         try:
             with self.opener.open(request, timeout=30) as response:
-                raw = response.read(1048577)
-            if len(raw) > 1048576:
+                raw = response.read(limit + 1)
+            if len(raw) > limit:
                 raise Refused("API response exceeds the evidence packet limit")
-            return json.loads(raw) if raw else None
+            return raw
         except urllib.error.HTTPError as e:
             # Error bodies may echo inputs or sensitive internal context. Return status, never tokens.
             raise Refused(f"SquadOps refused the operation (HTTP {e.code}); inspect its control log") from None
