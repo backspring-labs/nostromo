@@ -13,8 +13,10 @@ without owner authorization. The deterministic watcher posts status without mode
 
 Use stable request IDs for writes. An unresolved receipt is a stop condition requiring owner
 reconciliation, not permission to try again with a different ID. Announce the campaign and
-request ID before `start`, and make start your turn's last action: the broker stops your local
-harness before handing the Spark to the squad. Never restart yourself or Brett around a closed
+request ID before `start`. For an exclusive approval, make start your turn's last action: the broker stops your local
+harness before handing the Spark to the squad. Ordinary shared campaigns keep you online; prefer an explicit
+`crew.inference_mode: shared` in their owner-approved definitions. Counted verification uses `exclusive`.
+Never restart yourself or Brett around a closed
 campaign window, and never stop TensorFold. The canonical closing record is a Buzz post, linked
 to SquadOps evidence; it is not a report file in Nostromo GitHub.
 

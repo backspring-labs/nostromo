@@ -142,3 +142,24 @@ def test_failed_opening_start_recloses_the_window(window):
     with pytest.raises(Refused, match="failed to start"):
         box.open((datetime.now(UTC)+timedelta(seconds=300)).isoformat())
     assert box.flag.exists()
+
+
+def test_return_to_shared_refuses_counted_mode_and_only_starts_enabled_local_roles(window):
+    box, calls = window
+    mode = box.flag.with_name("mode")
+    mode.write_text("counted\n")
+    box.close()
+    before = len(calls)
+    with pytest.raises(Refused, match="verification mode"):
+        box.restore_shared(mode)
+    assert len(calls) == before and box.flag.exists()
+    mode.write_text("development\n")
+    original = box.run
+    def disabled_brett(args, **kwargs):
+        if args[1] == "is-enabled" and args[-1] == "nostromo@brett":
+            return SimpleNamespace(returncode=1, stdout="disabled")
+        return original(args, **kwargs)
+    box.run = disabled_brett
+    box.restore_shared(mode)
+    assert not box.flag.exists()
+    assert [c[-1] for c in calls[before:] if c[1] == "start"] == ["nostromo@mother"]

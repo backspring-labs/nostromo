@@ -48,6 +48,11 @@ class Store:
             CREATE TABLE IF NOT EXISTS analyses(campaign TEXT PRIMARY KEY, body TEXT);
             CREATE TABLE IF NOT EXISTS launches(definition TEXT PRIMARY KEY, request TEXT UNIQUE, campaign TEXT);
         """)
+        columns = {row[1] for row in self.db.execute("PRAGMA table_info(definitions)")}
+        if "inference_mode" not in columns:
+            # Never reinterpret an approval made before shared inference was introduced.
+            self.db.execute("ALTER TABLE definitions ADD COLUMN inference_mode TEXT NOT NULL DEFAULT 'exclusive'")
+            self.db.commit()
 
     def definition(self, name):
         row = self.db.execute("SELECT * FROM definitions WHERE name=?", (identifier(name),)).fetchone()
@@ -63,6 +68,10 @@ class Store:
 
     def save(self):
         self.db.commit()
+
+    def inference_mode(self, name):
+        self.definition(name)
+        return self.db.execute("SELECT inference_mode FROM definitions WHERE name=?", (name,)).fetchone()[0]
 
 
 READS = {"status", "log", "ledger", "package", "escalations", "lease"}
@@ -87,6 +96,30 @@ class Broker:
         if command == "tracked":
             exact(args, set())
             return [dict(row) for row in self.store.db.execute("SELECT * FROM campaigns ORDER BY id")]
+        if command == "shared-ready":
+            exact(args, set())
+            return {"contract": 1, "new_approvals_default": "shared", "legacy_approvals": "exclusive"}
+        if command == "restore-shared":
+            if caller != "owner" or self.window is None:
+                raise Refused("restoring shared inference belongs to the owner")
+            exact(args, {"campaign"})
+            self.store.campaign(args["campaign"])
+            for row in self.store.db.execute("SELECT id FROM campaigns"):
+                status = self.read("status", {"campaign": row["id"]})
+                if status["state"] != "completed":
+                    raise Refused("a registered campaign is still open; wait for completion")
+            host = self.api.host()
+            if host.get("box", {}).get("quiet") is not True:
+                raise Refused("the runtime box is not verified quiet")
+            lease = host["box"].get("lease")
+            if lease and lease.get("holder") == "supervisor":
+                raise Refused("an operator still holds the runtime box lease")
+            expected = self.policy.get("shared_model", "qwen3.8-27b-tf-nvfp4")
+            engines = host.get("engines", [])
+            if len(engines) != 1 or engines[0].get("engine") != "tensorfold" or engines[0].get("loaded") != [expected]:
+                raise Refused("shared use requires only TensorFold with the crew's pinned model")
+            self.window.restore_shared()
+            return {"window": "shared", "model": expected}
         if command == "open-window":
             if caller not in {"mother", "watcher"} or self.window is None:
                 raise Refused("window coordination is unavailable to this caller")
@@ -96,6 +129,9 @@ class Broker:
             campaign = self.api("read", "GET", f"/api/v1/campaigns/{cid}", None)
             if campaign["state"] != "awaiting_ruling":
                 raise Refused("local inference window requires an open increment gate")
+            record = self.store.campaign(cid)
+            if self.store.inference_mode(record["definition"]) == "shared":
+                return {"window": "shared", "lease_required_for_inference": False}
             lease = self.api("read", "GET", f"/api/v1/campaigns/{cid}/lease", None)
             if not lease or not lease.get("supervisor_holds"):
                 import uuid
@@ -151,6 +187,10 @@ class Broker:
             self.verify_event(request.get("decision_event"), "ripley", "campaign-decision", expected)
         # Construct and validate before reserving an action. A validation refusal has no side effect.
         principal, method, path, body, after = self.operation(command, args, rid, request)
+        if command == "start" and self.window is not None:
+            record = self.store.campaign(args["campaign"])
+            if self.store.inference_mode(record["definition"]) == "shared":
+                self.window.check_shared()
         self.store.db.execute("INSERT INTO receipts VALUES(?,?,?,?,?,?)",
                              (rid, caller, fingerprint, "pending", None, time.time(),))
         if command == "create":
@@ -159,17 +199,19 @@ class Broker:
                                   (args["definition"], rid, body["campaign_id"]))
         self.store.save()
         try:
-            if self.window is not None and (command == "start" or command in GATES or command == "lease-give"):
+            record = self.store.campaign(args["campaign"]) if command != "create" else None
+            exclusive = record and self.store.inference_mode(record["definition"]) == "exclusive"
+            if self.window is not None and exclusive and (command == "start" or command in GATES or command == "lease-give"):
                 self.window.close()
-                if command in GATES:
-                    lease = self.api("read", "GET", f"/api/v1/campaigns/{args['campaign']}/lease", None)
-                    if lease and lease.get("supervisor_holds"):
-                        if lease.get("held_by") != self.policy["control_principal"]:
-                            raise Refused("another actor holds the box lease")
-                        self.api("control", "POST", f"/api/v1/campaigns/{args['campaign']}/lease/release", {
-                            "reason": "local harnesses stopped before Ripley's gate submission",
-                            "idempotency_key": rid + "-lease-release",
-                        })
+            if self.window is not None and command in GATES:
+                lease = self.api("read", "GET", f"/api/v1/campaigns/{args['campaign']}/lease", None)
+                if lease and lease.get("supervisor_holds"):
+                    if lease.get("held_by") != self.policy["control_principal"]:
+                        raise Refused("another actor holds the box lease")
+                    self.api("control", "POST", f"/api/v1/campaigns/{args['campaign']}/lease/release", {
+                        "reason": "gate submission; exclusive local harnesses quiesced where required",
+                        "idempotency_key": rid + "-lease-release",
+                    })
             result = self.api(principal, method, path, body)
             if after:
                 after(result)
@@ -199,7 +241,10 @@ class Broker:
             if type(policy.get(field)) is not int or policy[field] < 1:
                 raise Refused(f"policy.{field} needs a positive bound")
         crew = definition.get("crew", {})
-        exact(crew, set(), {"require_dallas", "paid_dispatches"})
+        exact(crew, set(), {"require_dallas", "paid_dispatches", "inference_mode"})
+        inference_mode = crew.get("inference_mode", "shared")
+        if inference_mode not in {"shared", "exclusive"}:
+            raise Refused("inference_mode must be shared or exclusive")
         if type(crew.get("require_dallas", True)) is not bool:
             raise Refused("require_dallas must be boolean")
         # Version one never automatically dispatches metered roles. Owner can request them in Buzz.
@@ -210,8 +255,8 @@ class Broker:
         previous = self.store.db.execute("SELECT body FROM definitions WHERE name=?", (name,)).fetchone()
         if previous and previous["body"] != canonical(stored):
             raise Refused("approved definitions are immutable; approve a new name")
-        self.store.db.execute("INSERT OR IGNORE INTO definitions VALUES(?,?,?)",
-                             (name, canonical(stored), sha))
+        self.store.db.execute("INSERT OR IGNORE INTO definitions(name,body,sha,inference_mode) VALUES(?,?,?,?)",
+                             (name, canonical(stored), sha, inference_mode))
         self.store.save()
         return {"name": name, "sha256": sha, "approved": True}
 
@@ -229,6 +274,7 @@ class Broker:
                 item = self.store.campaign(cid)
                 definition, _ = self.store.definition(item["definition"])
                 result["crew_policy"] = definition["definition"].get("crew", {})
+                result["crew_policy"] = {**result["crew_policy"], "inference_mode": self.store.inference_mode(item["definition"])}
             except Refused:
                 result["crew_policy"] = {"paid_dispatches": 0}
             return result

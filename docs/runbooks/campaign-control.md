@@ -61,7 +61,7 @@ the socket's live role refusals have been checked.
 
 Owner `approve-definition` takes `name`, `definition`, `channel`, and `thread`. The definition
 contains `project_id`, `objective`, `policy`, optional `scenario_suite`, and optional
-`crew: {"require_dallas":true,"paid_dispatches":0}`. Its positive cycle, elapsed, and token
+`crew: {"require_dallas":true,"paid_dispatches":0,"inference_mode":"shared"}`. Its positive cycle, elapsed, and token
 bounds and allowed scope are mandatory. A name's entire approved content is immutable. The
 canonical definition digest is recorded on creation. Approve a new name for any amendment.
 Each approval authorizes one campaign creation, including an unresolved creation attempt;
@@ -87,7 +87,7 @@ the runtime/control log and reconcile as owner before further action. Never gues
 mint a fresh ID to repeat an unresolved write. `resume` accepts no owner action and SquadOps
 rejects attempts to resume somebody else's pause.
 
-Starting a campaign stops Mother's own local harness. Announce the accepted request and its
+Starting an exclusive campaign stops Mother's own local harness. Announce the accepted request and its
 ID before submitting `start`, and make start the last action of that turn. The independent
 broker completes the action and stores its receipt even if the role-side client disappears.
 
@@ -121,6 +121,16 @@ owner-only; there is no `answer` or action-bearing `resume` shortcut.
 
 ## Spark windows and recovery
 
+New approvals default to **shared** inference: Mother stays online and Brett shares bounded
+work through one worker, at most 20 model rounds and 900 seconds per turn. Declare
+`crew.inference_mode: exclusive` for counted verification. Existing approvals migrate as
+exclusive and are never reinterpreted in place. The independent `crewctl mode counted`
+launcher guard still prevents local inference during measured runs. Shared inference does
+not authorize repository mutation, deployment changes or merges outside existing role rules.
+
+The following lease/quiescence rules apply to exclusive approvals. Shared gate submission
+still releases a broker-owned lease if one was explicitly taken, but does not stop the crew.
+
 Before start, gate submission, or lease release, the broker persists a reboot guard, stops
 Mother and Brett, and verifies both unit state and zero MainPID. It never stops TensorFold,
 which the squad also needs. The watcher can reopen local roles at an increment gate only
@@ -129,11 +139,16 @@ before expiry, including across restart. Failed stops prevent the squad action.
 
 This is a campaign-specific interlock, not full protection against every external Spark
 workload. Generic external runs remain the separate isolation work tracked in Nostromo #1.
-After a campaign closes, the local guard deliberately remains closed. The owner must inspect
-the global runtime box lease, active campaigns/runs and GPU workloads before clearing
-`/var/lib/nostromo-campaign-broker/squad-window` and any `crew-window-lease`, then starting
-Mother and Brett. Do not clear a guard merely because a watcher read failed. A root install
+After an exclusive campaign closes, the local guard remains closed. The owner restores sharing
+with `campaignctl restore-shared --args -` and `{"campaign":"cmp_..."}`. The broker verifies
+all registered campaigns completed, the global box is quiet without a supervisor lease,
+and only TensorFold is loaded on the pinned model. The host also refuses while counted mode
+holds the Spark and starts only enabled Mother/Brett services. Do not clear a guard merely
+because a watcher read failed. A root install
 alone does not launch a campaign or alter the running inference server.
+
+See [shared inference deployment and validation](shared-inference.md) for the one-shot job that
+waits for the current diagnostic before testing two lanes and restoring the local crew.
 
 ## Closing record
 

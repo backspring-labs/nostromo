@@ -44,6 +44,18 @@ class API:
         self.opener = urllib.request.build_opener(NoRedirect)
         self.tokens = {}
 
+    def host(self):
+        """Fixed, read-only public health route; never a caller-supplied URL or API pass-through."""
+        request = urllib.request.Request(self.config["api_url"].rstrip("/") + "/health/host")
+        try:
+            with self.opener.open(request, timeout=15) as response:
+                raw = response.read(65537)
+            if len(raw) > 65536:
+                raise ValueError()
+            return json.loads(raw)
+        except (OSError, ValueError):
+            raise Refused("runtime box state unreadable; shared inference stays closed") from None
+
     def token(self, principal):
         held = self.tokens.get(principal)
         if held and held[1] > time.time() + 20:

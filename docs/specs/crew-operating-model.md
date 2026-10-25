@@ -1,5 +1,13 @@
 # Crew Operating Model and SquadOps 1.8 Commissioning Plan
 
+> **Shared inference amendment, 2026-10-24 (owner authorized, after commissioning cycle).**
+> Ordinary new campaigns share one TensorFold model with Mother and bounded Brett work.
+> Existing approvals retain exclusive behavior; measured verification uses explicit exclusive
+> mode and the counted-mode launcher guard. Parallel generation is enabled only after long-context,
+> output-equivalence and memory validation; an unsuccessful candidate falls back to the original
+> serial recipe. This supersedes the blanket campaign stop rule, while preserving benchmark
+> isolation and repository controls. See [the shared-use protocol](../runbooks/shared-inference.md).
+
 > **Campaign adapter amendment, 2026-10-24 (owner authorized).** Nostromo is a Buzz crew that
 > can use SquadOps against target applications. Mother owns campaign orchestration and
 > operations; Ripley owns and submits plan/increment decisions and analyzes results; Dallas

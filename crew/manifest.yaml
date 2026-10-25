@@ -293,7 +293,9 @@ agents:
     respond_to: allowlist
     workdir: ~/src/squad-ops
     requires_clone: true
-    max_rounds: 60
+    # Shared inference: one worker (launcher), bounded task card, at most 20 model rounds / 15 min.
+    max_rounds: 20
+    max_turn_duration: 900
     buzz_pubkey: 3b7b029c96843910fc4660d7d22c514d69804f174fff43c74eaaa389b3fef14d
     buzz_auth_tag: '["auth","508cd1c7dbcddcc93b8168923cac49ef28bb02f0e60de549e44b01000d2bce5f","","794a8ba0bc46f5d5b723196ba4e42bb929d0640225c0dbe4face5c3905eb25d08b0dcfd2bba1e792bee9ee21a9aaeea35cd3d943272eaf1ec0f09cc0ff7eb9e8"]'
     buzz_private_key: spark:~brett/.config/nostromo/secrets/buzz.key

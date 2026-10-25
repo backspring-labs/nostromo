@@ -1,4 +1,4 @@
-"""Keep crew model harnesses out of squad execution. Never stop or unload TensorFold."""
+"""Exclusive verification windows and an owner-controlled return to shared TensorFold use."""
 import json
 import os
 import subprocess
@@ -66,6 +66,23 @@ class Window:
             return
         if time.time() >= deadline - 60:
             self.close()
+
+    def restore_shared(self, mode_file="/opt/nostromo/state/spark-mode"):
+        if Path(mode_file).read_text().strip() != "development":
+            raise Refused("exclusive verification mode still holds the Spark")
+        self.flag.with_name("crew-window-lease").unlink(missing_ok=True)
+        self.flag.unlink(missing_ok=True)
+        for role in ("mother", "brett"):
+            enabled, state = self.unit("is-enabled", role)
+            if enabled == 0 and state == "enabled":
+                code, _ = self.unit("start", role)
+                if code:
+                    self.close()
+                    raise Refused("shared local role failed to start: " + role)
+
+    def check_shared(self, mode_file="/opt/nostromo/state/spark-mode"):
+        if Path(mode_file).read_text().strip() != "development" or self.flag.exists() or self.flag.with_name("crew-window-lease").exists():
+            raise Refused("shared inference is not open; owner must restore it after exclusive work")
 
 
 def startup_check():
