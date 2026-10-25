@@ -5,6 +5,7 @@ import os
 import pwd
 import subprocess
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -14,6 +15,25 @@ from .core import Refused, canonical
 from .review import MAX_REQUEST_BYTES, MODELS, attestations, decode, validate
 
 ENDPOINTS = {"ripley": "https://api.openai.com/v1/responses", "dallas": "https://api.anthropic.com/v1/messages"}
+
+
+class WorkerFailure(Refused):
+    """A failure with safe diagnostic metadata; never contains request or response text."""
+
+    def __init__(self, stage, error_type, status=None, failure_report_type=None):
+        self.stage = stage
+        self.error_type = error_type
+        self.status = status
+        self.failure_report_type = failure_report_type
+        super().__init__("review failed; reservation retained and no automatic retry")
+
+    def diagnostic(self):
+        fields = ["stage=" + self.stage, "error=" + self.error_type]
+        if self.status is not None:
+            fields.append("http_status=" + str(self.status))
+        if self.failure_report_type is not None:
+            fields.append("failure_report_error=" + self.failure_report_type)
+        return " ".join(fields)
 
 
 def secret(name):
@@ -28,17 +48,30 @@ def provider(role, body, timeout):
     if body.get("model") != MODELS[role] or len(raw) > MAX_REQUEST_BYTES:
         raise Refused("review request violates the fixed model or input bound")
     headers = {"Content-Type": "application/json"}
-    if role == "ripley":
-        headers["Authorization"] = "Bearer " + secret("openai.key")
-    else:
-        headers.update({"x-api-key": secret("anthropic.key"), "anthropic-version": "2026-10-21"})
+    try:
+        if role == "ripley":
+            headers["Authorization"] = "Bearer " + secret("openai.key")
+        else:
+            headers.update({"x-api-key": secret("anthropic.key"), "anthropic-version": "2026-10-21"})
+    except Exception as error:
+        raise WorkerFailure("provider_setup", type(error).__name__) from None
+
     request = urllib.request.Request(ENDPOINTS[role], data=raw, headers=headers)
     # urllib performs one HTTP request, with redirects disabled and no SDK retry policy.
-    with urllib.request.build_opener(NoRedirect).open(request, timeout=timeout) as response:
-        data = response.read(1048577)
-    if len(data) > 1048576:
-        raise Refused("provider response exceeds its bound")
-    return decode(role, json.loads(data))
+    try:
+        with urllib.request.build_opener(NoRedirect).open(request, timeout=timeout) as response:
+            data = response.read(1048577)
+    except urllib.error.HTTPError as error:
+        raise WorkerFailure("provider_http", type(error).__name__, status=error.code) from None
+    except Exception as error:
+        # Do not log exception text: URL and transport exceptions may contain sensitive data.
+        raise WorkerFailure("provider_transport", type(error).__name__) from None
+    try:
+        if len(data) > 1048576:
+            raise Refused("provider response exceeds its bound")
+        return decode(role, json.loads(data))
+    except Exception as error:
+        raise WorkerFailure("provider_response", type(error).__name__) from None
 
 
 def publish(job, result):
@@ -66,20 +99,34 @@ def run(role, rpc=call, infer=provider, post=publish, persist=None):
     if job is None:
         return {"idle": True}
     # Everything after a durable claim is single-attempt, including publication/return.
+    stage = "preflight"
     try:
         remaining = job["deadline"] - time.time()
         if remaining < 30:
             raise Refused("review authorization is about to expire")
+        stage = "provider_request"
         result, usage = infer(role, job["payload"]["body"], min(remaining, 780))
+        stage = "result_validation"
         validate(job["kind"], result, job["payload"]["packet"]["references"])
         if persist:
+            stage = "recovery_persist"
             persist(job["id"], {"result": result, "usage": usage, "model": MODELS[role], "recorded_at": time.time()})
+        stage = "buzz_publication"
         proof = post(job, result)
+        stage = "broker_result_submit"
         return rpc({"command": "review-result", "args": {"job": job["id"], "result": result, "usage": usage},
                     "decision_event": proof})
-    except Exception:
-        rpc({"command": "review-failed", "args": {"job": job["id"]}})
-        raise Refused("review failed; reservation retained and no automatic retry") from None
+    except Exception as error:
+        if isinstance(error, WorkerFailure):
+            failure = error
+        else:
+            failure = WorkerFailure(stage, type(error).__name__)
+        try:
+            rpc({"command": "review-failed", "args": {"job": job["id"]}})
+        except Exception as report_error:
+            failure = WorkerFailure(failure.stage, failure.error_type, failure.status,
+                                    type(report_error).__name__)
+        raise failure from None
 
 
 def main():
@@ -101,9 +148,15 @@ def main():
             os.fsync(f.fileno())
     try:
         print(canonical(run(args.role, persist=persist)), flush=True)
-    except Exception:
-        # Provider exceptions may include echoed request content; never log their bodies.
-        print("campaign review worker failed; inspect the retained job and role recovery record", flush=True)
+    except WorkerFailure as error:
+        # Log only a stage, exception class and optional HTTP status, never exception text.
+        print("campaign review worker failed; reservation retained; no automatic retry; "
+              + error.diagnostic(), flush=True)
+        raise SystemExit(1) from None
+    except Exception as error:
+        # Failures before a job is claimed have no review reservation to reconcile.
+        print("campaign review worker failed before a claimed job; error="
+              + type(error).__name__, flush=True)
         raise SystemExit(1) from None
 
 
