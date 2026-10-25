@@ -54,6 +54,8 @@ class Store:
                 role TEXT NOT NULL, kind TEXT NOT NULL, state TEXT NOT NULL, payload TEXT NOT NULL,
                 reserved INTEGER NOT NULL DEFAULT 0, claimed REAL, result TEXT, proof TEXT, usage TEXT,
                 failure_diagnostic TEXT);
+            CREATE TABLE IF NOT EXISTS review_recoveries(job TEXT PRIMARY KEY, state TEXT NOT NULL,
+                authorized REAL NOT NULL, claimed REAL, failure TEXT, event_id TEXT);
         """)
         columns = {row[1] for row in self.db.execute("PRAGMA table_info(definitions)")}
         if "inference_mode" not in columns:
@@ -63,6 +65,10 @@ class Store:
         job_columns = {row[1] for row in self.db.execute("PRAGMA table_info(review_jobs)")}
         if "failure_diagnostic" not in job_columns:
             self.db.execute("ALTER TABLE review_jobs ADD COLUMN failure_diagnostic TEXT")
+            self.db.commit()
+        recovery_columns = {row[1] for row in self.db.execute("PRAGMA table_info(review_recoveries)")}
+        if "event_id" not in recovery_columns:
+            self.db.execute("ALTER TABLE review_recoveries ADD COLUMN event_id TEXT")
             self.db.commit()
 
     def definition(self, name):

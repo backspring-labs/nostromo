@@ -8,7 +8,9 @@ from .core import Refused, canonical, digest, exact, identifier
 from .evidence import Evidence
 from .review import PRICE_EXPIRES, RESERVATION_MICROUSD, body, timestamp, validate, decision_request
 
-COMMANDS = {"approve-budget", "automation", "advance", "review-claim", "review-result", "review-failed", "review-submit"}
+COMMANDS = {"approve-budget", "automation", "advance", "review-claim", "review-result", "review-failed",
+            "review-submit", "review-recovery-authorize", "review-recovery-claim", "review-recovery-result",
+            "review-recovery-failed"}
 
 
 class Automation:
@@ -44,6 +46,9 @@ class Automation:
         row = self.db.execute("SELECT * FROM automation WHERE campaign=?", (cid,)).fetchone()
         jobs = [dict(j) for j in self.db.execute(
             "SELECT id,role,kind,state,reserved,claimed,usage,failure_diagnostic FROM review_jobs WHERE campaign=? ORDER BY rowid", (cid,))]
+        for job in jobs:
+            recovery = self.db.execute("SELECT state,failure,event_id FROM review_recoveries WHERE job=?", (job["id"],)).fetchone()
+            job["recovery"] = dict(recovery) if recovery else None
         for job in jobs:
             if job["failure_diagnostic"]:
                 job["failure_diagnostic"] = json.loads(job["failure_diagnostic"])
@@ -303,6 +308,87 @@ class Automation:
         # Successful Dallas review is exposed to Ripley's deterministic submission worker.
         return {"stored": True}
 
+    def authorize_recovery(self, caller, args):
+        if caller != "owner":
+            raise Refused("only the owner can authorize publication recovery")
+        exact(args, {"job"}, {"no_matching_event_verified", "existing_event_id"})
+        if set(args) == {"job", "no_matching_event_verified"}:
+            if args["no_matching_event_verified"] is not True:
+                raise Refused("owner must verify that no matching signed Buzz result is already published")
+            event_id = None
+        elif set(args) == {"job", "existing_event_id"}:
+            event_id = args["existing_event_id"]
+            if not isinstance(event_id, str) or not re.fullmatch(r"[0-9a-f]{64}", event_id):
+                raise Refused("existing signed result needs its Buzz event ID")
+        else:
+            raise Refused("choose exactly one recovery mode: verified absence or an existing event ID")
+        jid = identifier(args["job"])
+        job = self.db.execute("SELECT * FROM review_jobs WHERE id=?", (jid,)).fetchone()
+        if not job or job["state"] != "uncertain" or job["reserved"] <= 0 or job["role"] not in {"ripley", "dallas"}:
+            raise Refused("job is not an eligible reserved review")
+        diagnostic = json.loads(job["failure_diagnostic"] or "{}")
+        if diagnostic.get("stage") != "buzz_publication":
+            raise Refused("recovery is limited to a failed Buzz publication")
+        control = self.db.execute("SELECT * FROM automation WHERE campaign=?", (job["campaign"],)).fetchone()
+        if not control or control["state"] != "parked" or self.now + 180 >= control["deadline"]:
+            raise Refused("campaign is not in a recoverable parked window")
+        old = self.db.execute("SELECT state,claimed FROM review_recoveries WHERE job=?", (jid,)).fetchone()
+        if old and (old["state"] in {"queued", "done"}
+                    or old["state"] == "claimed" and self.now - old["claimed"] < 900):
+            raise Refused("publication recovery is already authorized or completed")
+        self.db.execute("INSERT INTO review_recoveries(job,state,authorized,claimed,failure,event_id) VALUES(?, 'queued', ?, NULL, NULL, ?) "
+                        "ON CONFLICT(job) DO UPDATE SET state='queued',authorized=excluded.authorized,claimed=NULL,failure=NULL,event_id=excluded.event_id",
+                        (jid, self.now, event_id))
+        self.b.store.save()
+        return {"authorized": True, "job": jid, "provider_calls": 0, "will_publish": event_id is None}
+
+    def claim_recovery(self, role):
+        if role not in {"ripley", "dallas"}:
+            raise Refused("only the assigned review role can recover its publication")
+        row = self.db.execute("SELECT r.job,r.event_id,j.campaign,j.role,j.kind,j.payload FROM review_recoveries r "
+                              "JOIN review_jobs j ON j.id=r.job WHERE r.state='queued' AND j.role=? ORDER BY r.authorized LIMIT 1",
+                              (role,)).fetchone()
+        if not row:
+            return None
+        control = self.db.execute("SELECT state,deadline FROM automation WHERE campaign=?", (row["campaign"],)).fetchone()
+        job_state = self.db.execute("SELECT state FROM review_jobs WHERE id=?", (row["job"],)).fetchone()
+        if not control or control["state"] != "parked" or self.now + 180 >= control["deadline"] or job_state[0] != "uncertain":
+            self.db.execute("UPDATE review_recoveries SET state='failed',failure='AuthorizationExpired' WHERE job=?",
+                            (row["job"],))
+            self.b.store.save()
+            return None
+        self.db.execute("UPDATE review_recoveries SET state='claimed',claimed=? WHERE job=? AND state='queued'",
+                        (self.now, row["job"]))
+        self.b.store.save()
+        return {"id": row["job"], "campaign": row["campaign"], "role": row["role"], "kind": row["kind"],
+                "event_id": row["event_id"],
+                "payload": json.loads(row["payload"])}
+
+    def recover_result(self, role, args, event):
+        exact(args, {"job", "result", "usage"})
+        jid = identifier(args["job"])
+        row = self.db.execute("SELECT j.*,c.state AS control_state,c.deadline,r.state AS recovery_state "
+                              "FROM review_jobs j JOIN automation c ON c.campaign=j.campaign "
+                              "JOIN review_recoveries r ON r.job=j.id WHERE j.id=?", (jid,)).fetchone()
+        if (not row or row["role"] != role or row["state"] != "uncertain" or row["recovery_state"] != "claimed"
+                or row["control_state"] != "parked" or self.now >= row["deadline"]):
+            raise Refused("publication recovery is not currently authorized for this role")
+        if json.loads(row["failure_diagnostic"] or "{}").get("stage") != "buzz_publication":
+            raise Refused("job did not fail during Buzz publication")
+        payload = json.loads(row["payload"])
+        result = validate(row["kind"], args["result"], payload["packet"]["references"])
+        if not isinstance(args["usage"], dict) or len(canonical(args["usage"]).encode()) > 4096:
+            raise Refused("saved review usage is invalid")
+        self.b.verify_event(event, role, "campaign-job-result", {"job": jid, "result": result},
+                            not_before=row["claimed"] - 30)
+        self.db.execute("UPDATE review_jobs SET state='done',result=?,proof=?,usage=? WHERE id=?",
+                        (canonical(result), canonical(event), canonical(args["usage"]), jid))
+        self.db.execute("UPDATE review_recoveries SET state='done',failure=NULL WHERE job=?", (jid,))
+        self.b.store.save()
+        # Keep the campaign parked. Recovery records the saved result but never resumes work,
+        # queues another paid review, or submits a SquadOps gate.
+        return {"stored": True, "campaign_remains_parked": True, "provider_calls": 0}
+
     def submit(self, caller):
         if caller != "ripley":
             raise Refused("gate submission belongs to Ripley")
@@ -344,6 +430,24 @@ class Automation:
         return None
 
     def handle(self, caller, command, args, request):
+        if command == "review-recovery-authorize":
+            return self.authorize_recovery(caller, args)
+        if command == "review-recovery-claim":
+            exact(args, set())
+            return self.claim_recovery(caller)
+        if command == "review-recovery-result":
+            return self.recover_result(caller, args, request.get("decision_event"))
+        if command == "review-recovery-failed":
+            exact(args, {"job", "error"})
+            jid = identifier(args["job"])
+            if not isinstance(args["error"], str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9]{0,63}", args["error"]):
+                raise Refused("recovery failure must contain only an exception class")
+            row = self.db.execute("SELECT j.role,r.state FROM review_jobs j JOIN review_recoveries r ON r.job=j.id WHERE j.id=?", (jid,)).fetchone()
+            if not row or row["role"] != caller or row["state"] != "claimed":
+                raise Refused("recovery failure is not owned by this role")
+            self.db.execute("UPDATE review_recoveries SET state='failed',failure=? WHERE job=?", (args["error"], jid))
+            self.b.store.save()
+            return {"failed": True, "provider_calls": 0}
         if command == "approve-budget":
             if caller != "owner":
                 raise Refused("review allowances belong to the owner")

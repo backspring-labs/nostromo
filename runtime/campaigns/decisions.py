@@ -22,12 +22,14 @@ def helpers():
 def verifier(policy, now=time.time):
     crypto = helpers()
 
-    def verify(event, signer, prefix, expected):
+    def verify(event, signer, prefix, expected, not_before=None):
         try:
             if not isinstance(event, dict) or event["kind"] != 9:
                 raise ValueError()
             age = now() - event["created_at"]
-            if age < -30 or age > policy.get("decision_ttl_s", 1800):
+            if age < -30 or age > policy.get("decision_ttl_s", 1800) and not_before is None:
+                raise ValueError()
+            if not_before is not None and event["created_at"] < not_before:
                 raise ValueError()
             if event["pubkey"] != policy["public_keys"][signer]:
                 raise ValueError()

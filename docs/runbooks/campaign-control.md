@@ -147,6 +147,35 @@ precise cause is unavailable; a reserved call alone cannot recover its response.
 the report to Brett for deterministic evidence inspection, but only the owner can authorize a new
 immutable definition or budget change.
 
+### Recovering a validated response after Buzz publication failure
+
+When triage reports `stage=buzz_publication`, the role worker has already validated and persisted
+the provider response in its private recovery directory. Do not rerun the provider call. First
+search the campaign's Buzz thread for the exact job ID and `campaign-job-result` marker. The owner
+can authorize adoption of an existing signed result by event ID, without publishing again:
+
+```bash
+campaignctl review-recovery-authorize --args - <<'JSON'
+{"job":"job_...","existing_event_id":"<64-hex-event-id>"}
+JSON
+```
+
+If no matching event exists, the owner may authorize one no-provider publication:
+
+```bash
+campaignctl review-recovery-authorize --args - <<'JSON'
+{"job":"job_...","no_matching_event_verified":true}
+JSON
+```
+
+The authorization is bound to that uncertain job and requires an active parked window. The assigned
+role's existing review timer reads and validates the private saved response, publishes it once with
+a two-minute transport bound, and submits the role-signed event to the broker. This makes zero
+provider calls and never retries automatically. If publication still fails, inspect Buzz again
+before any new authorization. Triage reports the recovery state. Recovery records the result only;
+it keeps the campaign parked and does not resume the campaign, queue another paid review, or submit
+a SquadOps gate. Expired windows and non-publication failures remain owner-inspection cases.
+
 The review packet includes selected authoritative planning, proposal and verification records
 in full, with hashes, and discloses its selection. It does not include all source files. A
 proposal ruling authorizes implementation; it does not certify the resulting source or UI.

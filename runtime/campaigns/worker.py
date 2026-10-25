@@ -99,7 +99,7 @@ def publish(job, result):
     destination = job["payload"]["destination"]
     command = ["/opt/nostromo/runtime/bin/buzz", "messages", "send", "--channel", destination["channel"],
                "--reply-to", destination["thread"], "--content", "-"]
-    response = subprocess.run(command, input=attestations(job, result), text=True, capture_output=True, env=env, timeout=30)
+    response = subprocess.run(command, input=attestations(job, result), text=True, capture_output=True, env=env, timeout=120)
     if response.returncode:
         raise Refused("signed review publication failed")
     sent = json.loads(response.stdout)
@@ -109,6 +109,9 @@ def publish(job, result):
 
 
 def run(role, rpc=call, infer=provider, post=publish, persist=None):
+    recovery = rpc({"command": "review-recovery-claim", "args": {}})
+    if recovery is not None:
+        return recover(role, recovery, rpc=rpc, post=post)
     if role == "ripley":
         rpc({"command": "review-submit", "args": {}})
     job = rpc({"command": "review-claim", "args": {}})
@@ -144,6 +147,29 @@ def run(role, rpc=call, infer=provider, post=publish, persist=None):
             failure = WorkerFailure(failure.stage, failure.error_type, failure.status,
                                     failure.reason_code, type(report_error).__name__)
         raise failure from None
+
+
+def recover(role, job, rpc=call, post=publish):
+    """Publish a previously validated response only after an explicit owner authorization."""
+    if job.get("role") != role:
+        raise Refused("recovery job belongs to a different role")
+    path = Path.home() / ".local/state/nostromo-reviews" / (job["id"] + ".json")
+    try:
+        if path.is_symlink() or not path.is_file() or path.stat().st_uid != os.getuid() or path.stat().st_mode & 0o077:
+            raise Refused("private recovery record is unavailable")
+        record = json.loads(path.read_text())
+        if record.get("model") != MODELS[role] or not isinstance(record.get("result"), dict) or not isinstance(record.get("usage"), dict):
+            raise Refused("recovery record does not match the pinned review")
+        validate(job["kind"], record["result"], job["payload"]["packet"]["references"])
+        proof = read_event(job["event_id"]) if job.get("event_id") else post(job, record["result"])
+        return rpc({"command": "review-recovery-result", "args": {
+            "job": job["id"], "result": record["result"], "usage": record["usage"]}, "decision_event": proof})
+    except Exception as error:
+        try:
+            rpc({"command": "review-recovery-failed", "args": {"job": job["id"], "error": type(error).__name__}})
+        except Exception:
+            pass
+        raise WorkerFailure("recovery_publication", type(error).__name__) from None
 
 
 def main():

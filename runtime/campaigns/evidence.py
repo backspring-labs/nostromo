@@ -91,6 +91,9 @@ class Evidence:
                 elif diagnostic["stage"] == "provider_http":
                     findings.append({"job": job["id"], "classification": "provider_http_error",
                                      "detail": "The provider returned the recorded HTTP status. No automatic retry was attempted."})
+                elif diagnostic["stage"] == "buzz_publication":
+                    findings.append({"job": job["id"], "classification": "buzz_publication_failed",
+                                     "detail": "The validated response may be recovered from the role's private record after the owner verifies no matching signed Buzz result is present. Recovery makes no provider call and leaves the campaign parked."})
                 else:
                     findings.append({"job": job["id"], "classification": "worker_stage_failed",
                                      "detail": "See the bounded diagnostic fields for the failing stage and error class. No automatic retry was attempted."})
@@ -104,7 +107,7 @@ class Evidence:
                                      for r in c.get("runs", [])]} for c in progress["cycles"]],
                 "gates": progress["gates"],
                 "ledger": ledger,
-                "review_jobs": [{k: j.get(k) for k in ("id", "role", "kind", "state", "reserved", "claimed", "failure_diagnostic")}
+                "review_jobs": [{k: j.get(k) for k in ("id", "role", "kind", "state", "reserved", "claimed", "failure_diagnostic", "recovery")}
                                 for j in automation["jobs"]],
                 "reserved_microusd": automation["reserved_microusd"],
                 "shared_budget_reserved_microusd": automation["shared_budget_reserved_microusd"],
