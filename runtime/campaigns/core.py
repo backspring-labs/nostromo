@@ -52,12 +52,17 @@ class Store:
                 state TEXT NOT NULL, reason TEXT);
             CREATE TABLE IF NOT EXISTS review_jobs(id TEXT PRIMARY KEY, campaign TEXT NOT NULL,
                 role TEXT NOT NULL, kind TEXT NOT NULL, state TEXT NOT NULL, payload TEXT NOT NULL,
-                reserved INTEGER NOT NULL DEFAULT 0, claimed REAL, result TEXT, proof TEXT, usage TEXT);
+                reserved INTEGER NOT NULL DEFAULT 0, claimed REAL, result TEXT, proof TEXT, usage TEXT,
+                failure_diagnostic TEXT);
         """)
         columns = {row[1] for row in self.db.execute("PRAGMA table_info(definitions)")}
         if "inference_mode" not in columns:
             # Never reinterpret an approval made before shared inference was introduced.
             self.db.execute("ALTER TABLE definitions ADD COLUMN inference_mode TEXT NOT NULL DEFAULT 'exclusive'")
+            self.db.commit()
+        job_columns = {row[1] for row in self.db.execute("PRAGMA table_info(review_jobs)")}
+        if "failure_diagnostic" not in job_columns:
+            self.db.execute("ALTER TABLE review_jobs ADD COLUMN failure_diagnostic TEXT")
             self.db.commit()
 
     def definition(self, name):

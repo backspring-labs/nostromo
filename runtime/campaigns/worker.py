@@ -12,7 +12,7 @@ from pathlib import Path
 from .auth import NoRedirect
 from .cli import call, read_event
 from .core import Refused, canonical
-from .review import MAX_REQUEST_BYTES, MODELS, attestations, decode, validate
+from .review import MAX_REQUEST_BYTES, MODELS, attestations, decode, refusal_code, validate
 
 ENDPOINTS = {"ripley": "https://api.openai.com/v1/responses", "dallas": "https://api.anthropic.com/v1/messages"}
 
@@ -20,10 +20,11 @@ ENDPOINTS = {"ripley": "https://api.openai.com/v1/responses", "dallas": "https:/
 class WorkerFailure(Refused):
     """A failure with safe diagnostic metadata; never contains request or response text."""
 
-    def __init__(self, stage, error_type, status=None, failure_report_type=None):
+    def __init__(self, stage, error_type, status=None, reason_code=None, failure_report_type=None):
         self.stage = stage
         self.error_type = error_type
         self.status = status
+        self.reason_code = reason_code
         self.failure_report_type = failure_report_type
         super().__init__("review failed; reservation retained and no automatic retry")
 
@@ -31,9 +32,19 @@ class WorkerFailure(Refused):
         fields = ["stage=" + self.stage, "error=" + self.error_type]
         if self.status is not None:
             fields.append("http_status=" + str(self.status))
+        if self.reason_code is not None:
+            fields.append("reason_code=" + self.reason_code)
         if self.failure_report_type is not None:
             fields.append("failure_report_error=" + self.failure_report_type)
         return " ".join(fields)
+
+    def record(self):
+        result = {"stage": self.stage, "error": self.error_type}
+        if self.status is not None:
+            result["http_status"] = self.status
+        if self.reason_code is not None:
+            result["reason_code"] = self.reason_code
+        return result
 
 
 def secret(name):
@@ -54,7 +65,8 @@ def provider(role, body, timeout):
         else:
             headers.update({"x-api-key": secret("anthropic.key"), "anthropic-version": "2026-10-21"})
     except Exception as error:
-        raise WorkerFailure("provider_setup", type(error).__name__) from None
+        raise WorkerFailure("provider_setup", type(error).__name__, reason_code=refusal_code(error)
+                            if isinstance(error, Refused) else None) from None
 
     request = urllib.request.Request(ENDPOINTS[role], data=raw, headers=headers)
     # urllib performs one HTTP request, with redirects disabled and no SDK retry policy.
@@ -62,7 +74,8 @@ def provider(role, body, timeout):
         with urllib.request.build_opener(NoRedirect).open(request, timeout=timeout) as response:
             data = response.read(1048577)
     except urllib.error.HTTPError as error:
-        raise WorkerFailure("provider_http", type(error).__name__, status=error.code) from None
+        raise WorkerFailure("provider_http", type(error).__name__, status=error.code,
+                            reason_code="provider_http_error") from None
     except Exception as error:
         # Do not log exception text: URL and transport exceptions may contain sensitive data.
         raise WorkerFailure("provider_transport", type(error).__name__) from None
@@ -71,7 +84,10 @@ def provider(role, body, timeout):
             raise Refused("provider response exceeds its bound")
         return decode(role, json.loads(data))
     except Exception as error:
-        raise WorkerFailure("provider_response", type(error).__name__) from None
+        raise WorkerFailure("provider_response", type(error).__name__,
+                            reason_code=refusal_code(error) if isinstance(error, Refused)
+                            else "provider_json_invalid" if isinstance(error, json.JSONDecodeError)
+                            else None) from None
 
 
 def publish(job, result):
@@ -120,12 +136,13 @@ def run(role, rpc=call, infer=provider, post=publish, persist=None):
         if isinstance(error, WorkerFailure):
             failure = error
         else:
-            failure = WorkerFailure(stage, type(error).__name__)
+            failure = WorkerFailure(stage, type(error).__name__,
+                                    reason_code=refusal_code(error) if isinstance(error, Refused) else None)
         try:
-            rpc({"command": "review-failed", "args": {"job": job["id"]}})
+            rpc({"command": "review-failed", "args": {"job": job["id"], "diagnostic": failure.record()}})
         except Exception as report_error:
             failure = WorkerFailure(failure.stage, failure.error_type, failure.status,
-                                    type(report_error).__name__)
+                                    failure.reason_code, type(report_error).__name__)
         raise failure from None
 
 

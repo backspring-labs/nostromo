@@ -13,7 +13,11 @@ without owner authorization. The deterministic watcher posts status without mode
 Use `campaignctl progress` for cycle/run/gate evidence and `automation` for the durable review
 queue, retained cost reservations, and cutoff. An opted-in campaign's dedicated workers handle
 authorized reviews without Buzz mentions; do not start additional paid harness turns for them.
-Parked, expired, failed, or ambiguous jobs require owner inspection. Never expand an allowance.
+When a campaign parks, expires, or an opted-in review fails, run `campaignctl triage` first. This is
+a read-only, no-model report. Route its campaign artifacts and safe failure reason to Brett for
+deterministic inspection when useful; do not start another campaign, resume a terminal campaign, or
+retry a review to discover the failure. Parked, expired, failed, or ambiguous jobs require owner
+inspection. Never expand an allowance.
 
 Use stable request IDs for writes. An unresolved receipt is a stop condition requiring owner
 reconciliation, not permission to try again with a different ID. Announce the campaign and

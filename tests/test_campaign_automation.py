@@ -169,7 +169,34 @@ def test_worker_failure_never_repeats_provider_call(world, fault):
     run("ripley", request, infer, post)
     assert len(calls) == 1
     assert store.db.execute("SELECT reserved,state FROM review_jobs").fetchone()[0] == RESERVATION_MICROUSD
-    assert rpc(broker, "mother", "automation", {"campaign": "cmp_test"})["control"]["state"] == "parked"
+    status = rpc(broker, "mother", "automation", {"campaign": "cmp_test"})
+    assert status["control"]["state"] == "parked"
+    assert status["jobs"][0]["failure_diagnostic"]["stage"] == expected_stage
+
+
+def test_validation_failure_is_stored_for_read_only_triage(world):
+    broker, api, _ = world
+    rpc(broker, "mother", "advance", {"campaign": "cmp_test"})
+    calls = []
+
+    def invalid_result(*args):
+        calls.append(args)
+        return {**DECISION, "evidence": ["not-in-approved-packet"]}, {"output_tokens": 100}
+
+    def ripley_rpc(request):
+        return broker.handle("ripley", request)
+
+    with pytest.raises(WorkerFailure) as caught:
+        run("ripley", ripley_rpc, invalid_result)
+    assert caught.value.diagnostic() == "stage=result_validation error=Refused reason_code=evidence_refs_invalid"
+    triage = rpc(broker, "mother", "triage", {"campaign": "cmp_test"})
+    assert triage["mode"] == "read_only_no_model_calls"
+    assert triage["findings"][0]["classification"] == "evidence_refs_invalid"
+    assert triage["review_jobs"][0]["failure_diagnostic"] == {
+        "stage": "result_validation", "error": "Refused", "reason_code": "evidence_refs_invalid"}
+    assert "not-in-approved-packet" not in json.dumps(triage)
+    assert len(calls) == 1
+    assert api.posts and api.posts[-1][1].endswith("/pause")
 
 
 def test_provider_http_failure_logs_status_without_provider_body(monkeypatch):
@@ -183,7 +210,7 @@ def test_provider_http_failure_logs_status_without_provider_body(monkeypatch):
     monkeypatch.setattr("runtime.campaigns.worker.urllib.request.build_opener", lambda redirect: FailedOpener())
     with pytest.raises(WorkerFailure) as caught:
         provider("ripley", {"model": "gpt-5.6-sol"}, 1)
-    assert caught.value.diagnostic() == "stage=provider_http error=HTTPError http_status=401"
+    assert caught.value.diagnostic() == "stage=provider_http error=HTTPError http_status=401 reason_code=provider_http_error"
     assert "TOP_SECRET" not in caught.value.diagnostic()
 
 

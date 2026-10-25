@@ -1,5 +1,6 @@
 """Durable bounded review queue. Mother routes; Ripley judges; Dallas challenges."""
 import json
+import re
 import time
 from pathlib import Path
 
@@ -42,7 +43,10 @@ class Automation:
         self.b.store.campaign(cid)
         row = self.db.execute("SELECT * FROM automation WHERE campaign=?", (cid,)).fetchone()
         jobs = [dict(j) for j in self.db.execute(
-            "SELECT id,role,kind,state,reserved,claimed,usage FROM review_jobs WHERE campaign=? ORDER BY rowid", (cid,))]
+            "SELECT id,role,kind,state,reserved,claimed,usage,failure_diagnostic FROM review_jobs WHERE campaign=? ORDER BY rowid", (cid,))]
+        for job in jobs:
+            if job["failure_diagnostic"]:
+                job["failure_diagnostic"] = json.loads(job["failure_diagnostic"])
         spec = self.spec(cid)
         total = self.spent(spec["budget"])[0] if spec else 0
         return {"control": dict(row) if row else None, "jobs": jobs,
@@ -370,10 +374,31 @@ class Automation:
             return self.submit(caller)
         if command == "review-result":
             return self.result(caller, args, request.get("decision_event"))
-        exact(args, {"job"})
+        exact(args, {"job"}, {"diagnostic"})
         job = self.db.execute("SELECT * FROM review_jobs WHERE id=?", (identifier(args["job"]),)).fetchone()
         if not job or job["role"] != caller or job["state"] != "claimed":
             raise Refused("review failure is not owned by this caller")
-        self.db.execute("UPDATE review_jobs SET state='uncertain' WHERE id=?", (job["id"],))
+        diagnostic = args.get("diagnostic")
+        if diagnostic is not None:
+            exact(diagnostic, {"stage", "error"}, {"http_status", "reason_code"})
+            stages = {"preflight", "provider_setup", "provider_http", "provider_transport", "provider_response",
+                      "provider_request", "result_validation", "recovery_persist", "buzz_publication",
+                      "broker_result_submit"}
+            if diagnostic["stage"] not in stages:
+                raise Refused("review diagnostic stage is not recognized")
+            if not isinstance(diagnostic["error"], str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9]{0,63}", diagnostic["error"]):
+                raise Refused("review diagnostic error class is invalid")
+            if "http_status" in diagnostic and (diagnostic["stage"] != "provider_http"
+                    or type(diagnostic["http_status"]) is not int or not 100 <= diagnostic["http_status"] <= 599):
+                raise Refused("review diagnostic HTTP status is invalid")
+            reason_codes = {"result_shape_invalid", "notes_invalid", "evidence_refs_invalid", "decision_invalid",
+                            "classification_rationale_missing", "blocking_flag_invalid", "provider_model_mismatch",
+                            "provider_incomplete_response", "provider_json_invalid", "provider_response_oversized",
+                            "request_bound_violation", "provider_http_error", "review_refused"}
+            if "reason_code" in diagnostic and diagnostic["reason_code"] not in reason_codes:
+                raise Refused("review diagnostic reason code is invalid")
+        serialized = canonical(diagnostic) if diagnostic is not None else None
+        self.db.execute("UPDATE review_jobs SET state='uncertain',failure_diagnostic=? WHERE id=?",
+                        (serialized, job["id"]))
         self.park(job["campaign"], "provider or worker failure; no automatic retry; reservation retained")
         return {"parked": True}

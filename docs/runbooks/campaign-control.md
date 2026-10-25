@@ -61,6 +61,8 @@ the socket's live role refusals have been checked.
 Additional read-only evidence commands:
 
 - `progress`: campaign ID → launched cycles, runs, verification outcomes and waiting gates.
+- `triage`: campaign ID → read-only campaign state, gates, ledger, bounded review-job diagnostics,
+  retained reservations, and recent control events. This command makes no model or provider calls.
 - `cycle`: campaign + cycle IDs; `run` and `checkpoints`: campaign + cycle + run IDs.
 - `artifacts`: campaign + cycle, optionally run; paginated internally, refuses oversized lists.
 - `artifact`: campaign + artifact IDs; complete UTF-8 bytes up to 256 KiB, checked against the
@@ -128,6 +130,23 @@ evidence, an oversized complete packet, a reserved owner choice, blocking review
 failure, stale/uncertain writes or exhausted allowance parks the campaign for owner inspection.
 The remaining runtime cutoff still applies. Never resume around a parked control state.
 
+For any parked, expired, failed, or uncertain review, Mother starts with:
+
+```bash
+campaignctl triage --args - <<'JSON'
+{"campaign":"cmp_..."}
+JSON
+```
+
+This deterministic report combines SquadOps evidence available through the `campaign-evidence`
+(`campaign-triage`) principal with broker state and sanitized worker failure metadata. It does not
+call a model, resume a campaign, or retry a review. `result_validation` reason codes identify the
+failed contract check without storing the proposed answer. Provider HTTP statuses are reported
+separately from schema failures. If the job predates structured diagnostics, the report says the
+precise cause is unavailable; a reserved call alone cannot recover its response. Mother may route
+the report to Brett for deterministic evidence inspection, but only the owner can authorize a new
+immutable definition or budget change.
+
 The review packet includes selected authoritative planning, proposal and verification records
 in full, with hashes, and discloses its selection. It does not include all source files. A
 proposal ruling authorizes implementation; it does not certify the resulting source or UI.
@@ -136,9 +155,11 @@ selected evidence is insufficient. No test result may be invented to fill that g
 
 Successful closure queues one signed Ripley interpretation and the watcher updates the canonical
 Buzz post. A late cutoff or parked/failed review can leave interpretation explicitly pending;
-the factual report still records the outcome and retained reservations. Provider responses
-survive in the role's private `~/.local/state/nostromo-reviews/job_*.json` recovery files.
-These records never authorize another provider call. Review workers add no sudo/polkit grant.
+the factual report still records the outcome and retained reservations. Validated provider responses
+survive in the role's private `~/.local/state/nostromo-reviews/job_*.json` recovery files. Rejected
+responses are not stored; only a bounded stage, exception class, fixed reason code, and optional
+HTTP status are recorded for triage. These records never authorize another provider call. Review
+workers add no sudo/polkit grant.
 
 Check `nostromo-campaign-advance.timer`, `nostromo-campaign-review@ripley.timer`, and
 `nostromo-campaign-review@dallas.timer` after installation. Existing zero-paid approvals retain

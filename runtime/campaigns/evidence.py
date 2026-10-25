@@ -4,7 +4,7 @@ import json
 
 from .core import Refused, exact, identifier
 
-COMMANDS = {"progress", "cycle", "run", "checkpoints", "artifacts", "artifact"}
+COMMANDS = {"progress", "cycle", "run", "checkpoints", "artifacts", "artifact", "triage"}
 MAX_ARTIFACT = 262144
 
 
@@ -68,6 +68,53 @@ class Evidence:
         exact(args, required, optional)
         self.broker.store.campaign(args["campaign"])
         campaign = self.broker.read("status", {"campaign": args["campaign"]})
+        if command == "triage":
+            from .automation import Automation
+            progress = self.handle("progress", {"campaign": args["campaign"]})
+            automation = Automation(self.broker).status(args["campaign"])
+            ledger = self.broker.read("ledger", {"campaign": args["campaign"]})
+            control_log = self.broker.read("log", {"campaign": args["campaign"]})
+            findings = []
+            for job in automation["jobs"]:
+                if job["state"] != "uncertain":
+                    continue
+                diagnostic = job.get("failure_diagnostic")
+                if not diagnostic:
+                    findings.append({"job": job["id"], "classification": "failure_detail_unavailable",
+                                     "detail": "This worker version did not persist a safe diagnostic. The review response cannot be reconstructed; do not retry this job."})
+                elif diagnostic["stage"] == "result_validation":
+                    findings.append({"job": job["id"], "classification": diagnostic.get("reason_code", "result_validation_failed"),
+                                     "detail": "The provider returned a response, but the local review contract rejected it. No decision was committed; do not retry this job."})
+                elif diagnostic["stage"] == "provider_http" and diagnostic.get("http_status") == 429:
+                    findings.append({"job": job["id"], "classification": "provider_rate_limited",
+                                     "detail": "The provider returned HTTP 429. No automatic retry was attempted."})
+                elif diagnostic["stage"] == "provider_http":
+                    findings.append({"job": job["id"], "classification": "provider_http_error",
+                                     "detail": "The provider returned the recorded HTTP status. No automatic retry was attempted."})
+                else:
+                    findings.append({"job": job["id"], "classification": "worker_stage_failed",
+                                     "detail": "See the bounded diagnostic fields for the failing stage and error class. No automatic retry was attempted."})
+            return {
+                "mode": "read_only_no_model_calls",
+                "campaign": {k: campaign.get(k) for k in ("campaign_id", "project_id", "state", "outcome", "accepted")},
+                "cycles": [{"cycle_id": c.get("cycle_id"), "kind": c.get("kind"), "status": c.get("status"),
+                            "outcome": c.get("cycle_outcome", {}).get("verdict"),
+                            "runs": [{"run_id": r.get("run_id"), "type": r.get("workload_type"),
+                                      "status": r.get("status"), "finished_at": r.get("finished_at")}
+                                     for r in c.get("runs", [])]} for c in progress["cycles"]],
+                "gates": progress["gates"],
+                "ledger": ledger,
+                "review_jobs": [{k: j.get(k) for k in ("id", "role", "kind", "state", "reserved", "claimed", "failure_diagnostic")}
+                                for j in automation["jobs"]],
+                "reserved_microusd": automation["reserved_microusd"],
+                "shared_budget_reserved_microusd": automation["shared_budget_reserved_microusd"],
+                "findings": findings,
+                "control_log": [{k: e.get(k) for k in ("seq", "operation", "outcome", "reason", "committed_at")}
+                                for e in control_log[-12:]],
+                "limitations": ["This report does not call a model.",
+                                "Missing failure diagnostics cannot be recovered from the provider reservation.",
+                                "This report contains metadata and references only; inspect artifacts separately when needed."],
+            }
         if command == "artifact":
             return self.content(campaign, args["artifact"])
         if command == "progress":

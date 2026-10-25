@@ -14,6 +14,26 @@ RESERVATION_MICROUSD = ((MAX_REQUEST_BYTES + 4096) * 5 + MAX_OUTPUT_TOKENS * 20)
 PRICE_EXPIRES = "2026-11-01T00:00:00Z"
 MODELS = {"ripley": "gpt-5.6-sol", "dallas": "claude-opus-5-5"}
 
+REFUSAL_CODES = {
+    "missing or unexpected request fields": "result_shape_invalid",
+    "review needs substantive bounded notes": "notes_invalid",
+    "review must cite packet evidence references": "evidence_refs_invalid",
+    "invalid decision result": "decision_invalid",
+    "returned proposal needs its classification rationale": "classification_rationale_missing",
+    "Dallas must state whether findings block": "blocking_flag_invalid",
+    "provider returned a different model": "provider_model_mismatch",
+    "review did not complete within its output bound": "provider_incomplete_response",
+    "review ended without a complete unrestricted answer": "provider_incomplete_response",
+    "review output is not a JSON result": "provider_json_invalid",
+    "provider response exceeds its bound": "provider_response_oversized",
+    "review request violates the fixed model or input bound": "request_bound_violation",
+}
+
+
+def refusal_code(error):
+    """Return a fixed, non-content-bearing code for known review contract refusals."""
+    return REFUSAL_CODES.get(str(error), "review_refused")
+
 
 def timestamp(value):
     try:
