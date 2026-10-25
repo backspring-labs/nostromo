@@ -1,0 +1,22 @@
+[Unit]
+Description=Nostromo campaign observer (no model calls or paid dispatch)
+After=nostromo-campaign-broker.service network-online.target
+Requires=nostromo-campaign-broker.service
+
+[Service]
+User=mother
+ExecStart=/usr/bin/python3 -I /usr/local/lib/nostromo/campaign-watch.py
+Restart=on-failure
+RestartSec=15
+StateDirectory=nostromo-campaign-watch
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/nostromo-campaign-watch
+MemoryMax=128M
+
+[Install]
+WantedBy=multi-user.target

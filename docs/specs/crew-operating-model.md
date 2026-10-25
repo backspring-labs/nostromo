@@ -1,5 +1,16 @@
 # Crew Operating Model and SquadOps 1.8 Commissioning Plan
 
+> **Campaign adapter amendment, 2026-10-24 (owner authorized).** Nostromo is a Buzz crew that
+> can use SquadOps against target applications. Mother owns campaign orchestration and
+> operations; Ripley owns and submits plan/increment decisions and analyzes results; Dallas
+> independently reviews exact proposed decisions; Brett provides bounded evidence. The broker
+> enforces this split with separate service clients, Unix caller identity, and signed Buzz
+> records. No crew admin role or owner override is added. Automatic metered dispatch is disabled
+> for commissioning. Campaign reports are canonical Buzz posts, runtime records remain in
+> SquadOps, and application changes follow the target repository's governance. This amendment
+> supersedes earlier statements that Mother submits substantive gates or that all accepted
+> campaign reports belong in GitHub. See [the implemented protocol](../runbooks/campaign-control.md).
+
 **Status.** Proposed; **partly in effect**. Owner review of the whole is still open, but several of its
 decisions are already running — §45 opens with which, as of 2026-09-23.
 **Date.** 2026-09-10; status added 2026-09-23.

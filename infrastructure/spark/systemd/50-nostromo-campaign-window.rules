@@ -1,0 +1,13 @@
+// The broker can quiesce and restore only the two local model harnesses. Never TensorFold/Docker.
+polkit.addRule(function(action, subject) {
+    if (action.id !== "org.freedesktop.systemd1.manage-units" || subject.user !== "nostromo-broker") {
+        return polkit.Result.NOT_HANDLED;
+    }
+    var unit = action.lookup("unit");
+    var verb = action.lookup("verb");
+    if ((unit === "nostromo@mother.service" || unit === "nostromo@brett.service") &&
+        (verb === "start" || verb === "stop")) {
+        return polkit.Result.YES;
+    }
+    return polkit.Result.NOT_HANDLED;
+});
