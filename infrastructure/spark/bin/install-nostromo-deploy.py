@@ -73,8 +73,9 @@ def main():
     deploy.STATE.mkdir(mode=0o700, exist_ok=True)
     deploy.trusted(deploy.STATE, directory=True)
     units = deploy.unit_files(owner.pw_uid)
-    installed = {**units}
-    requires = {}
+    installed = {**units, str(helper): deploy.sha(helper.read_bytes())}
+    requires = {name: deploy.sha((repo / name).read_bytes()) for name in (
+        'infrastructure/spark/bin/nostromo-deploy.py', 'infrastructure/spark/bin/install-nostromo-deploy.py')}
     for source_name, installed_path in deploy.PROTECTED.items():
         deploy.trusted(installed_path)
         raw = installed_path.read_bytes()

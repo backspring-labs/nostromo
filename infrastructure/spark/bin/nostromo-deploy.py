@@ -104,7 +104,8 @@ def destination(name):
 
 
 def privileged_sources():
-    return set(PROTECTED) | {'crew/manifest.yaml', *STARTUP_DROPINS.values()} | {
+    return set(PROTECTED) | {'crew/manifest.yaml', *STARTUP_DROPINS.values(),
+        'infrastructure/spark/bin/nostromo-deploy.py', 'infrastructure/spark/bin/install-nostromo-deploy.py'} | {
         'infrastructure/spark/systemd/' + re.sub(r'@[^.]+\.', '@.', unit)
         for unit in (*IDENTITIES, *TIMERS)}
 
