@@ -105,6 +105,9 @@ def main():
               'socket_gid': grp.getgrnam('nostromo').gr_gid, 'units': units,
               'requires': requires, 'installed': installed}
     deploy.health(config)
+    # Validate the exact pin set before persisting it. This keeps a bad bootstrap from
+    # succeeding and deferring an infrastructure mismatch until the first app release.
+    deploy.verify_pins(config)
     runbook = repo / 'docs/runbooks/routine-deployment.md'
     owner_snapshot(runbook, owner_uid)
     deploy.atomic(deploy.SHARE / 'routine-deployment.md', runbook.read_bytes())

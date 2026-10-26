@@ -192,8 +192,9 @@ def verify_pins(config):
         raise Refused('installed unit definitions changed; authenticated setup is required')
     for target, expected in config['installed'].items():
         trusted(target)
-        if sha(target.read_bytes()) != expected:
-            raise Refused('installed entry point or unit changed; authenticated setup is required')
+        actual = sha(target.read_bytes())
+        if actual != expected:
+            raise Refused(f'installed pin changed: {target} (expected {expected}, found {actual})')
 
 
 def snapshot():
