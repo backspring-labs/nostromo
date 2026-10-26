@@ -191,6 +191,7 @@ def verify_pins(config):
     if unit_files(config['uid']) != config['units']:
         raise Refused('installed unit definitions changed; authenticated setup is required')
     for target, expected in config['installed'].items():
+        target = Path(target)
         trusted(target)
         actual = sha(target.read_bytes())
         if actual != expected:
