@@ -84,12 +84,20 @@ def main():
         requires[source_name] = deploy.sha(raw)
     for target, checksum in units.items():
         path = Path(target)
-        if path.parent != Path('/etc/systemd/system'):
+        if target in deploy.STARTUP_DROPINS:
+            source_name = deploy.STARTUP_DROPINS[target]
+        elif path.parent == Path('/etc/systemd/system'):
+            source_name = 'infrastructure/spark/systemd/' + path.name
+        else:
             raise SystemExit('unit drop-ins/custom locations need explicit bootstrap support')
-        source_name = 'infrastructure/spark/systemd/' + path.name
-        if deploy.sha((repo / source_name).read_bytes()) != checksum:
+        source_checksum = deploy.sha((repo / source_name).read_bytes())
+        # Crew harnesses consume the startup check but are never deployment targets. Keep
+        # their safe installed template as-is, even if an older exit-status rule is live.
+        # Actual unit bytes and reviewed source bytes are pinned independently thereafter.
+        guard_template = path.name == 'nostromo@.service' and path.parent == Path('/etc/systemd/system')
+        if not guard_template and source_checksum != checksum:
             raise SystemExit('installed campaign units differ from the reviewed source')
-        requires[source_name] = checksum
+        requires[source_name] = source_checksum
     # Manifest changes may require root config changes; do not silently skip them.
     requires['crew/manifest.yaml'] = hashlib.sha256((repo / 'crew/manifest.yaml').read_bytes()).hexdigest()
     config = {'owner': owner.pw_name, 'uid': owner.pw_uid, 'gid': owner.pw_gid,

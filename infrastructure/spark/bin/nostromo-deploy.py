@@ -44,6 +44,11 @@ SERVICES = {
 }
 DAEMONS = ('nostromo-campaign-broker.service', 'nostromo-campaign-watch.service')
 TIMERS = tuple(name.replace('.service', '.timer') for name in SERVICES if name not in DAEMONS)
+GUARDS = {'nostromo@mother.service': 'mother', 'nostromo@brett.service': 'brett'}
+IDENTITIES = {**SERVICES, **GUARDS}
+STARTUP_DROPINS = {
+    '/etc/systemd/system/nostromo@' + role + '.service.d/20-campaign-window.conf':
+    'infrastructure/spark/systemd/20-campaign-window.conf' for role in ('mother', 'brett')}
 ENTRYPOINTS = {
     'infrastructure/spark/bin/' + name: Path('/usr/local/lib/nostromo') / name
     for name in ('campaign-broker.py', 'campaign-watch.py', 'campaign-review.py',
@@ -99,9 +104,9 @@ def destination(name):
 
 
 def privileged_sources():
-    return set(PROTECTED) | {'crew/manifest.yaml'} | {
-        'infrastructure/spark/systemd/' + re.sub(r'@(ripley|dallas)\.', '@.', unit)
-        for unit in (*SERVICES, *TIMERS)}
+    return set(PROTECTED) | {'crew/manifest.yaml', *STARTUP_DROPINS.values()} | {
+        'infrastructure/spark/systemd/' + re.sub(r'@[^.]+\.', '@.', unit)
+        for unit in (*IDENTITIES, *TIMERS)}
 
 
 def decode(raw, commit, checksum, pins):
@@ -152,12 +157,12 @@ def properties(unit):
 
 def unit_files(owner_uid=None):
     result = {}
-    for unit in (*SERVICES, *TIMERS):
+    for unit in (*IDENTITIES, *TIMERS):
         props = properties(unit)
-        if unit in SERVICES and (props['User'] != SERVICES[unit] or
+        if unit in IDENTITIES and (props['User'] != IDENTITIES[unit] or
                 props.get('NoNewPrivileges') != 'yes' or props.get('AmbientCapabilities')):
             raise Refused('campaign service identity differs from its admitted role')
-        if unit in SERVICES:
+        if unit in IDENTITIES:
             account = pwd.getpwnam(props['User'])
             groups = {grp.getgrgid(gid).gr_name for gid in os.getgrouplist(props['User'], account.pw_gid)}
             for group in (props.get('Group', '') + ' ' + props.get('SupplementaryGroups', '')).split():

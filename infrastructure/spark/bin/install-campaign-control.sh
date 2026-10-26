@@ -93,10 +93,7 @@ for name in nostromo-campaign-broker.service nostromo-campaign-watch.service nos
 done
 for role in mother brett; do
   install -d -m 755 "/etc/systemd/system/nostromo@$role.service.d"
-  cat > "/etc/systemd/system/nostromo@$role.service.d/20-campaign-window.conf" <<'UNIT'
-[Service]
-ExecCondition=/usr/bin/python3 -I /usr/local/lib/nostromo/campaign-window-check.py
-UNIT
+  install -m 644 "$REPO/infrastructure/spark/systemd/20-campaign-window.conf" "/etc/systemd/system/nostromo@$role.service.d/20-campaign-window.conf"
 done
 systemctl daemon-reload
 systemctl enable --now nostromo-campaign-broker.service nostromo-campaign-window.timer nostromo-campaign-watch.service

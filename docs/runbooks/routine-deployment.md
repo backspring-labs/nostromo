@@ -30,9 +30,14 @@ owner/root-owned, non-symlink source path. Setup derives the human owner from th
 root-owned broker configuration. It checks
 service identities, `NoNewPrivileges`, capabilities, root ownership, and privileged hook
 prefixes; pins installed unit/entry-point bytes; and proves the owner's socket access. It
-validates the sudo rule with `visudo` before installing it. It creates a private root-owned
+also pins the Mother/Brett startup-condition consumers of campaign code. It validates the sudo
+rule with `visudo` before installing it. It creates a private root-owned
 state directory, configuration, and deployment lock. The setup grants no new crew permission.
-It refuses unsupported unit drop-ins and unresolved interrupted deployments.
+It admits only the existing campaign-window startup drop-ins and refuses other drop-ins and
+unresolved interrupted deployments.
+The crew harness template is pinned as installed after its execution identity/security checks;
+its reviewed source is pinned separately. A source/installed exit-status difference does not
+silently synchronize or restart crew harnesses during campaign-code deployment.
 
 The installed helper uses isolated Python and only the standard library. It never imports
 application modules or executes Git, repository installers, build hooks, or release code as root.

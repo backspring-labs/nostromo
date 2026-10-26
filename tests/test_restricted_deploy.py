@@ -277,15 +277,29 @@ def test_pinned_units_refuse_root_hooks_and_wrong_role(host, tmp_path, monkeypat
     monkeypatch.setattr(updater.os, 'getgrouplist', lambda user, gid: [gid])
     monkeypatch.setattr(updater.grp, 'getgrgid', lambda gid: SimpleNamespace(gr_name='nostromo'))
     monkeypatch.setattr(updater.grp, 'getgrnam', lambda group: SimpleNamespace(gr_name=group))
-    monkeypatch.setattr(updater, 'properties', lambda unit: {**props, 'User': updater.SERVICES.get(unit, '')})
+    monkeypatch.setattr(updater, 'properties', lambda unit: {**props, 'User': updater.IDENTITIES.get(unit, '')})
     with pytest.raises(updater.Refused, match='privileged service hooks'): updater.unit_files()
     fragment.write_text('[Service]\nExecStart=\\\n +/bin/sh\n')
     with pytest.raises(updater.Refused, match='continued service directives'): updater.unit_files()
     fragment.write_text('[Service]\nExecStart=/usr/bin/python3 -I /fixed.py\n')
     monkeypatch.setattr(updater, 'properties', lambda unit: {**props, 'User': 'root'})
     with pytest.raises(updater.Refused, match='service identity'): updater.unit_files()
-    monkeypatch.setattr(updater, 'properties', lambda unit: {**props, 'User': updater.SERVICES.get(unit, ''), 'Group': 'docker'})
+    monkeypatch.setattr(updater, 'properties', lambda unit: {**props, 'User': updater.IDENTITIES.get(unit, ''), 'Group': 'docker'})
     with pytest.raises(updater.Refused, match='privileged service account'): updater.unit_files()
+
+
+def test_crew_startup_condition_cannot_become_a_root_execution_path(host, tmp_path, monkeypatch):
+    updater = host[0]
+    fragment = tmp_path / 'unit.service'; fragment.write_text('[Service]\nExecStart=/fixed/unprivileged\n')
+    monkeypatch.setattr(updater.pwd, 'getpwnam', lambda user: SimpleNamespace(pw_uid=1001, pw_gid=1001))
+    monkeypatch.setattr(updater.os, 'getgrouplist', lambda user, gid: [gid])
+    monkeypatch.setattr(updater.grp, 'getgrgid', lambda gid: SimpleNamespace(gr_name='nostromo'))
+    def props(unit):
+        return {'User': 'root' if unit == 'nostromo@brett.service' else updater.IDENTITIES.get(unit, ''),
+                'NoNewPrivileges': 'yes', 'AmbientCapabilities': '', 'FragmentPath': str(fragment), 'DropInPaths': ''}
+    monkeypatch.setattr(updater, 'properties', props)
+    with pytest.raises(updater.Refused, match='service identity'):
+        updater.unit_files(owner_uid=1000)
 
 
 def test_release_packaging_reads_exact_git_commit_and_refuses_tracked_symlinks(tmp_path):
