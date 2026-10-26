@@ -278,6 +278,26 @@ broker completes the action and stores its receipt even if the role-side client 
 
 ## Gate protocol
 
+Each bounded proposal review includes a deterministic `decision_contract` derived from the
+immutable approved policy, runtime campaign policy, effective cycle `campaign_proposal` block,
+and stored run history. SquadOps resolves cycle config with overrides replacing defaults and
+counts cancelled proposal runs as superseded revisions. Those same rules determine the
+remaining allowance here; missing or conflicting evidence cannot authorize a revision.
+
+When no proposal revisions remain, `returned_for_revision` is omitted from Ripley's response
+schema. If acceptance evidence needs revision, she chooses `needs_owner` and explains the gap.
+Approval must still be earned; a revision request is never silently changed into approval or
+rejection. SquadOps itself counts an exhausted revision request as rejection. Nostromo's
+bounded interface instead requires an explicit owner hold when revision is needed but
+unavailable. This does not expand the existing approval or change the campaign's limits.
+
+The worker and broker both enforce the contract. Remaining revision authority is checked
+again before dispatching Dallas and at gate submission. A forbidden or unverifiable revision
+parks the campaign without an automatic provider retry or policy amendment. `triage` retains
+the fixed `decision_policy_forbidden` finding and can also identify incompatible pre-fix
+saved judgments from their policy and run records, without paid calls or replaying a ruling.
+Otherwise valid decisions continue to require Dallas's independent review of the exact ruling.
+
 Ripley prepares a JSON file with `campaign`, `cycle`, `run`, `decision`, and substantive
 `notes`; increment rulings also carry the SquadOps `binding` and, when required,
 `classification` and `classification_rationale`. Use the exact current runtime gate binding.
@@ -290,7 +310,8 @@ The output gives two exact single lines: `campaign-decision: {...}` and
 `campaign-review: {...}`. Ripley publishes the first under her own Buzz identity. Dallas
 independently examines the packet and publishes the second only if that exact decision has
 no blocking finding. A signature on a different decision, campaign, cycle, or run is refused.
-If Dallas has a blocking finding, report it in the thread and revise; do not sign a false
+If Dallas has a blocking finding, report it in the thread and hold for owner inspection. Any
+revision or additional paid review requires remaining explicit authority; do not sign a false
 nonblocking review. Ripley then submits:
 
 ```bash

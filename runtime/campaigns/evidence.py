@@ -76,9 +76,27 @@ class Evidence:
             control_log = self.broker.read("log", {"campaign": args["campaign"]})
             findings = []
             for job in automation["jobs"]:
+                diagnostic = job.get("failure_diagnostic")
+                if diagnostic and diagnostic.get("reason_code") == "decision_policy_forbidden":
+                    findings.append({"job": job["id"], "classification": "decision_policy_forbidden",
+                                     "detail": "The proposed ruling lacks verified proposal revision authority. The campaign is held for owner inspection; no automatic retry was attempted."})
+                    continue
+                if job["kind"] == "decision" and job["state"] == "done":
+                    # Diagnose retained pre-fix judgments without a new model call or exposing
+                    # their free-form response. Definitions are immutable, including old jobs.
+                    record = self.broker.store.db.execute("SELECT payload,result FROM review_jobs WHERE id=?", (job["id"],)).fetchone()
+                    if record["result"] and json.loads(record["result"]).get("decision") == "returned_for_revision":
+                        from .review_policy import decision_contract
+                        packet = json.loads(record["payload"])["packet"]
+                        item = self.broker.store.campaign(args["campaign"])
+                        approved, _ = self.broker.store.definition(item["definition"])
+                        contract = decision_contract({**packet, "approved_policy": approved["definition"]["policy"]})
+                        if "returned_for_revision" not in contract["allowed_decisions"]:
+                            findings.append({"job": job["id"], "classification": "decision_policy_forbidden",
+                                             "proposal_revisions": contract["proposal_revisions"],
+                                             "detail": "The retained ruling requested revision without established remaining revision authority. Inspect the recorded policy before authorizing further work."})
                 if job["state"] != "uncertain":
                     continue
-                diagnostic = job.get("failure_diagnostic")
                 if not diagnostic:
                     findings.append({"job": job["id"], "classification": "failure_detail_unavailable",
                                      "detail": "This worker version did not persist a safe diagnostic. The review response cannot be reconstructed; do not retry this job."})

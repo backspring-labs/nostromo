@@ -151,7 +151,7 @@ def run(role, rpc=call, infer=provider, post=publish, persist=None):
         stage = "provider_request"
         result, usage = infer(role, job["payload"]["body"], min(remaining, 780))
         stage = "result_validation"
-        validate(job["kind"], result, job["payload"]["packet"]["references"])
+        validate(job["kind"], result, job["payload"]["packet"]["references"], job["payload"]["packet"])
         if persist:
             stage = "recovery_persist"
             persist(job["id"], {"result": result, "usage": usage, "model": MODELS[role], "recorded_at": time.time()})
@@ -185,7 +185,7 @@ def recover(role, job, rpc=call, post=publish):
         record = json.loads(path.read_text())
         if record.get("model") != MODELS[role] or not isinstance(record.get("result"), dict) or not isinstance(record.get("usage"), dict):
             raise Refused("recovery record does not match the pinned review")
-        validate(job["kind"], record["result"], job["payload"]["packet"]["references"])
+        validate(job["kind"], record["result"], job["payload"]["packet"]["references"], job["payload"]["packet"])
         event_id = job.get("event_id") or record.get("pending_event_id")
         if event_id:
             if not isinstance(event_id, str) or not re.fullmatch(r"[0-9a-f]{64}", event_id):

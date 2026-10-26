@@ -4,6 +4,7 @@ import time
 from datetime import datetime
 
 from .core import Refused, canonical, exact
+from .review_policy import POLICY_REFUSAL, decision_contract, validate_decision
 
 MAX_REQUEST_BYTES = 65536
 MAX_OUTPUT_TOKENS = 8192
@@ -19,6 +20,7 @@ REFUSAL_CODES = {
     "review needs substantive bounded notes": "notes_invalid",
     "review must cite packet evidence references": "evidence_refs_invalid",
     "invalid decision result": "decision_invalid",
+    POLICY_REFUSAL: "decision_policy_forbidden",
     "returned proposal needs its classification rationale": "classification_rationale_missing",
     "Dallas must state whether findings block": "blocking_flag_invalid",
     "provider returned a different model": "provider_model_mismatch",
@@ -45,10 +47,10 @@ def timestamp(value):
         raise Refused("timestamp must include a timezone") from None
 
 
-def schema(kind):
+def schema(kind, packet=None):
     fields = {"notes": {"type": "string"}, "evidence": {"type": "array", "items": {"type": "string"}}}
     if kind == "decision":
-        fields.update(decision={"type": "string", "enum": ["approved", "rejected", "returned_for_revision", "needs_owner"]},
+        fields.update(decision={"type": "string", "enum": decision_contract(packet or {})["allowed_decisions"]},
                       classification_rationale={"type": "string"})
     elif kind == "review":
         fields["blocking"] = {"type": "boolean"}
@@ -65,10 +67,17 @@ def body(role, kind, packet, persona):
                     "Do not invent observations or claim checks ran. "
                     "Missing or incomplete evidence, reserved owner decisions, ambiguous scope, and unmet acceptance require a hold. "
                     "A decision needs_owner stops for the owner. Dallas independently challenges the exact proposed decision; "
-                    "blocking=true prevents submission. Closing analysis covers improvements, failures, interventions, unknowns, "
+                    "blocking=true prevents submission. "
+                    "The packet.decision_contract lists available decisions and the remaining proposal revisions. "
+                    "Use returned_for_revision only when that contract allows it. If needed revisions are unavailable, "
+                    "choose needs_owner and explain the missing acceptance evidence and policy bound. "
+                    "Do not substitute approval to keep work moving, turn a revision request into rejection automatically, "
+                    "or assume a larger revision, retry, review, or time allowance. "
+                    "Closing analysis covers improvements, failures, interventions, unknowns, "
                     "cost reservations versus reported usage, and recommended next work. Return only the required JSON.\n")
+    packet = {**packet, "decision_contract": decision_contract(packet)} if kind in {"decision", "review"} else packet
     prompt = canonical({"kind": kind, "packet": packet})
-    shape = schema(kind)
+    shape = schema(kind, packet)
     if role == "ripley":
         result = {"model": MODELS[role], "instructions": instructions, "input": prompt,
                   "max_output_tokens": MAX_OUTPUT_TOKENS, "reasoning": {"effort": "low"},
@@ -85,7 +94,7 @@ def body(role, kind, packet, persona):
     return result
 
 
-def validate(kind, result, allowed):
+def validate(kind, result, allowed, packet=None):
     shape = schema(kind)
     exact(result, set(shape["required"]))
     if not isinstance(result["notes"], str) or not 10 <= len(result["notes"].strip()) <= 16000:
@@ -98,12 +107,15 @@ def validate(kind, result, allowed):
             raise Refused("invalid decision result")
         if result["decision"] in {"rejected", "returned_for_revision"} and not result["classification_rationale"].strip():
             raise Refused("returned proposal needs its classification rationale")
+        if packet is not None:
+            validate_decision(packet, result)
     if kind == "review" and type(result["blocking"]) is not bool:
         raise Refused("Dallas must state whether findings block")
     return result
 
 
 def decision_request(cid, payload, result):
+    validate_decision(payload["packet"], result)
     gate = payload["gate"]
     command = {"progress_plan_review": "plan", "progress_increment_ruling": "increment"}[gate["gate"]]
     args = {"campaign": cid, "cycle": gate["cycle"], "run": gate["run"],

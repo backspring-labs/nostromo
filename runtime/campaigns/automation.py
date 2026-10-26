@@ -7,6 +7,7 @@ from pathlib import Path
 from .core import Refused, canonical, digest, exact, identifier
 from .evidence import Evidence
 from .review import PRICE_EXPIRES, RESERVATION_MICROUSD, body, timestamp, validate, decision_request
+from .review_policy import POLICY_REFUSAL, decision_contract, validate_decision
 
 COMMANDS = {"approve-budget", "automation", "advance", "review-claim", "review-result", "review-failed",
             "review-submit", "review-recovery-authorize", "review-recovery-claim", "review-recovery-result",
@@ -141,6 +142,8 @@ class Automation:
         # The control log and ledger are authoritative. Artifact excerpts are never passed
         # off as full records: selected authoritative documents are included in full.
         packet = {k: p[k] for k in ("campaign", "ledger", "log", "escalations")}
+        approved, _ = self.b.store.definition(self.b.store.campaign(cid)["definition"])
+        packet["approved_policy"] = approved["definition"]["policy"]
         packet["budget"] = self.status(cid)
         evidence = Evidence(self.b)
         progress = evidence.handle("progress", {"campaign": cid})
@@ -170,8 +173,22 @@ class Automation:
             "source_files_included": False, "note": "A proposal ruling authorizes work, not acceptance of implemented code. Full source is available through campaignctl artifact. Hold if needed evidence is absent."}
         if gate:
             packet["gate"] = gate
+            packet["decision_contract"] = decision_contract(packet)
         packet["references"] = [r["entry_id"] for r in p["log"]] + [a["artifact_id"] for a in packet["artifacts"]]
         return packet
+
+    def current_decision_packet(self, cid, gate):
+        campaign = self.b.read("status", {"campaign": cid})
+        cycle, _ = Evidence(self.b).cycle(campaign, gate["cycle"])
+        approved, _ = self.b.store.definition(self.b.store.campaign(cid)["definition"])
+        return {"campaign": campaign, "approved_policy": approved["definition"]["policy"],
+                "gate": gate, "cycles": [cycle]}
+
+    def policy_hold(self, cid, jid, reason):
+        diagnostic = {"stage": "result_validation", "error": "Refused", "reason_code": "decision_policy_forbidden"}
+        self.db.execute("UPDATE review_jobs SET failure_diagnostic=? WHERE id=?", (canonical(diagnostic), jid))
+        self.b.store.save()
+        self.park(cid, reason)
 
     def advance(self, cid):
         spec = self.spec(cid)
@@ -265,6 +282,14 @@ class Automation:
                 self.db.execute("UPDATE review_jobs SET state='cancelled' WHERE id=?", (row["id"],))
                 self.b.store.save()
                 return None
+            if row["kind"] == "review" and payload["packet"]["proposed_decision"]["decision"] == "returned_for_revision":
+                try:
+                    validate_decision(self.current_decision_packet(cid, gate), payload["packet"]["proposed_decision"])
+                except Exception:
+                    self.db.execute("UPDATE review_jobs SET state='cancelled' WHERE id=?", (row["id"],))
+                    self.b.store.save()
+                    self.policy_hold(cid, row["id"], "proposed revision authority could not be verified; no Dallas call made")
+                    return None
         self.db.execute("UPDATE review_jobs SET state='claimed',claimed=?,reserved=? WHERE id=?",
                         (self.now, RESERVATION_MICROUSD, row["id"]))
         self.b.store.save()  # Reservation is durable BEFORE any provider access.
@@ -281,7 +306,7 @@ class Automation:
         if control["state"] != "active" or self.now >= control["deadline"] or self.now - job["claimed"] >= 900:
             raise Refused("review arrived after its active authorization window")
         payload = json.loads(job["payload"])
-        result = validate(job["kind"], args["result"], payload["packet"]["references"])
+        result = validate(job["kind"], args["result"], payload["packet"]["references"], payload["packet"])
         self.b.verify_event(event, role, "campaign-job-result", {"job": job["id"], "result": result})
         self.db.execute("UPDATE review_jobs SET state='done',result=?,proof=?,usage=? WHERE id=?",
                         (canonical(result), canonical(event), canonical(args["usage"]), job["id"]))
@@ -296,6 +321,12 @@ class Automation:
             if result["decision"] == "needs_owner":
                 self.park(cid, "Ripley requires an owner decision")
             else:
+                if result["decision"] == "returned_for_revision":
+                    try:
+                        validate_decision(self.current_decision_packet(cid, payload["gate"]), result)
+                    except Exception:
+                        self.policy_hold(cid, job["id"], "proposal revision authority could not be verified; owner inspection required")
+                        return {"stored": True, "parked": True}
                 packet = {**payload["packet"], "proposed_decision": result,
                           "decision_job": job["id"], "decision_sha256": digest(result),
                           "decision_request": decision_request(cid, payload, result)}
@@ -385,7 +416,7 @@ class Automation:
         if json.loads(row["failure_diagnostic"] or "{}").get("stage") != "buzz_publication":
             raise Refused("job did not fail during Buzz publication")
         payload = json.loads(row["payload"])
-        result = validate(row["kind"], args["result"], payload["packet"]["references"])
+        result = validate(row["kind"], args["result"], payload["packet"]["references"], payload["packet"])
         if not isinstance(args["usage"], dict) or len(canonical(args["usage"]).encode()) > 4096:
             raise Refused("saved review usage is invalid")
         self.b.verify_event(event, role, "campaign-job-result", {"job": jid, "result": result},
@@ -448,8 +479,11 @@ class Automation:
                 self.db.execute("UPDATE review_jobs SET state='submitted' WHERE id=?", (review["id"],))
                 self.b.store.save()
                 return result
-            except Exception:
-                self.park(cid, "gate submission failed; owner inspection required")
+            except Exception as error:
+                if isinstance(error, Refused) and str(error) == POLICY_REFUSAL:
+                    self.policy_hold(cid, decision["id"], "proposal revision authority changed before gate submission; owner inspection required")
+                else:
+                    self.park(cid, "gate submission failed; owner inspection required")
                 raise
         return None
 
@@ -524,11 +558,14 @@ class Automation:
             reason_codes = {"result_shape_invalid", "notes_invalid", "evidence_refs_invalid", "decision_invalid",
                             "classification_rationale_missing", "blocking_flag_invalid", "provider_model_mismatch",
                             "provider_incomplete_response", "provider_json_invalid", "provider_response_oversized",
-                            "request_bound_violation", "provider_http_error", "review_refused"}
+                            "request_bound_violation", "provider_http_error", "review_refused", "decision_policy_forbidden"}
             if "reason_code" in diagnostic and diagnostic["reason_code"] not in reason_codes:
                 raise Refused("review diagnostic reason code is invalid")
         serialized = canonical(diagnostic) if diagnostic is not None else None
         self.db.execute("UPDATE review_jobs SET state='uncertain',failure_diagnostic=? WHERE id=?",
                         (serialized, job["id"]))
-        self.park(job["campaign"], "provider or worker failure; no automatic retry; reservation retained")
+        reason = ("review decision conflicts with proposal revision policy; owner inspection required"
+                  if diagnostic and diagnostic.get("reason_code") == "decision_policy_forbidden" else
+                  "provider or worker failure; no automatic retry; reservation retained")
+        self.park(job["campaign"], reason)
         return {"parked": True}

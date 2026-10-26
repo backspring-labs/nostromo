@@ -68,7 +68,7 @@ class Runtime:
 
 
 @pytest.fixture
-def world(tmp_path, monkeypatch):
+def world(tmp_path, monkeypatch, request):
     monkeypatch.setattr(time, "time", lambda: NOW)
     policy = {"automation_enabled": True, "review_personas": {}, "decision_channels": ["channel"],
               "public_keys": {r: helpers().xonly_pubkey(k) for r, k in KEYS.items()}}
@@ -81,10 +81,13 @@ def world(tmp_path, monkeypatch):
     broker.handle("owner", {"command": "approve-budget", "args": {"name": "pilot", "cap_microusd": 5000000,
                   "max_dispatches": 8, "expires_at": "2026-10-26T12:00:00Z"}})
     spec = {"project_id": "group_run", "objective": {"allowed_scope": ["backend/**", "frontend/**"], "target_accepted_increments": 1},
-            "policy": {"max_cycles": 2, "max_elapsed_s": 7200, "budget_tokens": 1000000},
+            "policy": {"max_cycles": 2, "max_elapsed_s": 7200, "budget_tokens": 1000000,
+                       "max_proposal_revisions": getattr(request, "param", 0)},
             "crew": {"paid_dispatches": 8, "require_dallas": True,
                      "automation": {"budget": "pilot", "not_after": "2026-10-25T03:00:00Z"}}}
     broker.approve({"name": "pilot-test", "definition": spec, "channel": "channel", "thread": "thread"})
+    api.campaign["policy"] = copy.deepcopy(spec["policy"])
+    api.cycle["execution_overrides"] = {"campaign_proposal": {"max_revisions": spec["policy"]["max_proposal_revisions"]}}
     store.db.execute("INSERT INTO campaigns VALUES(?,?,?,?,?)", ("cmp_test", "pilot-test", "channel", "thread", "mother"))
     store.save()
     Automation(broker).arm("cmp_test")
@@ -107,6 +110,8 @@ def finish(broker, job, result, event=None):
 DECISION = {"decision": "approved", "notes": "Proposal fits the bounded feature and acceptance source.",
             "classification_rationale": "", "evidence": ["art_test", "ctl_launched"]}
 REVIEW = {"blocking": False, "notes": "No blocking findings after independent seam review.", "evidence": ["art_test"]}
+RETURNED = {**DECISION, "decision": "returned_for_revision", "notes": "Acceptance evidence needs clarification before implementation.",
+            "classification_rationale": "The proposal omits an objective acceptance condition."}
 
 
 def test_signed_independent_handoff_submits_once_after_restart(world):
@@ -481,3 +486,131 @@ def test_buzz_publisher_bounds_threads_and_keeps_failure_diagnostics_safe(monkey
         assert worker.send_message(job, {}) == "a" * 64
     assert calls[0]["env"]["TOKIO_WORKER_THREADS"] == "2"
     assert calls[0]["input"] == "fixture review"
+
+
+def test_zero_revision_packet_and_provider_schema_offer_an_owner_hold(world):
+    broker, _, _ = world
+    rpc(broker, "mother", "advance", {"campaign": "cmp_test"})
+    job = rpc(broker, "ripley", "review-claim")
+    contract = job["payload"]["packet"]["decision_contract"]
+    assert contract["proposal_revisions"] == {
+        "available": False, "reason": "revision_allowance_exhausted",
+        "limits": {"approved": 0, "campaign": 0, "cycle": 0}, "used": 0, "remaining": 0}
+    shape = job["payload"]["body"]["text"]["format"]["schema"]
+    assert shape["properties"]["decision"]["enum"] == ["approved", "rejected", "needs_owner"]
+    assert json.loads(job["payload"]["body"]["input"])["packet"]["decision_contract"] == contract
+    result = {**RETURNED, "decision": "needs_owner"}
+    finish(broker, job, result)
+    control = rpc(broker, "mother", "automation", {"campaign": "cmp_test"})
+    assert control["control"]["state"] == "parked" and len(control["jobs"]) == 1
+
+
+def test_retained_zero_revision_failure_stops_before_dallas_or_gate_write(world):
+    broker, api, store = world
+    rpc(broker, "mother", "advance", {"campaign": "cmp_test"})
+    calls, publications = [], []
+    def infer(*args):
+        calls.append(args)
+        return RETURNED, {"output_tokens": 100}
+    def post(*args):
+        publications.append(args)
+        raise AssertionError("policy-forbidden decision must not be published")
+    with pytest.raises(WorkerFailure) as caught:
+        run("ripley", lambda req: broker.handle("ripley", req), infer, post)
+    assert caught.value.reason_code == "decision_policy_forbidden"
+    run("ripley", lambda req: broker.handle("ripley", req), infer, post)
+    assert len(calls) == 1 and publications == []
+    assert store.db.execute("SELECT count(*) FROM review_jobs WHERE role='dallas'").fetchone()[0] == 0
+    assert store.db.execute("SELECT sum(reserved) FROM review_jobs").fetchone()[0] == RESERVATION_MICROUSD
+    assert all("/gates/" not in p[1] for p in api.posts)
+    assert rpc(broker, "mother", "triage", {"campaign": "cmp_test"})["findings"][0]["classification"] == "decision_policy_forbidden"
+
+
+def test_broker_refuses_forbidden_signed_result_without_trusting_worker_validation(world):
+    broker, api, store = world
+    rpc(broker, "mother", "advance", {"campaign": "cmp_test"})
+    job = rpc(broker, "ripley", "review-claim")
+    event = helpers().sign_event(KEYS["ripley"], 9, "campaign-job-result: " + canonical({"job": job["id"], "result": RETURNED}),
+                                 [["h", "channel"]], created_at=int(NOW))
+    with pytest.raises(Refused, match="proposal revision is unavailable"):
+        finish(broker, job, RETURNED, event)
+    assert store.db.execute("SELECT count(*) FROM review_jobs").fetchone()[0] == 1
+    assert api.posts == []
+
+
+def test_read_only_triage_diagnoses_the_retained_pre_fix_ruling_without_replay(world):
+    broker, api, store = world
+    rpc(broker, "mother", "advance", {"campaign": "cmp_test"})
+    job = rpc(broker, "ripley", "review-claim")
+    # The old worker accepted this judgment before policy checks existed.
+    payload = copy.deepcopy(job["payload"])
+    payload["packet"].pop("decision_contract")
+    payload["packet"].pop("approved_policy")
+    store.db.execute("UPDATE review_jobs SET state='done',result=?,payload=? WHERE id=?",
+                     (canonical(RETURNED), canonical(payload), job["id"]))
+    store.save()
+    report = rpc(broker, "mother", "triage", {"campaign": "cmp_test"})
+    finding = report["findings"][0]
+    assert finding["classification"] == "decision_policy_forbidden"
+    assert finding["proposal_revisions"]["remaining"] == 0
+    assert finding["proposal_revisions"]["reason"] == "revision_allowance_exhausted"
+    assert api.posts == [] and store.db.execute("SELECT count(*) FROM review_jobs").fetchone()[0] == 1
+    assert RETURNED["notes"] not in canonical(report)
+
+
+@pytest.mark.parametrize("world", [1], indirect=True)
+def test_positive_revision_allowance_keeps_independent_review_and_exact_ruling(world):
+    broker, api, _ = world
+    rpc(broker, "mother", "advance", {"campaign": "cmp_test"})
+    ripley = rpc(broker, "ripley", "review-claim")
+    assert "returned_for_revision" in ripley["payload"]["body"]["text"]["format"]["schema"]["properties"]["decision"]["enum"]
+    finish(broker, ripley, RETURNED)
+    dallas = rpc(broker, "dallas", "review-claim")
+    assert dallas["payload"]["packet"]["proposed_decision"] == RETURNED
+    assert api.posts == []
+    finish(broker, dallas, REVIEW)
+    rpc(broker, "ripley", "review-submit")
+    assert len(api.posts) == 1 and api.posts[0][2]["decision"] == "returned_for_revision"
+    assert broker.store.definition("pilot-test")[0]["definition"]["policy"]["max_proposal_revisions"] == 1
+
+
+@pytest.mark.parametrize("world", [1], indirect=True)
+@pytest.mark.parametrize("when", ["before_result", "before_dallas", "before_submit"])
+def test_live_revision_exhaustion_cannot_spend_dallas_or_submit_stale_ruling(world, when):
+    broker, api, store = world
+    rpc(broker, "mother", "advance", {"campaign": "cmp_test"})
+    ripley = rpc(broker, "ripley", "review-claim")
+    superseded = {"run_id": "run_old", "workload_type": "proposal", "status": "cancelled", "run_number": 0}
+    if when == "before_result":
+        api.cycle["runs"].append(superseded)
+    finish(broker, ripley, RETURNED)
+    if when == "before_dallas":
+        api.cycle["runs"].append(superseded)
+    dallas = rpc(broker, "dallas", "review-claim")
+    if when == "before_submit":
+        finish(broker, dallas, REVIEW)
+        api.cycle["runs"].append(superseded)
+        with pytest.raises(Refused, match="proposal revision is unavailable"):
+            rpc(broker, "ripley", "review-submit")
+    else:
+        assert dallas is None
+        assert store.db.execute("SELECT coalesce(sum(reserved),0) FROM review_jobs WHERE role='dallas'").fetchone()[0] == 0
+    assert all("/gates/" not in p[1] for p in api.posts)
+    assert rpc(broker, "mother", "automation", {"campaign": "cmp_test"})["control"]["state"] == "parked"
+    assert rpc(broker, "mother", "triage", {"campaign": "cmp_test"})["findings"][0]["classification"] == "decision_policy_forbidden"
+
+
+@pytest.mark.parametrize("world", [1], indirect=True)
+def test_unreadable_live_revision_authority_retains_signed_result_and_parks(world, monkeypatch):
+    broker, api, store = world
+    rpc(broker, "mother", "advance", {"campaign": "cmp_test"})
+    ripley = rpc(broker, "ripley", "review-claim")
+    def unavailable(*args):
+        raise OSError("unreadable runtime; do not log transport details")
+    monkeypatch.setattr(Automation, "current_decision_packet", unavailable)
+    finish(broker, ripley, RETURNED)
+    result = store.db.execute("SELECT state,result,proof FROM review_jobs WHERE id=?", (ripley["id"],)).fetchone()
+    assert result["state"] == "done" and json.loads(result["result"]) == RETURNED and result["proof"]
+    assert rpc(broker, "dallas", "review-claim") is None
+    assert rpc(broker, "mother", "triage", {"campaign": "cmp_test"})["findings"][0]["classification"] == "decision_policy_forbidden"
+    assert len(api.posts) == 1 and api.posts[0][1].endswith("/pause")

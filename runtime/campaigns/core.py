@@ -404,6 +404,10 @@ class Broker:
         run = self.api("read", "GET", f"{base}/runs/{args['run']}", None)
         if run.get("cycle_id") != args["cycle"]:
             raise Refused("run is not part of the named cycle")
+        if command == "increment" and args["decision"] == "returned_for_revision":
+            from .review_policy import POLICY_REFUSAL, proposal_revisions
+            if not proposal_revisions(campaign, cycle, approved["definition"]["policy"])["available"]:
+                raise Refused(POLICY_REFUSAL)
         gate_name = "progress_increment_ruling" if command == "increment" else "progress_plan_review"
         if any(g.get("gate_name") == gate_name for g in run.get("gate_decisions", [])):
             raise Refused("gate already has a decision")
