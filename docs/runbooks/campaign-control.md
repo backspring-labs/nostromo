@@ -29,6 +29,11 @@ limits are runtime boundaries, not a provider billing cap. No model or subscript
 
 ## Install on Spark
 
+For ordinary code updates after infrastructure is installed, use the
+[owner-only deployment helper](routine-deployment.md). It avoids repeated password prompts
+without granting crew accounts root access. The installer below remains the authenticated path
+for changes to accounts, keys, service definitions, or privilege rules.
+
 Run from the tested source checkout on Spark as the owner:
 
 ```bash
