@@ -13,6 +13,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import traceback
 from pathlib import Path
 
 CONFIG = Path('/etc/nostromo/deploy.json')
@@ -381,5 +382,9 @@ if __name__ == '__main__':
         main()
     except BaseException as error:
         # No child output, payload contents, or credential-bearing exception bodies.
-        print(canonical({'ok': False, 'error': str(error) if isinstance(error, Refused) else type(error).__name__}), file=sys.stderr)
+        frames = traceback.extract_tb(error.__traceback__)
+        location = [{'file': Path(frame.filename).name, 'function': frame.name, 'line': frame.lineno}
+                    for frame in frames[-6:]]
+        print(canonical({'ok': False, 'error': str(error) if isinstance(error, Refused) else type(error).__name__,
+                         'where': location}), file=sys.stderr)
         sys.exit(1)
