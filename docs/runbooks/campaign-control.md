@@ -173,7 +173,9 @@ its deadline, or after deadline expiry solely to retain the result as an audit r
 role's existing review timer reads and validates the private saved response, publishes it once with
 a two-minute transport bound, and submits the role-signed event to the broker. This makes zero
 provider calls and never retries automatically. If publication still fails, inspect Buzz again
-before any new authorization. Triage reports the recovery state. Recovery records the result only;
+before any new authorization. If Buzz accepted the event but the relay read is delayed, the event ID
+is persisted first; a later authorization must adopt that same event and cannot republish it. Triage
+reports the recovery state. Recovery records the result only;
 it keeps the campaign parked and does not resume the campaign, queue another paid review, or submit
 a SquadOps gate. A deadline-expired campaign remains terminal; this recovery cannot reopen it.
 Non-publication failures remain owner-inspection cases.

@@ -335,6 +335,9 @@ class Automation:
         if not recoverable_control:
             raise Refused("campaign is not in a recoverable parked window")
         old = self.db.execute("SELECT state,claimed FROM review_recoveries WHERE job=?", (jid,)).fetchone()
+        old_event = self.db.execute("SELECT event_id FROM review_recoveries WHERE job=?", (jid,)).fetchone()
+        if old_event and old_event["event_id"] and event_id != old_event["event_id"]:
+            raise Refused("a Buzz event ID is already recorded; recovery must adopt it without republication")
         if old and (old["state"] in {"queued", "done"}
                     or old["state"] == "claimed" and self.now - old["claimed"] < 900):
             raise Refused("publication recovery is already authorized or completed")
@@ -395,6 +398,21 @@ class Automation:
         # queues another paid review, or submits a SquadOps gate.
         return {"stored": True, "campaign_control_unchanged": True, "provider_calls": 0}
 
+    def record_recovery_event(self, role, args):
+        exact(args, {"job", "event_id"})
+        jid = identifier(args["job"])
+        if not isinstance(args["event_id"], str) or not re.fullmatch(r"[0-9a-f]{64}", args["event_id"]):
+            raise Refused("recovery event ID must be hex64")
+        row = self.db.execute("SELECT j.role,r.state,r.event_id FROM review_jobs j "
+                              "JOIN review_recoveries r ON r.job=j.id WHERE j.id=?", (jid,)).fetchone()
+        if not row or row["role"] != role or row["state"] != "claimed":
+            raise Refused("recovery event does not belong to this claimed role job")
+        if row["event_id"] and row["event_id"] != args["event_id"]:
+            raise Refused("recovery already records a different event ID")
+        self.db.execute("UPDATE review_recoveries SET event_id=? WHERE job=?", (args["event_id"], jid))
+        self.b.store.save()
+        return {"stored": True, "provider_calls": 0}
+
     def submit(self, caller):
         if caller != "ripley":
             raise Refused("gate submission belongs to Ripley")
@@ -443,6 +461,8 @@ class Automation:
             return self.claim_recovery(caller)
         if command == "review-recovery-result":
             return self.recover_result(caller, args, request.get("decision_event"))
+        if command == "review-recovery-pending":
+            return self.record_recovery_event(caller, args)
         if command == "review-recovery-failed":
             exact(args, {"job", "error"})
             jid = identifier(args["job"])

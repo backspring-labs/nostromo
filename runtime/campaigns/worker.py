@@ -3,7 +3,9 @@ import argparse
 import json
 import os
 import pwd
+import re
 import subprocess
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -90,7 +92,7 @@ def provider(role, body, timeout):
                             else None) from None
 
 
-def publish(job, result):
+def send_message(job, result):
     env = dict(os.environ)
     env["BUZZ_PRIVATE_KEY"] = secret("buzz.key")
     env["BUZZ_RELAY_URL"] = "wss://nostromo.backspring.xyz"
@@ -105,7 +107,14 @@ def publish(job, result):
     sent = json.loads(response.stdout)
     if sent.get("accepted") is not True:
         raise Refused("signed review publication was not accepted")
-    return read_event(sent["event_id"])
+    event_id = sent.get("event_id")
+    if not isinstance(event_id, str) or not re.fullmatch(r"[0-9a-f]{64}", event_id):
+        raise Refused("signed review publication did not return a valid event ID")
+    return event_id
+
+
+def publish(job, result):
+    return read_event(send_message(job, result))
 
 
 def run(role, rpc=call, infer=provider, post=publish, persist=None):
@@ -161,7 +170,25 @@ def recover(role, job, rpc=call, post=publish):
         if record.get("model") != MODELS[role] or not isinstance(record.get("result"), dict) or not isinstance(record.get("usage"), dict):
             raise Refused("recovery record does not match the pinned review")
         validate(job["kind"], record["result"], job["payload"]["packet"]["references"])
-        proof = read_event(job["event_id"]) if job.get("event_id") else post(job, record["result"])
+        event_id = job.get("event_id") or record.get("pending_event_id")
+        if event_id:
+            if not isinstance(event_id, str) or not re.fullmatch(r"[0-9a-f]{64}", event_id):
+                raise Refused("saved Buzz event ID is invalid")
+            proof = read_event(event_id)
+        elif post is publish:
+            event_id = send_message(job, record["result"])
+            record["pending_event_id"] = event_id
+            with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=path.parent,
+                                             prefix=".review-recovery-", delete=False) as temp:
+                temp.write(canonical(record) + "\n")
+                temp.flush()
+                os.fsync(temp.fileno())
+                temporary = Path(temp.name)
+            os.replace(temporary, path)
+            rpc({"command": "review-recovery-pending", "args": {"job": job["id"], "event_id": event_id}})
+            proof = read_event(event_id)
+        else:
+            proof = post(job, record["result"])
         return rpc({"command": "review-recovery-result", "args": {
             "job": job["id"], "result": record["result"], "usage": record["usage"]}, "decision_event": proof})
     except Exception as error:
