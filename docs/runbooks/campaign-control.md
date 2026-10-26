@@ -180,6 +180,10 @@ it keeps the campaign parked and does not resume the campaign, queue another pai
 a SquadOps gate. A deadline-expired campaign remains terminal; this recovery cannot reopen it.
 Non-publication failures remain owner-inspection cases.
 
+The publisher explicitly limits Tokio to two worker threads. Spark exposes 20 CPUs while the
+review unit permits 16 tasks; the default CLI thread pool exhausts that allowance and prevents
+DNS work from running. A larger subprocess timeout does not correct this resource mismatch.
+
 The review packet includes selected authoritative planning, proposal and verification records
 in full, with hashes, and discloses its selection. It does not include all source files. A
 proposal ruling authorizes implementation; it does not certify the resulting source or UI.

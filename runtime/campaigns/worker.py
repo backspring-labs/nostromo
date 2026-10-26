@@ -94,6 +94,9 @@ def provider(role, body, timeout):
 
 def send_message(job, result):
     env = dict(os.environ)
+    # Spark exposes 20 CPUs but this worker's cgroup permits 16 tasks. Tokio's
+    # default pool consumes the task allowance and prevents DNS blocking work.
+    env["TOKIO_WORKER_THREADS"] = "2"
     env["BUZZ_PRIVATE_KEY"] = secret("buzz.key")
     env["BUZZ_RELAY_URL"] = "wss://nostromo.backspring.xyz"
     config = json.loads(Path("/etc/nostromo/campaign-broker.json").read_text())
@@ -103,7 +106,20 @@ def send_message(job, result):
                "--reply-to", destination["thread"], "--content", "-"]
     response = subprocess.run(command, input=attestations(job, result), text=True, capture_output=True, env=env, timeout=120)
     if response.returncode:
-        raise Refused("signed review publication failed")
+        # The CLI's message may contain URLs or other sensitive data. Retain only
+        # a fixed category so triage can distinguish transport, auth and input.
+        categories = {"network_error": "BuzzNetworkError", "auth_error": "BuzzAuthError",
+                      "key_error": "BuzzAuthError", "relay_error": "BuzzRelayError",
+                      "user_error": "BuzzInputError", "delivery_unknown": "BuzzDeliveryUnknown"}
+        error_type = "BuzzCommandError"
+        for line in response.stderr.splitlines()[-64:]:
+            try:
+                failure = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(failure, dict) and failure.get("error") in categories:
+                error_type = categories[failure["error"]]
+        raise WorkerFailure("buzz_publication", error_type)
     sent = json.loads(response.stdout)
     if sent.get("accepted") is not True:
         raise Refused("signed review publication was not accepted")
@@ -192,11 +208,12 @@ def recover(role, job, rpc=call, post=publish):
         return rpc({"command": "review-recovery-result", "args": {
             "job": job["id"], "result": record["result"], "usage": record["usage"]}, "decision_event": proof})
     except Exception as error:
+        error_type = error.error_type if isinstance(error, WorkerFailure) else type(error).__name__
         try:
-            rpc({"command": "review-recovery-failed", "args": {"job": job["id"], "error": type(error).__name__}})
+            rpc({"command": "review-recovery-failed", "args": {"job": job["id"], "error": error_type}})
         except Exception:
             pass
-        raise WorkerFailure("recovery_publication", type(error).__name__) from None
+        raise WorkerFailure("recovery_publication", error_type) from None
 
 
 def main():

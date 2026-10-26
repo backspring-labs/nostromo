@@ -3,6 +3,8 @@ import copy
 import hashlib
 import json
 import time
+from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -389,3 +391,93 @@ def test_review_usage_preserves_cache_and_reasoning_accounting():
     c = observed({"model": "gpt-5.6-sol", "usage": {"input_tokens": 300, "input_tokens_details": {"cached_tokens": 200},
                   "output_tokens": 80, "output_tokens_details": {"reasoning_tokens": 40}}})
     assert (c["input"], c["cached"], c["output"], c["reasoning"]) == (300, 200, 80, 40)
+
+
+def test_recovery_keeps_accepted_event_across_read_failure_without_republishing(world, tmp_path, monkeypatch):
+    from runtime.campaigns import worker
+    broker, api, store = world
+    rpc(broker, "mother", "advance", {"campaign": "cmp_test"})
+    job = rpc(broker, "ripley", "review-claim")
+    rpc(broker, "ripley", "review-failed", {"job": job["id"], "diagnostic": {
+        "stage": "buzz_publication", "error": "TimeoutExpired"}})
+    store.db.execute("UPDATE automation SET state='expired',reason='deadline reached',deadline=?", (NOW - 1,))
+    store.save()
+    api.campaign["state"] = "completed"
+    original_posts = copy.deepcopy(api.posts)
+    state = tmp_path / ".local/state/nostromo-reviews"
+    state.mkdir(parents=True)
+    record = state / (job["id"] + ".json")
+    record.write_text(canonical({"model": "gpt-5.6-sol", "result": DECISION, "usage": {"output_tokens": 100}}))
+    record.chmod(0o600)
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+    event = proof(job, DECISION)
+    sent = []
+    def send(*args):
+        sent.append(args)
+        return event["id"]
+    monkeypatch.setattr(worker, "send_message", send)
+    def unavailable(eid):
+        raise OSError("relay read unavailable")
+    monkeypatch.setattr(worker, "read_event", unavailable)
+    request = lambda req: broker.handle("ripley", req)
+    infer = lambda *args: pytest.fail("recovery must never call a provider")
+    authorize = {"job": job["id"], "no_matching_event_verified": True}
+    with pytest.raises(Refused, match="owner"):
+        rpc(broker, "mother", "review-recovery-authorize", authorize)
+    rpc(broker, "owner", "review-recovery-authorize", authorize)
+    with pytest.raises(WorkerFailure):
+        worker.run("ripley", rpc=request, infer=infer)
+    saved = rpc(broker, "owner", "automation", {"campaign": "cmp_test"})["jobs"][0]
+    assert saved["recovery"] == {"state": "failed", "failure": "OSError", "event_id": event["id"]}
+    assert json.loads(record.read_text())["pending_event_id"] == event["id"]
+    with pytest.raises(Refused, match="without republication"):
+        rpc(broker, "owner", "review-recovery-authorize", authorize)
+    rpc(broker, "owner", "review-recovery-authorize", {"job": job["id"], "existing_event_id": event["id"]})
+    monkeypatch.setattr(worker, "read_event", lambda eid: event)
+    result = worker.run("ripley", rpc=request, infer=infer)
+    assert result == {"stored": True, "campaign_control_unchanged": True, "provider_calls": 0}
+    assert len(sent) == 1
+    assert api.posts == original_posts
+    assert store.db.execute("SELECT state FROM automation").fetchone()[0] == "expired"
+    assert store.db.execute("SELECT count(*) FROM review_jobs").fetchone()[0] == 1
+    assert store.db.execute("SELECT state,reserved FROM review_jobs").fetchone()[:] == ("done", RESERVATION_MICROUSD)
+
+
+@pytest.mark.parametrize("stage", ["provider_request", "result_validation", "recovery_persist"])
+def test_publication_recovery_refuses_other_failure_stages(world, stage):
+    broker, _, _ = world
+    rpc(broker, "mother", "advance", {"campaign": "cmp_test"})
+    job = rpc(broker, "ripley", "review-claim")
+    rpc(broker, "ripley", "review-failed", {"job": job["id"], "diagnostic": {"stage": stage, "error": "Refused"}})
+    with pytest.raises(Refused, match="failed Buzz publication"):
+        rpc(broker, "owner", "review-recovery-authorize", {"job": job["id"], "no_matching_event_verified": True})
+
+
+@pytest.mark.parametrize("category,expected", [(None, None), ("network_error", "BuzzNetworkError"),
+                                              ("auth_error", "BuzzAuthError"), ("relay_error", "BuzzRelayError")])
+def test_buzz_publisher_bounds_threads_and_keeps_failure_diagnostics_safe(monkeypatch, category, expected):
+    from runtime.campaigns import worker
+    original_read = Path.read_text
+    monkeypatch.setattr(Path, "read_text", lambda path, *a, **kw:
+        json.dumps({"review_auth_tags": {"ripley": "fixture"}})
+        if str(path) == "/etc/nostromo/campaign-broker.json" else original_read(path, *a, **kw))
+    monkeypatch.setattr(worker, "secret", lambda name: "fixture-key")
+    monkeypatch.setenv("TOKIO_WORKER_THREADS", "99")
+    monkeypatch.setattr(worker, "attestations", lambda job, result: "fixture review")
+    calls = []
+    def command(argv, **kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(returncode=2 if category else 0,
+                               stdout=json.dumps({"accepted": True, "event_id": "a" * 64}),
+                               stderr=json.dumps({"error": category, "message": "TOP_SECRET"}))
+    monkeypatch.setattr(worker.subprocess, "run", command)
+    job = {"role": "ripley", "payload": {"destination": {"channel": "channel", "thread": "thread"}}}
+    if category:
+        with pytest.raises(WorkerFailure) as caught:
+            worker.send_message(job, {})
+        assert caught.value.error_type == expected
+        assert "TOP_SECRET" not in caught.value.diagnostic()
+    else:
+        assert worker.send_message(job, {}) == "a" * 64
+    assert calls[0]["env"]["TOKIO_WORKER_THREADS"] == "2"
+    assert calls[0]["input"] == "fixture review"

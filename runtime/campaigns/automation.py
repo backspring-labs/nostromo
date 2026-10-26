@@ -10,7 +10,7 @@ from .review import PRICE_EXPIRES, RESERVATION_MICROUSD, body, timestamp, valida
 
 COMMANDS = {"approve-budget", "automation", "advance", "review-claim", "review-result", "review-failed",
             "review-submit", "review-recovery-authorize", "review-recovery-claim", "review-recovery-result",
-            "review-recovery-failed"}
+            "review-recovery-failed", "review-recovery-pending"}
 
 
 class Automation:
