@@ -62,7 +62,10 @@ def bootstrap(repo, commit, target):
         if int(git(repo, 'cat-file', '-s', oid)) > format.MAX_FILE:
             raise format.Refused('bootstrap source exceeds its bound')
         path = target / name
-        path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        parent = target
+        for component in Path(name).parts[:-1]:
+            parent /= component
+            parent.mkdir(exist_ok=True, mode=0o700)
         descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
         with os.fdopen(descriptor, 'wb') as handle:
             handle.write(git(repo, 'cat-file', 'blob', oid))

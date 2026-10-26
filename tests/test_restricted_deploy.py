@@ -308,7 +308,7 @@ def test_release_packaging_reads_exact_git_commit_and_refuses_tracked_symlinks(t
     packer.bootstrap(repo, commit, private)
     assert (private / 'infrastructure/spark/bin/nostromo-deploy.py').read_bytes() == b'# committed\n'
     assert private.stat().st_mode & 0o077 == 0
-    assert all(path.stat().st_mode & 0o077 == 0 for path in private.rglob('*') if path.is_file())
+    assert all(path.stat().st_mode & 0o077 == 0 for path in private.rglob('*'))
     with pytest.raises(FileExistsError): packer.bootstrap(repo, commit, private)
     core.unlink(); core.symlink_to(tmp_path / 'outside')
     git('add', '.')
