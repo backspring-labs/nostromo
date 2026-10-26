@@ -330,7 +330,9 @@ class Automation:
         if diagnostic.get("stage") != "buzz_publication":
             raise Refused("recovery is limited to a failed Buzz publication")
         control = self.db.execute("SELECT * FROM automation WHERE campaign=?", (job["campaign"],)).fetchone()
-        if not control or control["state"] != "parked" or self.now + 180 >= control["deadline"]:
+        recoverable_control = (control and (control["state"] == "parked" and self.now + 180 < control["deadline"]
+                               or control["state"] == "expired" and control["reason"] == "deadline reached"))
+        if not recoverable_control:
             raise Refused("campaign is not in a recoverable parked window")
         old = self.db.execute("SELECT state,claimed FROM review_recoveries WHERE job=?", (jid,)).fetchone()
         if old and (old["state"] in {"queued", "done"}
@@ -350,9 +352,11 @@ class Automation:
                               (role,)).fetchone()
         if not row:
             return None
-        control = self.db.execute("SELECT state,deadline FROM automation WHERE campaign=?", (row["campaign"],)).fetchone()
+        control = self.db.execute("SELECT state,deadline,reason FROM automation WHERE campaign=?", (row["campaign"],)).fetchone()
         job_state = self.db.execute("SELECT state FROM review_jobs WHERE id=?", (row["job"],)).fetchone()
-        if not control or control["state"] != "parked" or self.now + 180 >= control["deadline"] or job_state[0] != "uncertain":
+        recoverable_control = (control and (control["state"] == "parked" and self.now + 180 < control["deadline"]
+                               or control["state"] == "expired" and control["reason"] == "deadline reached"))
+        if not recoverable_control or job_state[0] != "uncertain":
             self.db.execute("UPDATE review_recoveries SET state='failed',failure='AuthorizationExpired' WHERE job=?",
                             (row["job"],))
             self.b.store.save()
@@ -367,11 +371,13 @@ class Automation:
     def recover_result(self, role, args, event):
         exact(args, {"job", "result", "usage"})
         jid = identifier(args["job"])
-        row = self.db.execute("SELECT j.*,c.state AS control_state,c.deadline,r.state AS recovery_state "
+        row = self.db.execute("SELECT j.*,c.state AS control_state,c.deadline,c.reason AS control_reason,r.state AS recovery_state "
                               "FROM review_jobs j JOIN automation c ON c.campaign=j.campaign "
                               "JOIN review_recoveries r ON r.job=j.id WHERE j.id=?", (jid,)).fetchone()
+        recoverable_control = (row and (row["control_state"] == "parked" and self.now < row["deadline"]
+                               or row["control_state"] == "expired" and row["control_reason"] == "deadline reached"))
         if (not row or row["role"] != role or row["state"] != "uncertain" or row["recovery_state"] != "claimed"
-                or row["control_state"] != "parked" or self.now >= row["deadline"]):
+                or not recoverable_control):
             raise Refused("publication recovery is not currently authorized for this role")
         if json.loads(row["failure_diagnostic"] or "{}").get("stage") != "buzz_publication":
             raise Refused("job did not fail during Buzz publication")
@@ -387,7 +393,7 @@ class Automation:
         self.b.store.save()
         # Keep the campaign parked. Recovery records the saved result but never resumes work,
         # queues another paid review, or submits a SquadOps gate.
-        return {"stored": True, "campaign_remains_parked": True, "provider_calls": 0}
+        return {"stored": True, "campaign_control_unchanged": True, "provider_calls": 0}
 
     def submit(self, caller):
         if caller != "ripley":

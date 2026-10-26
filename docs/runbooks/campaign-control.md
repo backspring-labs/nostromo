@@ -168,13 +168,15 @@ campaignctl review-recovery-authorize --args - <<'JSON'
 JSON
 ```
 
-The authorization is bound to that uncertain job and requires an active parked window. The assigned
+The authorization is bound to that uncertain job. It is allowed while the campaign is parked before
+its deadline, or after deadline expiry solely to retain the result as an audit record. The assigned
 role's existing review timer reads and validates the private saved response, publishes it once with
 a two-minute transport bound, and submits the role-signed event to the broker. This makes zero
 provider calls and never retries automatically. If publication still fails, inspect Buzz again
 before any new authorization. Triage reports the recovery state. Recovery records the result only;
 it keeps the campaign parked and does not resume the campaign, queue another paid review, or submit
-a SquadOps gate. Expired windows and non-publication failures remain owner-inspection cases.
+a SquadOps gate. A deadline-expired campaign remains terminal; this recovery cannot reopen it.
+Non-publication failures remain owner-inspection cases.
 
 The review packet includes selected authoritative planning, proposal and verification records
 in full, with hashes, and discloses its selection. It does not include all source files. A
