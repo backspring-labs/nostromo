@@ -80,6 +80,54 @@ canonical definition digest is recorded on creation. Approve a new name for any 
 Each approval authorizes one campaign creation, including an unresolved creation attempt;
 Mother cannot multiply the authorization by using fresh request IDs.
 
+## Durable launch handoff
+
+For an ordinary campaign, create a fresh top-level post in the campaign channel and obtain the
+immutable owner approval bound to that root. Mother then submits one request:
+
+```bash
+campaignctl launch --request-id pilot-launch-001 --args - <<'JSON'
+{"definition":"approved-pilot-name","reason":"Owner-approved bounded mechanics test"}
+JSON
+```
+
+The response is a durable **queued** intent, not confirmation that the campaign has started.
+Mother can end her turn immediately. The no-model `nostromo-campaign-launch.timer` runs every
+thirty seconds as Mother: create once, publish and verify a signed announcement in the approved
+thread, start once, then publish a start receipt. It reads only Mother's existing Buzz key;
+it never accesses provider keys or makes inference calls. Reviews, cutoff enforcement, and
+progress/closing reports keep their existing independent workers.
+
+`launches` takes `{}`. `launch-status` takes `{"launch":"pilot-launch-001"}` and reports the
+fixed campaign ID, operation IDs, thread, state, deadline, signed notices, and bounded diagnostic.
+States progress through `queued`, `creating`, `created`, `announcing`, `announced`, `starting`,
+and `started`; `blocked` requires owner inspection. Acceptance survives a lost client response:
+resubmit exactly the same launch ID and arguments to retrieve its current status.
+
+The launch deadline is fixed at acceptance: ten minutes or the approved automation `not_after`,
+whichever is earlier. No later create/start is authorized. A transport failure after reserving
+a write triggers read-only campaign/control-log reconciliation; the worker never repeats an
+ambiguous campaign write. Buzz announcements use a private disk outbox: publication retries
+reuse the exact signed kind-9 event ID, with at most three attempts per notice. Relay failure
+is retained in `launch-status`; an unverified announcement cannot unlock start. A failure notice
+is attempted in the same campaign thread. Inspect status and runtime evidence if delivery fails.
+If creation has an ambiguous response and the approval includes a scenario suite, the create
+log alone cannot prove the subsequent suite pin. The workflow requires owner inspection and
+does not start automatically from that evidence.
+
+The workflow preserves the exact approved scope, runtime limits, paid dispatch count, and shared
+review allowance. It grants no new gate authority. A reserved definition/root cannot be reused
+by another launch, and manual create/start cannot bypass its workflow. Do not mint new request
+IDs to recover a blocked intent. Legacy manual operations remain available for definitions
+that have no durable launch reservation.
+
+Install the tested source with the existing root installer and the existing
+`$HOME/.config/nostromo/campaign-provision` staging directory; an upgrade does not require
+rerunning auth preparation. Verify `nostromo-campaign-launch.timer` is active and inspect
+`journalctl -u nostromo-campaign-launch.service`. The installer commissions the launch interface
+and backs up existing broker state. It does not restart Mother's harness; the updated prompt
+applies to her next turn. Validate with fault tests before attempting another long campaign.
+
 ## Bounded review opt-in
 
 Before commissioning, verify the provider projects have enough remaining headroom within the

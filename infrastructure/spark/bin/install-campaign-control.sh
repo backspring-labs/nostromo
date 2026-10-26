@@ -46,7 +46,7 @@ for source in "$REPO"/runtime/campaigns/*.py; do
   install -m 644 -o root -g root "$source" /usr/local/lib/nostromo/campaigns/
 done
 install -m 644 "$REPO/infrastructure/buzz/bin/nostr_keys.py" /usr/local/lib/nostromo/campaigns/nostr_keys.py
-for name in campaign-broker.py campaign-watch.py campaign-window.py campaign-window-check.py campaign-review.py campaign-advance.py; do
+for name in campaign-broker.py campaign-watch.py campaign-window.py campaign-window-check.py campaign-review.py campaign-advance.py campaign-launch.py; do
   install -m 755 "$REPO/infrastructure/spark/bin/$name" /usr/local/lib/nostromo/
 done
 install -m 755 "$REPO/infrastructure/spark/bin/campaignctl" /usr/local/bin/campaignctl
@@ -82,12 +82,13 @@ for role,(provider,model) in expected.items():
 c['review_auth_tags']={r:agents[r]['buzz_auth_tag'] for r in expected}
 c['review_personas']={r:'/usr/local/share/nostromo/campaign-'+r+'.md' for r in expected}
 c['automation_enabled']=True
+c['launch_enabled']=True
 p=pathlib.Path('/etc/nostromo/campaign-broker.json')
 p.write_text(json.dumps(c,indent=2)+'\n')
 p.chmod(0o644)
 PY
 install -m 644 "$REPO/infrastructure/spark/systemd/50-nostromo-campaign-window.rules" /etc/polkit-1/rules.d/
-for name in nostromo-campaign-broker.service nostromo-campaign-watch.service nostromo-campaign-window.service nostromo-campaign-window.timer nostromo-campaign-review@.service nostromo-campaign-review@.timer nostromo-campaign-advance.service nostromo-campaign-advance.timer; do
+for name in nostromo-campaign-broker.service nostromo-campaign-watch.service nostromo-campaign-window.service nostromo-campaign-window.timer nostromo-campaign-review@.service nostromo-campaign-review@.timer nostromo-campaign-advance.service nostromo-campaign-advance.timer nostromo-campaign-launch.service nostromo-campaign-launch.timer; do
   install -m 644 "$REPO/infrastructure/spark/systemd/$name" /etc/systemd/system/
 done
 for role in mother brett; do
@@ -102,6 +103,7 @@ systemctl enable --now nostromo-campaign-broker.service nostromo-campaign-window
 # An upgrade must reload the copied Python modules, including when the units were already active.
 systemctl restart nostromo-campaign-broker.service nostromo-campaign-watch.service
 systemctl enable --now nostromo-campaign-advance.timer nostromo-campaign-review@ripley.timer nostromo-campaign-review@dallas.timer
+systemctl enable --now nostromo-campaign-launch.timer
 systemctl is-active nostromo-campaign-broker.service nostromo-campaign-window.timer nostromo-campaign-watch.service
 echo "Installed. Existing crew services need no restart; the startup condition applies at their next start."
 echo "Verify the socket's role refusals before approving any definition or starting a campaign."

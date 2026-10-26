@@ -1,0 +1,22 @@
+[Unit]
+Description=Nostromo durable campaign launcher (no model calls)
+After=nostromo-campaign-broker.service network-online.target
+Requires=nostromo-campaign-broker.service
+
+[Service]
+Type=oneshot
+User=mother
+ExecStart=/usr/bin/python3 -I /usr/local/lib/nostromo/campaign-launch.py
+TimeoutStartSec=180
+TimeoutStopSec=10
+KillMode=control-group
+StateDirectory=nostromo-campaign-launch
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+MemoryMax=128M
+TasksMax=8
+LimitCORE=0

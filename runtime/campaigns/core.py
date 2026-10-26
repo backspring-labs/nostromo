@@ -56,6 +56,13 @@ class Store:
                 failure_diagnostic TEXT);
             CREATE TABLE IF NOT EXISTS review_recoveries(job TEXT PRIMARY KEY, state TEXT NOT NULL,
                 authorized REAL NOT NULL, claimed REAL, failure TEXT, event_id TEXT);
+            CREATE TABLE IF NOT EXISTS launch_workflows(
+                id TEXT PRIMARY KEY, definition TEXT NOT NULL UNIQUE, fingerprint TEXT NOT NULL,
+                body TEXT NOT NULL, campaign TEXT NOT NULL UNIQUE, channel TEXT NOT NULL, thread TEXT NOT NULL,
+                create_request TEXT NOT NULL UNIQUE, start_request TEXT NOT NULL UNIQUE,
+                state TEXT NOT NULL, created REAL NOT NULL, deadline REAL NOT NULL, diagnostic TEXT,
+                notice_phase TEXT, notice_claimed REAL, notice_attempts INTEGER NOT NULL DEFAULT 0,
+                notice_event TEXT, announcement_event TEXT, completion_event TEXT, delivery_error TEXT);
         """)
         columns = {row[1] for row in self.db.execute("PRAGMA table_info(definitions)")}
         if "inference_mode" not in columns:
@@ -110,6 +117,9 @@ class Broker:
         command, args = request["command"], request["args"]
         if not isinstance(args, dict):
             raise Refused("args must be an object")
+        from .launch import COMMANDS as LAUNCH_COMMANDS, Launches
+        if command in LAUNCH_COMMANDS:
+            return Launches(self).handle(caller, command, args, request)
         from .evidence import COMMANDS, Evidence
         if command in COMMANDS:
             return Evidence(self).handle(command, args)
@@ -318,6 +328,10 @@ class Broker:
         if command == "create":
             exact(args, {"definition", "reason"})
             approved, sha = self.store.definition(args["definition"])
+            workflow = self.store.db.execute("SELECT state,create_request,deadline FROM launch_workflows WHERE definition=?",
+                                             (args["definition"],)).fetchone()
+            if workflow and (workflow["state"] != "creating" or workflow["create_request"] != rid or time.time() >= workflow["deadline"]):
+                raise Refused("definition belongs to a durable launch; inspect launch-status")
             if self.store.db.execute("SELECT 1 FROM launches WHERE definition=?", (args["definition"],)).fetchone():
                 raise Refused("definition already reserved for one campaign; a new campaign needs fresh owner approval")
             spec = approved["definition"]
@@ -335,6 +349,10 @@ class Broker:
             return "control", "POST", "/api/v1/campaigns", body, remember
         cid = identifier(args.get("campaign"))
         record = self.store.campaign(cid)
+        if command == "start":
+            workflow = self.store.db.execute("SELECT state,start_request,deadline FROM launch_workflows WHERE campaign=?", (cid,)).fetchone()
+            if workflow and (workflow["state"] != "starting" or workflow["start_request"] != rid or time.time() >= workflow["deadline"]):
+                raise Refused("campaign belongs to a durable launch; inspect launch-status")
         approved, _ = self.store.definition(record["definition"])
         campaign = self.api("read", "GET", f"/api/v1/campaigns/{cid}", None)
         if command in GATES:
