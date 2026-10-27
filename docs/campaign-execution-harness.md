@@ -182,9 +182,20 @@ automation section means no paid dispatch.
    checks for supported waiting gates.
 2. SquadOps receives a 30-second interval for its own no-open-questions automatic approval before
    Nostromo queues Ripley's review.
-3. Ripley receives one complete bounded packet with the campaign objective, policy, gate, selected
-   full evidence, artifact digests, and allowed evidence-reference IDs. The packet is capped at
-   65,536 serialized bytes.
+3. Ripley receives one complete bounded packet with the campaign objective, policy, gate, the
+   gate's evidence in full, artifact digests, and allowed evidence-reference IDs.
+   - **What evidence a gate gets is a contract** (`GATE_EVIDENCE` in `runtime/campaigns/automation.py`).
+     Artifacts are selected by type. A generic `document` is also selected by the SquadOps task that
+     produced it.
+   - **A plan gate requires** the canonical plan (`control_implementation_plan`) and the consolidated
+     planning narrative (`document:governance.review_plan`). Other documents from the planning run
+     are not included.
+   - **A gate reads only its own run.** Failed emissions are never evidence.
+   - **Missing required evidence parks the campaign** with an explicit `required evidence missing`
+     hold.
+   - **The request is capped at 65,536 serialized bytes.** Over that, the campaign parks with
+     `evidence_size_hold`.
+   - **Both holds come before any paid job is queued.** Neither is silent omission.
 4. Ripley returns a strict structured decision. Available decisions are `approved`, `rejected`,
    `returned_for_revision`, and `needs_owner`; revision is removed from the schema if immutable
    campaign/cycle policy or run history shows no revision remaining.
