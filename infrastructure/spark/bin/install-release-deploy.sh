@@ -2,7 +2,8 @@
 # One authenticated step: put the Spark on release deploys, and retire the password-free helper.
 # Runs ON the Spark, AS root, from a release the supervisor has already staged:
 #
-#   ssh nostromo@spark python3 -I /opt/nostromo/nostromo-src/infrastructure/spark/bin/nostromo-release.py stage
+#   ssh nostromo@spark 'python3 -I - stage' < infrastructure/spark/bin/nostromo-release.py   (from the Mac;
+#     before adoption there is no current to run it from)
 #   sudo bash /opt/nostromo/releases/<sha>/infrastructure/spark/bin/install-release-deploy.sh
 #
 # Afterwards everything reads through /opt/nostromo/current, and nostromo-release.py deploys a
