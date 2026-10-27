@@ -149,13 +149,24 @@ class Adopt:
                 self.spark.systemctl('start', unit)
             if not rel.healthy(self.spark):
                 raise Refused('the campaign daemons did not come up healthy on the new layout')
+            # Resuming is part of adoption: a timer that will not start undoes it like any other step.
+            self.step('resume timers')
+            failed = rel.resume(self.spark, paused)
+            if failed:
+                raise Refused(f'these timers would not start on the new layout: {", ".join(failed)}')
         except BaseException:
+            # Quiesce first. A daemon or timer already running on the new layout must not keep running
+            # it after the files go back, and `systemctl start` on a running unit does nothing.
+            for unit in (*paused, *rel.DAEMONS):
+                try:
+                    self.spark.systemctl('stop', unit)
+                except Exception:
+                    pass
             errors = self.rollback()
             print('== adoption failed; ' + ('everything was put back as it was' if not errors else
                   'restoring hit errors, inspect ' + str(self.backup) + ': ' + '; '.join(errors)), file=sys.stderr)
             raise
         self.undo.clear()
-        rel.resume(self.spark, paused)
 
     def migrate(self):
         opt = self.at('opt/nostromo')

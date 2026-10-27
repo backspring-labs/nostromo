@@ -250,8 +250,14 @@ def drain(spark, timeout):
 
 
 def resume(spark, paused):
+    """Start every paused timer, even after one fails; return the ones that did not start."""
+    failed = []
     for timer in paused:
-        spark.systemctl('start', timer)
+        try:
+            spark.systemctl('start', timer)
+        except Exception:  # any failure to start counts; keep starting the rest
+            failed.append(timer)
+    return failed
 
 
 def switch(spark, sha, merged, reason, drain_timeout=120):
@@ -261,6 +267,7 @@ def switch(spark, sha, merged, reason, drain_timeout=120):
     if old == sha:
         return {'commit': sha, 'unchanged': True}
     paused = drain(spark, drain_timeout)
+    stopped = []
     try:
         if old:
             point(spark.previous, f'releases/{old}')
@@ -274,8 +281,13 @@ def switch(spark, sha, merged, reason, drain_timeout=120):
             raise Refused(f'{sha[:12]} failed its health check; ' + (
                 f'{old[:12]} is live again' if restored else 'and the previous release did not recover: inspect journalctl -u nostromo-campaign-broker'))
     finally:
-        resume(spark, paused)
-    record(spark, commit=sha, previous=old, merged=merged, reason=reason, result='live')
+        stopped = resume(spark, paused)
+    # A healthy release stays live; a timer that would not restart is recorded and reported, not hidden.
+    record(spark, commit=sha, previous=old, merged=merged, reason=reason, result='live',
+           **({'timers_not_restarted': stopped} if stopped else {}))
+    if stopped:
+        raise Refused(f'{sha[:12]} is live and healthy, but these timers did not restart: {", ".join(stopped)}. '
+                      'Start them by hand (systemctl start), and inspect their journals')
     return {'commit': sha, 'previous': old, 'stale_harnesses': stale(spark)}
 
 

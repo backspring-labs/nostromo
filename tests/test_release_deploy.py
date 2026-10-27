@@ -74,15 +74,24 @@ class FakeSpark(rel.Spark):
         self.units = {unit: 'active' for unit in (*rel.DAEMONS, *rel.TIMERS)}
         self.units.update({unit: 'inactive' for unit in rel.WORKERS})
         self.calls, self.bad, self.clock, self.harness_start = [], set(), 1000.0, {}
+        # Which release each running unit loaded (None: the pre-release layout), and units whose
+        # next start fails once.
+        self.loaded, self.fail_start = {}, set()
 
     def systemctl(self, *args):
         self.calls.append(args)
-        verb, unit = args[0], args[-1]
-        if verb == 'stop':
-            self.units[unit] = 'inactive'
-        elif verb in ('start', 'restart'):
-            self.units[unit] = 'active'
-        elif verb == 'show':
+        verb, units = args[0], args[1:]
+        for unit in units:
+            if verb == 'stop':
+                self.units[unit] = 'inactive'
+            elif verb == 'start' and unit in self.fail_start:
+                self.fail_start.discard(unit)
+                raise rel.Refused(f'systemctl start {unit}: injected failure')
+            # Like systemd: start on a running unit does nothing; restart always reloads it.
+            elif verb == 'restart' or (verb == 'start' and self.units.get(unit) != 'active'):
+                self.units[unit] = 'active'
+                self.loaded[unit] = rel.live(self) if self.current.is_symlink() else None
+        if verb == 'show':
             return '0'
         return ''
 
@@ -427,7 +436,7 @@ def test_adoption_links_everything_into_current_and_retires_the_helper(site):
 
 
 @pytest.mark.parametrize('failing', ['current and nostromo-src', '/usr/local links', 'polkit rule and crew unit',
-                                     'retire nostromo-deploy', 'start'])
+                                     'retire nostromo-deploy', 'start', 'resume timers'])
 def test_a_failure_after_the_drain_puts_everything_back(site, failing):
     before = snapshot(site.fs)
 
@@ -491,3 +500,43 @@ def test_bytecode_in_the_clone_is_ignored_but_planted_bytecode_in_a_release_is_n
     planted.chmod(0o555)
     with pytest.raises(adopt.Refused, match='differs from GitHub'):
         site.make().check()
+
+
+def restored(site, before):
+    assert snapshot(site.fs) == before
+    assert all(site.spark.units[unit] == 'active' for unit in (*rel.DAEMONS, *rel.TIMERS))
+    # Running again on the old layout, not still holding the new release's code.
+    assert all(site.spark.loaded.get(unit) is None for unit in rel.DAEMONS)
+
+
+def test_a_timer_that_will_not_resume_undoes_the_adoption(site):
+    before = snapshot(site.fs)
+    site.spark.fail_start.add('nostromo-campaign-advance.timer')
+    with pytest.raises(adopt.Refused, match='would not start'):
+        site.make().adopt()
+    restored(site, before)
+
+
+def test_daemons_that_started_on_the_new_layout_are_restarted_on_the_old(site):
+    before = snapshot(site.fs)
+    site.spark.bad.add(site.sha)
+    with pytest.raises(adopt.Refused, match='healthy'):
+        site.make().adopt()
+    restored(site, before)
+
+
+def test_a_successful_adoption_leaves_the_daemons_on_the_release(site):
+    site.make().adopt()
+    assert all(site.spark.loaded[unit] == site.sha for unit in rel.DAEMONS)
+
+
+def test_a_timer_that_will_not_restart_after_a_healthy_deploy_is_recorded_and_reported(spark, upstream):
+    deploy(spark)
+    second = upstream.commit({'runtime/campaigns/service.py': 'VALUE = 8\n'})
+    spark.fail_start.add('nostromo-campaign-launch.timer')
+    with pytest.raises(rel.Refused, match='live and healthy, but these timers did not restart: nostromo-campaign-launch.timer'):
+        deploy(spark)
+    assert rel.live(spark) == second
+    assert records(spark)[-1]['timers_not_restarted'] == ['nostromo-campaign-launch.timer']
+    # Every other paused timer was still started.
+    assert all(spark.units[t] == 'active' for t in rel.TIMERS if t != 'nostromo-campaign-launch.timer')
