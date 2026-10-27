@@ -103,8 +103,9 @@ creation; retries with new request IDs cannot multiply it.
 
 The current local owner path accepts the owner UID in `core.py` (`approve-definition`);
 `approve-budget` has the same owner-UID shortcut. An AI session acting under the owner UID therefore
-holds this authority, so AI sessions must use their crew identities and never invoke owner-only
-approval commands. These shortcuts are being replaced by signed Buzz approvals, verified through
+holds this authority. AI coding sessions (Codex, Claude Code) have no crew identity: they use
+`nostromo@spark` for deploys and `jladd@spark` only for read-only campaign reads, and never invoke
+owner-only approval commands unless the owner asks for that action. These shortcuts are being replaced by signed Buzz approvals, verified through
 the same remote approval path. For a remote Buzz approval, the owner publishes
 one exact `campaign-definition: {...}` line in an admitted channel. Mother imports the event by
 ID; the broker verifies the event kind, owner's pinned public key, freshness, channel, signature,
