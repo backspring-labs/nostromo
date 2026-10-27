@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Reviewed root step, ON the Spark. Never installs or grants a sudoers exception to an agent.
-# Usage: sudo bash install-campaign-control.sh /path/to/nostromo /path/to/owner-staging
+# Usage: sudo bash "$C/infrastructure/spark/bin/install-campaign-control.sh" "$C" /path/to/owner-staging
+#   where "$C" is a root-owned clone at the reviewed commit, never /opt/nostromo (docs/runbooks/deployment.md)
 set -euo pipefail
 REPO="${1:?usage: install-campaign-control.sh REPO STAGING}"
 STAGING="${2:?usage: install-campaign-control.sh REPO STAGING}"

@@ -70,14 +70,26 @@ again. Without that, deploy the main commit you want instead.
 ## Root steps run from a fresh clone, never from `/opt/nostromo`
 
 The supervisor owns `/opt/nostromo`, and AI sessions work as the supervisor. So a script there could
-change between the owner reading it and root running it. Any root step (the one-time adoption below,
-or a later `install-*.sh`) runs from a private root-owned clone of GitHub at the exact commit:
+change between the owner reading it and root running it. Every root step reads its files from a
+**root-owned clone of GitHub at the exact commit**. That covers the one-time adoption below and every
+`install-*.sh`. Anyone can read the clone; only root can change it.
 
 ```bash
-sudo bash -c 'set -e; D=$(mktemp -d); git -C "$D" init -q
-  git -C "$D" fetch -q --depth 1 https://github.com/backspring-labs/nostromo.git COMMIT
-  git -C "$D" checkout -q FETCH_HEAD; cd "$D"; exec "$@"' _ <command> [args]
+C=$(sudo mktemp -d /var/tmp/nostromo-root.XXXXXX) && sudo chmod 755 "$C"
+sudo git -C "$C" init -q
+sudo git -C "$C" fetch -q --depth 1 https://github.com/backspring-labs/nostromo.git COMMIT
+sudo git -C "$C" checkout -q FETCH_HEAD
+#   ... the step, reading only from "$C" (examples below) ...
+sudo rm -rf "$C"
 ```
+
+- **Use the full 40-character commit**, normally the head of main. Read the script in `"$C"`, then run
+  it from there.
+- **The installers default to the tree they run from.** Run from `"$C"`, they read `"$C"`.
+- **Examples:**
+  - `sudo bash "$C/infrastructure/spark/bin/install-units.sh" mother brett`
+  - `sudo bash "$C/infrastructure/spark/bin/install-budget-watch.sh"`
+  - campaign control: see `campaign-control.md`
 
 ## First adoption (once)
 
@@ -88,22 +100,20 @@ sudo bash -c 'set -e; D=$(mktemp -d); git -C "$D" init -q
    ssh nostromo@spark 'python3 -I - stage' < infrastructure/spark/bin/nostromo-release.py
    ```
 
-2. Adopt it as root, from a fresh clone of the same commit. `COMMIT` appears twice:
+2. On the Spark, make the clone above at the same commit. Then run:
 
    ```bash
-   sudo bash -c 'set -e; D=$(mktemp -d); git -C "$D" init -q
-     git -C "$D" fetch -q --depth 1 https://github.com/backspring-labs/nostromo.git COMMIT
-     git -C "$D" checkout -q FETCH_HEAD
-     python3 -I "$D/infrastructure/spark/bin/install-release-deploy.py" COMMIT'
+   sudo python3 -I "$C/infrastructure/spark/bin/install-release-deploy.py" COMMIT
    ```
 
 The installer does these, in order:
-- refuses unless the staged release is byte-identical to that clone;
+- refuses unless the clone is root-owned, writable only by root, and at that commit;
+- refuses unless the staged release is byte-identical to the clone;
 - drains;
 - switches the paths to links;
 - installs the polkit rule and `nostromo@.service`;
 - moves `nostromo-deploy`, its sudoers rule and its state to `/var/backups/nostromo-release-adopt-*`;
-- starts and checks the daemons.
+- starts and checks the daemons, and resumes the timers.
 
 A failure at any step after the drain stops what may be running the new layout, puts every change
 back in reverse order, and restarts the daemons and timers that were running. It then reads back

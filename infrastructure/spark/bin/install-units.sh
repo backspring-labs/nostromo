@@ -5,13 +5,14 @@
 #         install-units.sh --dry-run [role ...]
 set -euo pipefail
 
-REPO="${NOSTROMO_REPO:-/opt/nostromo/nostromo-src}"
+# The tree this script runs from: a root-owned clone, never /opt/nostromo (docs/runbooks/deployment.md).
+REPO="${NOSTROMO_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)}"
 UNIT_SRC="$REPO/infrastructure/spark/systemd/nostromo@.service"
 UNIT_DST=/etc/systemd/system/nostromo@.service
 
 die() { echo "install-units: $*" >&2; exit 1; }
 [[ "$(id -u)" == 0 ]] || die "must run as root (systemd unit installation and role log dirs)"
-[[ -r "$UNIT_SRC" ]] || die "missing $UNIT_SRC — run deploy-spark.sh from the Mac"
+[[ -r "$UNIT_SRC" ]] || die "missing $UNIT_SRC — run this from a root-owned clone (docs/runbooks/deployment.md)"
 
 DRY=""; [[ "${1:-}" == "--dry-run" ]] && { DRY=1; shift; }
 

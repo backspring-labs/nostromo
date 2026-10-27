@@ -253,6 +253,9 @@ def drain(spark, timeout):
     except BaseException as error:
         unresumed = resume(spark, paused)
         if not isinstance(error, Exception):
+            # Interrupted: still say which timers are left stopped, then let the interruption through.
+            if unresumed:
+                print('nostromo-release: interrupted during the drain' + timers_note(unresumed), file=sys.stderr)
             raise
         raise Refused(f'{error}; nothing changed. Retry later' + timers_note(unresumed)) from error
     return paused
@@ -277,11 +280,13 @@ def resume(spark, paused):
 
 
 def attempt(spark, sha, old):
-    """Point current at sha and restart. Unhealthy: point back and restart. Returns what is live."""
-    if old:
-        point(spark.previous, f'releases/{old}')
+    """Point current at sha and restart. Unhealthy: point back and restart. Returns what is live.
+
+    previous moves only once sha is live: a switch that fails part way keeps the rollback target."""
     point(spark.current, f'releases/{sha}')
     if restart(spark):
+        if old:
+            point(spark.previous, f'releases/{old}')
         return 'live'
     if old:
         point(spark.current, f'releases/{old}')

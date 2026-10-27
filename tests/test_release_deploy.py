@@ -641,3 +641,67 @@ def test_a_release_that_cannot_be_pruned_does_not_fail_a_good_deploy(spark, upst
     monkeypatch.setattr(rel, 'remove', lambda path: (_ for _ in ()).throw(PermissionError(13, 'Permission denied')))
     assert deploy(spark) == 0
     assert 'prune_problems' in json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+
+
+def test_no_instruction_runs_a_root_step_from_the_supervisors_tree():
+    """Root must read its files from a root-owned clone, never /opt/nostromo or a shared $PWD."""
+    offenders = []
+    sources = [*ROOT.glob('docs/runbooks/*.md'), *ROOT.glob('crew/**/*.md'), ROOT / 'instructions.md',
+               *BIN.glob('*'), *SYSTEMD.glob('*')]
+    for path in sources:
+        if not path.is_file():
+            continue
+        for number, line in enumerate(path.read_text(errors='ignore').splitlines(), 1):
+            if 'sudo' in line and re.search(r'/opt/nostromo|nostromo-src|"\$PWD"', line) and 'never' not in line:
+                offenders.append(f'{path.relative_to(ROOT)}:{number}: {line.strip()}')
+    assert offenders == []
+
+
+def test_installers_default_to_the_tree_they_run_from():
+    for name in ('install-units.sh', 'install-budget-watch.sh'):
+        text = (BIN / name).read_text()
+        assert 'REPO="${NOSTROMO_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)}"' in text, name
+
+
+def test_a_failed_switch_keeps_the_rollback_target(spark, upstream, monkeypatch):
+    deploy(spark)
+    second = upstream.commit({'runtime/campaigns/service.py': 'VALUE = 13\n'})
+    deploy(spark)
+    assert (rel.live(spark), rel.live(spark, spark.previous)) == (second, upstream.first)
+    upstream.commit({'runtime/campaigns/service.py': 'VALUE = 14\n'})
+    real = rel.point
+
+    def point(link, target):
+        if link == spark.current:
+            raise OSError(28, 'No space left on device')
+        real(link, target)
+    monkeypatch.setattr(rel, 'point', point)
+    with pytest.raises(rel.Refused, match='stopped by OSError'):
+        deploy(spark)
+    assert (rel.live(spark), rel.live(spark, spark.previous)) == (second, upstream.first)
+
+
+def test_a_rolled_back_deploy_keeps_the_rollback_target(spark, upstream):
+    deploy(spark)
+    second = upstream.commit({'runtime/campaigns/service.py': 'VALUE = 15\n'})
+    deploy(spark)
+    bad = upstream.commit({'runtime/campaigns/service.py': 'VALUE = 16\n'})
+    spark.bad.add(bad)
+    with pytest.raises(rel.Refused, match='is live again'):
+        deploy(spark)
+    assert (rel.live(spark), rel.live(spark, spark.previous)) == (second, upstream.first)
+
+
+def test_an_interrupted_drain_still_names_timers_left_stopped(spark, upstream, capsys):
+    deploy(spark)
+    upstream.commit({'runtime/campaigns/service.py': 'VALUE = 17\n'})
+    spark.units['nostromo-campaign-review@ripley.service'] = 'activating'
+    spark.fail_always.add('nostromo-campaign-launch.timer')
+
+    def interrupted(_seconds):
+        raise KeyboardInterrupt
+    spark.sleep = interrupted
+    with pytest.raises(KeyboardInterrupt):
+        deploy(spark)
+    assert 'interrupted during the drain. These timers did not restart and are stopped: nostromo-campaign-launch.timer' in capsys.readouterr().err
+    assert rel.live(spark) == upstream.first

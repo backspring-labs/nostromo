@@ -4,12 +4,13 @@
 #
 # Touches nothing else: no crew unit is restarted, unlike install-units.sh.
 set -euo pipefail
-REPO="${NOSTROMO_REPO:-/opt/nostromo/nostromo-src}"
+# The tree this script runs from: a root-owned clone, never /opt/nostromo (docs/runbooks/deployment.md).
+REPO="${NOSTROMO_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)}"
 SRC="$REPO/infrastructure/spark/systemd/nostromo-budget-watch.service"
 DST=/etc/systemd/system/nostromo-budget-watch.service
 die() { echo "install-budget-watch: $*" >&2; exit 1; }
 [[ "$(id -u)" == 0 ]] || die "run as root: sudo $0"
-[[ -r "$SRC" ]] || die "missing $SRC — run deploy-spark.sh from the Mac"
+[[ -r "$SRC" ]] || die "missing $SRC — run this from a root-owned clone (docs/runbooks/deployment.md)"
 [[ -x "$REPO/infrastructure/spark/bin/budget-watch" ]] || die "budget-watch is missing or not executable"
 getent group systemd-journal >/dev/null || die "no systemd-journal group on this host"
 

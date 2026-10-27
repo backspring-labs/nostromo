@@ -6,7 +6,8 @@
 # to the system journal, where the crew's refusals are logged, without adding the supervisor account
 # to that group for everything else it does.
 #
-# Install:  sudo /opt/nostromo/nostromo-src/infrastructure/spark/bin/install-budget-watch.sh
+# Install:  sudo bash "$C/infrastructure/spark/bin/install-budget-watch.sh", from a root-owned clone "$C"
+#           (docs/runbooks/deployment.md), never from /opt/nostromo
 
 [Unit]
 Description=Nostromo budget watch (pause metered roles at budget exhaustion, resume at reset)

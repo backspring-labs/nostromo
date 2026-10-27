@@ -33,12 +33,15 @@ Ordinary code, prompt and runbook updates are [deployed from merged main](deploy
 no password. The installer below remains the authenticated path for changes to accounts, keys,
 service definitions, or privilege rules.
 
-Run from the tested source checkout on Spark as the owner:
+Run both steps as the owner on the Spark, from a root-owned clone `"$C"` of GitHub at the reviewed
+commit. [Deployment](deployment.md#root-steps-run-from-a-fresh-clone-never-from-optnostromo) shows
+how to make it. Never run them from `/opt/nostromo`: the supervisor owns that tree, and AI sessions
+work as the supervisor.
 
 ```bash
-python3 infrastructure/spark/bin/prepare-campaign-auth.py --channels \
+python3 "$C/infrastructure/spark/bin/prepare-campaign-auth.py" --channels \
   60cf6624-62d1-4c37-9522-f6dbf884fd25 d6eb31a3-a79a-42cb-b812-21101736b1f1
-sudo bash infrastructure/spark/bin/install-campaign-control.sh "$PWD" \
+sudo bash "$C/infrastructure/spark/bin/install-campaign-control.sh" "$C" \
   "$HOME/.config/nostromo/campaign-provision"
 ```
 

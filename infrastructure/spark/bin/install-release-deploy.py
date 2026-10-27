@@ -244,8 +244,8 @@ def main(argv=None):
     if os.geteuid() != 0:
         raise Refused('run as root, from a fresh root-owned clone (docs/runbooks/deployment.md)')
     info = HERE.stat()
-    if info.st_uid != 0 or info.st_mode & 0o077:
-        raise Refused(f'{HERE} must be a private root-owned clone, not a shared tree')
+    if info.st_uid != 0 or info.st_mode & 0o022:
+        raise Refused(f'{HERE} must be a root-owned clone that only root can write, not a shared tree')
     head = subprocess.run(['git', '-C', str(HERE), 'rev-parse', 'HEAD'], capture_output=True, text=True).stdout.strip()
     if head != sha:
         raise Refused(f'this clone is at {head[:12] or "?"}, not {sha[:12]}')

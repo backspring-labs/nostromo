@@ -601,7 +601,8 @@ GEMINI
         bwrap --ro-bind / / --unshare-user /bin/true 2>/dev/null \
           || die "bubblewrap cannot build a sandbox as $ROLE, so every shell command this role runs" \
                  "would be refused before it starts. Install the AppArmor profile:" \
-                 "sudo install -m 644 $REPO/infrastructure/spark/apparmor/usr.bin.bwrap" \
+                 "from a root-owned clone \"\$C\" (docs/runbooks/deployment.md):" \
+                 "sudo install -m 644 \"\$C/infrastructure/spark/apparmor/usr.bin.bwrap\"" \
                  "/etc/apparmor.d/usr.bin.bwrap && sudo apparmor_parser -r /etc/apparmor.d/usr.bin.bwrap"
       fi
     fi
