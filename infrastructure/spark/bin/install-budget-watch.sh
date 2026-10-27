@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Install and start nostromo-budget-watch. Runs ON the Spark, AS root — once; later changes to the
-# watcher itself arrive with push-repo.sh and take effect on `systemctl restart nostromo-budget-watch`.
+# watcher itself arrive with a deploy (deploy-spark.sh), which also restarts it on `systemctl restart nostromo-budget-watch`.
 #
 # Touches nothing else: no crew unit is restarted, unlike install-units.sh.
 set -euo pipefail
@@ -9,7 +9,7 @@ SRC="$REPO/infrastructure/spark/systemd/nostromo-budget-watch.service"
 DST=/etc/systemd/system/nostromo-budget-watch.service
 die() { echo "install-budget-watch: $*" >&2; exit 1; }
 [[ "$(id -u)" == 0 ]] || die "run as root: sudo $0"
-[[ -r "$SRC" ]] || die "missing $SRC — run push-repo.sh from the Mac"
+[[ -r "$SRC" ]] || die "missing $SRC — run deploy-spark.sh from the Mac"
 [[ -x "$REPO/infrastructure/spark/bin/budget-watch" ]] || die "budget-watch is missing or not executable"
 getent group systemd-journal >/dev/null || die "no systemd-journal group on this host"
 

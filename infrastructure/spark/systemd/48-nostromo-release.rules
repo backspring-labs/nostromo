@@ -1,0 +1,32 @@
+// Let the supervisor (nostromo) restart the units that run release code, and nothing else.
+//
+// Install:  install-release-deploy.sh (once, as root). Used by nostromo-release.py, which deploys a
+// release by repointing /opt/nostromo/current and restarting these units. The supervisor already
+// owns that release tree, so this grants no new reach into code; it replaces a root helper and a
+// password-free sudo rule with a list of unit names.
+//
+// Named user only, never the `nostromo` group: every crew role is in that group (see
+// 49-nostromo-crewctl.rules). Crew harnesses (nostromo@*) are 49's; TensorFold, Docker and
+// everything else on the box are nobody's here. Keep this list equal to DAEMONS and TIMERS in
+// nostromo-release.py; tests/test_release_deploy.py asserts it.
+
+polkit.addRule(function(action, subject) {
+    if (action.id !== "org.freedesktop.systemd1.manage-units" || subject.user !== "nostromo") {
+        return polkit.Result.NOT_HANDLED;
+    }
+    var units = [
+        "nostromo-campaign-broker.service",
+        "nostromo-campaign-watch.service",
+        "nostromo-budget-watch.service",
+        "nostromo-campaign-window.timer",
+        "nostromo-campaign-advance.timer",
+        "nostromo-campaign-launch.timer",
+        "nostromo-campaign-review@ripley.timer",
+        "nostromo-campaign-review@dallas.timer"
+    ];
+    var verbs = ["start", "stop", "restart"];
+    if (units.indexOf(action.lookup("unit")) >= 0 && verbs.indexOf(action.lookup("verb")) >= 0) {
+        return polkit.Result.YES;
+    }
+    return polkit.Result.NOT_HANDLED;
+});

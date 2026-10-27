@@ -26,7 +26,7 @@ for forbidden in sudo docker adm; do
     echo "refusing broker with privileged group $forbidden" >&2; exit 1
   fi
 done
-install -d -m 755 /usr/local/lib/nostromo /usr/local/lib/nostromo/campaigns /etc/nostromo
+install -d -m 755 /etc/nostromo
 install -d -m 700 -o nostromo-broker -g nostromo /etc/nostromo/secrets
 install -d -m 755 -o nostromo-broker -g nostromo /var/lib/nostromo-campaign-broker
 python3 - <<'PY'
@@ -42,19 +42,13 @@ if path.exists():
     destination.close(); source.close()
     print('Saved campaign state backup: '+str(backup))
 PY
-for source in "$REPO"/runtime/campaigns/*.py; do
-  install -m 644 -o root -g root "$source" /usr/local/lib/nostromo/campaigns/
-done
-install -m 644 "$REPO/infrastructure/buzz/bin/nostr_keys.py" /usr/local/lib/nostromo/campaigns/nostr_keys.py
-for name in campaign-broker.py campaign-watch.py campaign-window.py campaign-window-check.py campaign-review.py campaign-advance.py campaign-launch.py; do
-  install -m 755 "$REPO/infrastructure/spark/bin/$name" /usr/local/lib/nostromo/
-done
-install -m 755 "$REPO/infrastructure/spark/bin/campaignctl" /usr/local/bin/campaignctl
-install -d -m 755 /usr/local/share/nostromo
-install -m 644 "$REPO/docs/runbooks/campaign-control.md" /usr/local/share/nostromo/campaign-control.md
-install -m 644 "$REPO/docs/runbooks/shared-inference.md" /usr/local/share/nostromo/shared-inference.md
+# Code, entry points, campaignctl and the runbooks are not copied here. They are root-owned links
+# into /opt/nostromo/current, made once by install-release-deploy.sh, and nostromo-release.py
+# deploys them (docs/runbooks/deployment.md). Copying through those links would write into a
+# read-only release, so refuse until they exist.
+[[ -L /usr/local/lib/nostromo/campaigns ]] \
+  || { echo "run install-release-deploy.sh first: campaign code is deployed as a release" >&2; exit 1; }
 for role in ripley dallas; do
-  install -m 644 "$REPO/crew/personas/$role.md" "/usr/local/share/nostromo/campaign-$role.md"
   install -d -m 700 -o "$role" -g "$role" "/home/$role/.local/state/nostromo-reviews"
 done
 for role in control review read; do
@@ -97,7 +91,7 @@ for role in mother brett; do
 done
 systemctl daemon-reload
 systemctl enable --now nostromo-campaign-broker.service nostromo-campaign-window.timer nostromo-campaign-watch.service
-# An upgrade must reload the copied Python modules, including when the units were already active.
+# A changed unit or config must reach running daemons, including when they were already active.
 systemctl restart nostromo-campaign-broker.service nostromo-campaign-watch.service
 systemctl enable --now nostromo-campaign-advance.timer nostromo-campaign-review@ripley.timer nostromo-campaign-review@dallas.timer
 systemctl enable --now nostromo-campaign-launch.timer

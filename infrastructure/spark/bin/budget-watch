@@ -30,7 +30,7 @@ buzz-acp retried that, too, with backoff, so the asker saw three minutes of sile
 seen half an hour. A model refusal has no reset time: it lasts until someone changes the role's
 configuration. So the pause records a fingerprint of crew/manifest.yaml, versions.lock and
 launch-role.sh, and the role is started again once that fingerprint moves — the fix landing through
-push-repo.sh is the signal. If the fix was wrong, its first turn pauses the role again. The journal
+A deploy (deploy-spark.sh) is the signal. If the fix was wrong, its first turn pauses the role again. The journal
 catch-up at start ignores model refusals: the saved state is their record, and an old refusal must
 not re-pause a role whose configuration has since been fixed. Only the refusal buzz-acp retries is
 matched; "model not found" it already dead-letters at once.

@@ -29,10 +29,9 @@ limits are runtime boundaries, not a provider billing cap. No model or subscript
 
 ## Install on Spark
 
-For ordinary code updates after infrastructure is installed, use the
-[owner-only deployment helper](routine-deployment.md). It avoids repeated password prompts
-without granting crew accounts root access. The installer below remains the authenticated path
-for changes to accounts, keys, service definitions, or privilege rules.
+Ordinary code, prompt and runbook updates are [deployed from merged main](deployment.md), with
+no password. The installer below remains the authenticated path for changes to accounts, keys,
+service definitions, or privilege rules.
 
 Run from the tested source checkout on Spark as the owner:
 
@@ -46,13 +45,13 @@ sudo bash infrastructure/spark/bin/install-campaign-control.sh "$PWD" \
 Preparation uses the existing Keycloak owner's bootstrap login in memory to provision only
 the three service clients, and proves each can read the deployed API. It creates no admin
 grant. Keep its staging directory owner-only; it contains recovery copies of signing keys.
-The root installer installs immutable executable files, keys, units, and a polkit rule allowing
+The root installer installs keys, units, the broker configuration, and a polkit rule allowing
 only the broker account to start/stop `nostromo@mother` and `nostromo@brett`. It grants no sudo
 or Docker access. An interactive sudo prompt must be completed by the owner.
 The owner is added to the `nostromo` group for socket access; use a fresh SSH login afterward.
 
-Deploy this source's constitution, capability table, and role prompts using the existing
-`push-repo.sh` workflow. Existing turns retain their old prompts until their next launch.
+The code it runs, the constitution, capability table and role prompts arrive with a
+[deploy](deployment.md). Running harnesses keep their persona until `rollout.sh` restarts them.
 Check `systemctl is-active nostromo-campaign-broker nostromo-campaign-watch
 nostromo-campaign-window.timer` and inspect the journal. Do not enable campaign starts until
 the socket's live role refusals have been checked.

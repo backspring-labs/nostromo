@@ -5,7 +5,7 @@
 # build (c045321a, 2026-09-15) was done by hand and recorded nowhere but the ledger; this is that
 # build, written down.
 #
-# Runs ON the Spark as the supervisor (nostromo), which owns /opt/nostromo. Run push-repo.sh first,
+# Runs ON the Spark as the supervisor (nostromo), which owns /opt/nostromo. Deploy first (deploy-spark.sh),
 # so the launcher it checks against is the one that will run.
 #
 #   build-buzz.sh <commit>             fetch, build, check. Installs nothing
@@ -15,6 +15,9 @@
 # because the swap is a rename. Restart roles with crewctl afterwards, a canary first.
 # Pin the same commit as the relay unless there is a reason not to; the ledger records both.
 set -euo pipefail
+# The supervisor's login umask is 002 and every crew role is in its group: without this, a role could
+# replace the binaries every other role runs.
+umask 022
 die() { echo "build-buzz: $*" >&2; exit 1; }
 say() { echo "== $*"; }
 
@@ -29,7 +32,7 @@ SRC=/opt/nostromo/buzz-src
 LAUNCHER=/opt/nostromo/nostromo-src/infrastructure/spark/bin/launch-role.sh
 BINS=(buzz buzz-acp buzz-agent buzz-dev-mcp)
 export CARGO_HOME="$R/cargo" RUSTUP_HOME="$R/rustup" PATH="$R/cargo/bin:$PATH"
-[[ -r "$LAUNCHER" ]] || die "no launcher at $LAUNCHER — run push-repo.sh from the Mac"
+[[ -r "$LAUNCHER" ]] || die "no launcher at $LAUNCHER — run deploy-spark.sh from the Mac"
 
 RUNNING="$(cat "$BIN/buzz-build.commit" 2>/dev/null || echo unrecorded)"
 say "building ${COMMIT:0:10} (running: ${RUNNING:0:10})"

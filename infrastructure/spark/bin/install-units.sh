@@ -11,7 +11,7 @@ UNIT_DST=/etc/systemd/system/nostromo@.service
 
 die() { echo "install-units: $*" >&2; exit 1; }
 [[ "$(id -u)" == 0 ]] || die "must run as root (systemd unit installation and role log dirs)"
-[[ -r "$UNIT_SRC" ]] || die "missing $UNIT_SRC — run push-repo.sh from the Mac"
+[[ -r "$UNIT_SRC" ]] || die "missing $UNIT_SRC — run deploy-spark.sh from the Mac"
 
 DRY=""; [[ "${1:-}" == "--dry-run" ]] && { DRY=1; shift; }
 

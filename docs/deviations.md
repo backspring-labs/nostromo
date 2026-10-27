@@ -171,6 +171,10 @@ Temporary or permanent: Temporary. Superseded when nostromo-mother and nostromo-
 Owner approval:        Recorded for review.
 Revisit trigger:       Registration of an App installed on the nostromo repository; or the organization
                        enabling deploy keys.
+Resolved:              2026-10-27. The repository is public, so the supervisor fetches GitHub main
+                       anonymously and still holds no GitHub credential. push-repo.sh is retired:
+                       the Spark deploys merged main as read-only releases (nostromo-release.py,
+                       docs/runbooks/deployment.md), which also closes the stale-copy cost above.
 ```
 
 ```text

@@ -1516,6 +1516,11 @@ This provides:
 
 Do not copy secret files from git.
 
+> **As built (2026-10-27):** not a clone. The Spark runs read-only releases of merged `main`,
+> fetched anonymously from GitHub by the supervisor account. `/opt/nostromo/current` names the
+> live one, and `/opt/nostromo/nostromo-src` links to it. See `docs/runbooks/deployment.md` and
+> DEV-007.
+
 ---
 
 # 11.3 Install Herdr

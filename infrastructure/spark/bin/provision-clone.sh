@@ -26,7 +26,7 @@ DEST="${SQUADOPS_DEST:-$HOME/src/squad-ops}"
 source /opt/nostromo/runtime/env.sh
 
 die() { echo "provision-clone: $*" >&2; exit 1; }
-[[ -r "$MANIFEST" ]] || die "missing $MANIFEST — run push-repo.sh from the Mac"
+[[ -r "$MANIFEST" ]] || die "missing $MANIFEST — run deploy-spark.sh from the Mac"
 
 yaml_agent() {  # yaml_agent <key>  — under agents: <ROLE>:
   awk -v r="$ROLE" -v k="$1" '
