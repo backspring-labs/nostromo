@@ -1146,6 +1146,10 @@ Non-secret logical names and cap amounts belong in git.
 > Until then Claude Code holds the seat as the owner's delegate (the 2.0 set's pre-registration,
 > §3a).
 
+> **As built (2026-10-27):** the broker is a Unix-socket service that identifies callers with
+> `SO_PEERCRED`; it does not use a sudo-invoked `squadops-supervisor` command or a Mother-to-broker
+> sudoers rule. See [the canonical campaign execution harness](../campaign-execution-harness.md).
+
 ---
 
 # 9. WP-2 — Jetson Orin Nano Super: Buzz Server

@@ -1,5 +1,8 @@
 # Campaign control from Buzz
 
+For the system architecture, full campaign flow, Spark service identities, and least-privilege
+boundaries, see [Nostromo campaign execution harness](../campaign-execution-harness.md).
+
 Nostromo is a Buzz crew. This adapter lets it operate SquadOps campaigns against a target
 application; it does not make Nostromo GitHub the campaign database.
 
