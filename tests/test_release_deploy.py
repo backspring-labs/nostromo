@@ -477,3 +477,17 @@ def test_a_running_worker_stops_adoption_before_anything_changes(site):
         site.make().adopt()
     assert snapshot(site.fs) == before
     assert all(site.spark.units[timer] == 'active' for timer in rel.TIMERS)
+
+
+def test_bytecode_in_the_clone_is_ignored_but_planted_bytecode_in_a_release_is_not(site, upstream):
+    cache = upstream.work / 'infrastructure/spark/bin/__pycache__'
+    cache.mkdir(parents=True)
+    (cache / 'nostromo-release.cpython-312.pyc').write_bytes(b'from importing the installer')
+    site.make().check()
+    planted = site.fs / 'opt/nostromo/releases' / site.sha / 'runtime/campaigns'
+    planted.chmod(0o755)
+    (planted / '__pycache__').mkdir()
+    (planted / '__pycache__/service.cpython-312.pyc').write_bytes(b'not the reviewed source')
+    planted.chmod(0o555)
+    with pytest.raises(adopt.Refused, match='differs from GitHub'):
+        site.make().check()

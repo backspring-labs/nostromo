@@ -48,12 +48,18 @@ def remove(path):
         shutil.rmtree(path)
 
 
-def tree(top):
-    """Relative path -> bytes for every regular file, without Git metadata or the release stamp."""
+def tree(top, clone=False):
+    """Relative path -> bytes for every regular file, without Git metadata or the release stamp.
+
+    The clone gets bytecode caches the moment this script imports nostromo-release.py from it, so they
+    are skipped there. They are not skipped in a release: a planted .pyc would run instead of the
+    source, so one appearing there is a difference like any other."""
     out = {}
     for path in top.rglob('*'):
         rel_path = path.relative_to(top)
         if rel_path.parts[0] == '.git' or rel_path == Path('RELEASE.json'):
+            continue
+        if clone and '__pycache__' in rel_path.parts:
             continue
         if path.is_symlink():
             out[str(rel_path)] = b'link:' + os.readlink(path).encode()
@@ -117,7 +123,7 @@ class Adopt:
             raise Refused(f'{self.release} is not owned by the supervisor')
         if any(not p.is_symlink() and p.stat().st_mode & 0o022 for p in [self.release, *self.release.rglob('*')]):
             raise Refused(f'{self.release} is group- or other-writable')
-        mine, staged = tree(self.source), tree(self.release)
+        mine, staged = tree(self.source, clone=True), tree(self.release)
         if mine != staged:
             differs = sorted(set(mine) ^ set(staged)) or sorted(n for n in mine if mine[n] != staged[n])
             raise Refused(f'{self.release} differs from GitHub at {self.sha[:12]}, first at {differs[0]}; refusing')
