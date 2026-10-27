@@ -1,0 +1,23 @@
+# The crew's Buzz channels (Bootstrap Plan §16.6). Read by sync-squadops-canvas.py for the channel
+# map on the #squadops canvas. Members are role names from crew/manifest.yaml, plus `owner`.
+channels:
+  - name: nostromo
+    id: 9f4ab953-d3ce-4335-be39-3a5f6db007c3
+    purpose: Govern the crew. Presence, status, budget, escalations.
+    members: [owner, mother, ripley, dallas, parker, brett, ash]
+  - name: squadops
+    id: 61ebdf50-d0fa-46c1-a3f9-27eb7449f615  # created 2026-10-27 as Mother
+    purpose: Reference. What SquadOps is, its current state, where everything lives. Read the canvas; don't post here.
+    members: [owner, mother, ripley, dallas, parker, brett, ash]
+  - name: squadops-planning
+    id: d6eb31a3-a79a-42cb-b812-21101736b1f1
+    purpose: Decide. Roadmap, backlog and campaign definitions, one thread each.
+    members: [owner, mother, ripley, dallas, ash]
+  - name: squadops-campaigns
+    id: 60cf6624-62d1-4c37-9522-f6dbf884fd25
+    purpose: Run. One thread per campaign. Launch notices, gate reviews, closing records.
+    members: [owner, mother, ripley, parker, dallas, brett]
+  - name: squadops-dev
+    id: d31a788c-23dd-46db-989e-f8eebb478ca0
+    purpose: Develop. One thread per work item. Parker's PRs, Brett's cards, Dallas's reviews.
+    members: [owner, mother, ripley, parker, brett, dallas]
