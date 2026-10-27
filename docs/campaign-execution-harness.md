@@ -267,6 +267,36 @@ reads are capped at 256 KiB, and evidence listings are bounded/paginated.
 
 ## Spark identities and least privilege
 
+### Trust model
+
+Three tiers. Harden the boundary between the second and third, not inside the first.
+
+| Tier | Who | Trust |
+|---|---|---|
+| **Owner** | `jladd`, held by the owner and the AI coding sessions the owner delegates to (Codex, Claude Code). Those sessions run as the owner on the Mac and use the owner's SSH key. | **Root-equivalent.** `jladd` is in the `docker` group, which gives root without a password, and `sudo` with a password. The broker also admits this UID as the owner. |
+| **Supervisor and services** | `nostromo` (owns `/opt/nostromo` and the releases, deploys, restarts the units that run release code); `nostromo-broker` (API signing keys) | Trusted with the code and credentials they hold. Compromise of either is outside what the per-role boundary protects. |
+| **Crew** | `mother`, `ripley`, `dallas`, `parker`, `brett`, `ash`, `lambert`: the agents that read untrusted content, often unattended | **The containment boundary.** One account each, with private homes and secrets. They are not in `sudo`, `docker` or `adm`, have no polkit right over another role, and cannot write shared code. |
+
+What follows from this:
+
+- **No root-side hardening against `jladd`.** Root-side checks, pinning and password-free root helpers
+  protect nothing against an account that is already root through Docker. That was the lesson of
+  `nostromo-deploy`, retired on 2026-10-27.
+- **The `docker` group is kept on purpose.** The `squad-ops` stack and its scripts use Docker without
+  sudo, and so do the AI sessions that develop SquadOps. Removing it would break that work without
+  separating the owner from the owner's own delegates.
+- **AI sessions are the owner's delegates, not the owner.** By rule they use `nostromo@spark` for
+  deploys and `jladd@spark` only for read-only campaign reads. They never run owner-only approval
+  commands unless the owner asks, and never use Docker or sudo to get past a refusal. The rule is
+  procedural: on this box nothing technical separates them from the owner.
+- **Keep sudo password-protected.** Add no new password-free sudo rule.
+- **Signed owner approvals are for visibility, not security.** A delegate holding the owner's key can
+  sign as the owner. The point is that every approval appears in the channel.
+- **Revisit this model** if any of these changes:
+  - anything runs unattended as `jladd` while reading untrusted input;
+  - anyone else gets access to the owner's account;
+  - SquadOps moves to rootless Docker.
+
 ### Unix accounts
 
 Each crew role has its own Linux UID and private home. The `nostromo` group grants socket access
