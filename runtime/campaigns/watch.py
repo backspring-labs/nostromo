@@ -29,11 +29,13 @@ def publication_result(command, stdout):
     return result
 
 
-def notice(campaign):
+def notice(campaign, automated=False):
     state = campaign["state"]
     if state == "completed":
         return "Campaign closed; evidence ready for analysis."
     if state in {"awaiting_ruling", "escalated", "paused", "launch_blocked"}:
+        if automated:
+            return "Inspect the bounded review control and current evidence; owner decisions remain pending."
         return "Action required; inspect the current evidence packet. No review has been dispatched automatically."
     return "Campaign state changed."
 
@@ -46,8 +48,12 @@ def report(packet, package):
                       "\n\nRipley decision event: " + analysis["decision_event"]) if analysis else (
                       "Pending. This factual record is not an app-quality verdict. "
                       "A reviewer must add what improved, failures, interventions, unknowns, actual crew cost, "
-                      "and recommendations, with evidence references. No automatic paid review was dispatched.")
+                      "and recommendations, with evidence references. " + (
+                      "Bounded review control is recorded below; no interpretation has been completed."
+                      if packet.get("automation") else "No automatic paid review was dispatched."))
     records = {"campaign": campaign, "ledger": packet["ledger"], "package": package}
+    if packet.get("automation"):
+        records["review_control"] = packet["automation"]
     raw = json.dumps(records, indent=2, ensure_ascii=False)
     evidence = ("```json\n" + raw + "\n```" if len(raw.encode()) <= 18000 else
                 "The runtime records exceed the Buzz excerpt limit. Retrieve them with "
@@ -77,17 +83,22 @@ class Watcher:
             try:
                 packet = self.rpc({"command": "packet", "args": {"campaign": cid}})
                 campaign = packet["campaign"]
+                automation = packet.get("automation")
                 if campaign["state"] == "awaiting_ruling":
                     self.rpc({"command": "open-window", "args": {"campaign": cid}})
                 fingerprint = digest({"state": campaign["state"], "outcome": campaign.get("outcome"),
                                       "escalations": packet["escalations"], "ledger": packet["ledger"],
                                       "analysis": packet.get("analysis")})
+                if automation:
+                    fingerprint = digest({"campaign": fingerprint, "automation": automation})
                 if campaign["state"] == "completed" and (not posted or fingerprint != previous):
                     package = self.rpc({"command": "package", "args": {"campaign": cid}})
                     # Stable NIP-23 name makes a retry update the same post after a crash.
                     posted = self.publish_report(cid, report(packet, package))
                 if fingerprint != previous:
-                    text = f"{cid}: {campaign['state']}. {notice(campaign)}"
+                    text = f"{cid}: {campaign['state']}. {notice(campaign, bool(automation))}"
+                    if automation:
+                        text += " Review control: " + canonical(automation)
                     if posted:
                         text += " Closing record: " + posted
                     self.publish(item, text)

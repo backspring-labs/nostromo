@@ -1,0 +1,16 @@
+[Unit]
+Description=Nostromo campaign deadlines and bounded review routing (no model)
+After=nostromo-campaign-broker.service
+Requires=nostromo-campaign-broker.service
+
+[Service]
+Type=oneshot
+User=mother
+ExecStart=/usr/bin/python3 -I /usr/local/lib/nostromo/campaign-advance.py
+TimeoutStartSec=180
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+MemoryMax=128M

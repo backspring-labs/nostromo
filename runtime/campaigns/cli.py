@@ -53,7 +53,7 @@ def read_event(eid, relay="https://nostromo.backspring.xyz"):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("command", help="status/log/ledger/package/escalations/packet/tracked; Mother: create/start/pause/resume/abort/materialize/lease-take/lease-give/open-window; Ripley: plan/increment/analysis; owner: approve-definition/restore-shared")
+    p.add_argument("command", help="Read: status/log/ledger/package/escalations/packet/tracked/progress/cycle/run/checkpoints/artifacts/artifact/automation/triage/launches/launch-status; Mother: launch/create/start/pause/resume/abort/materialize/lease-take/lease-give/open-window/advance; Ripley: plan/increment/analysis; owner: approve-definition/approve-budget/review-recovery-authorize/restore-shared")
     p.add_argument("--args", default="-", help="JSON file; - reads stdin")
     p.add_argument("--request-id", help="stable retry identity for a write")
     p.add_argument("--decision", help="signed Buzz decision event id")

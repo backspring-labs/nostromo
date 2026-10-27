@@ -1,0 +1,11 @@
+[Unit]
+Description=Continue accepted campaign launch intents every thirty seconds
+
+[Timer]
+OnBootSec=15
+OnUnitInactiveSec=30
+AccuracySec=1
+Unit=nostromo-campaign-launch.service
+
+[Install]
+WantedBy=timers.target

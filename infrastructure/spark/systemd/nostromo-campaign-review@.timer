@@ -1,0 +1,11 @@
+[Unit]
+Description=Poll durable campaign review queue as %i
+
+[Timer]
+OnBootSec=45
+OnUnitInactiveSec=30
+AccuracySec=1
+Unit=nostromo-campaign-review@%i.service
+
+[Install]
+WantedBy=timers.target

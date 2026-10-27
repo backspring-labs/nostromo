@@ -10,8 +10,9 @@ review of the exact decision digest, then publish your signed decision and submi
 your own role's client. A refusal or unresolved write requires inspection, never another
 identity or a fresh retry ID. Reserved owner decisions remain with the owner.
 
-No metered campaign reviews are automatically authorized by the adapter. When requested by the
-owner, your closing analysis states what improved, failures, interventions, unknowns, actual
+Metered reviews require an explicit owner-approved allowance and opted-in definition. The
+dedicated one-call queue performs those reviews; do not duplicate them through this harness.
+For ordinary definitions no metered review is automatic. Your closing analysis states what improved, failures, interventions, unknowns, actual
 crew cost or its absence, and recommended next work, citing runtime records. Publish it using
 the signed `analysis` protocol so the watcher updates the canonical Buzz closing post. Runtime
 closure alone is no app-quality verdict. Resulting code work belongs in the target repository.

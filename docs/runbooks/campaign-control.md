@@ -23,12 +23,16 @@ exposes only its command allowlist; no raw API, generic cycle write, admin role,
 override is exposed to the crew. OIDC keys are broker-only; access tokens stay in memory.
 The kernel's Unix peer UID determines the caller. No role impersonation field is accepted.
 
-The initial adapter never automatically dispatches paid reviews. A missing Ripley or Dallas
-review stays pending until an authorized human requests it. SquadOps policy token and elapsed
-limits are runtime boundaries, not a provider billing cap; use local-only recipes for the first
-probe and inspect usage afterward. No model or subscription is switched by this adapter.
+Definitions without an explicit automation opt-in never dispatch paid reviews. The bounded
+queue below requires a separate immutable owner allowance. SquadOps policy token and elapsed
+limits are runtime boundaries, not a provider billing cap. No model or subscription is switched.
 
 ## Install on Spark
+
+For ordinary code updates after infrastructure is installed, use the
+[owner-only deployment helper](routine-deployment.md). It avoids repeated password prompts
+without granting crew accounts root access. The installer below remains the authenticated path
+for changes to accounts, keys, service definitions, or privilege rules.
 
 Run from the tested source checkout on Spark as the owner:
 
@@ -59,6 +63,20 @@ the socket's live role refusals have been checked.
 `status`, `log`, `ledger`, `package`, `escalations`, `lease`, and `packet`, each with
 `{"campaign":"cmp_..."}`. `tracked` takes `{}`. No shell command is passed through.
 
+Additional read-only evidence commands:
+
+- `progress`: campaign ID → launched cycles, runs, verification outcomes and waiting gates.
+- `triage`: campaign ID → read-only campaign state, gates, ledger, bounded review-job diagnostics,
+  retained reservations, and recent control events. This command makes no model or provider calls.
+- `cycle`: campaign + cycle IDs; `run` and `checkpoints`: campaign + cycle + run IDs.
+- `artifacts`: campaign + cycle, optionally run; paginated internally, refuses oversized lists.
+- `artifact`: campaign + artifact IDs; complete UTF-8 bytes up to 256 KiB, checked against the
+  vault size/hash and campaign/project/cycle membership. Binary/oversized content is refused.
+- `automation`: campaign ID → durable control state, deadline, jobs, reservations and usage.
+
+The read principal does not expose the currently executing task. `progress` says so explicitly;
+run checkpoints describe completed work, and must not be presented as current-task telemetry.
+
 Owner `approve-definition` takes `name`, `definition`, `channel`, and `thread`. The definition
 contains `project_id`, `objective`, `policy`, optional `scenario_suite`, and optional
 `crew: {"require_dallas":true,"paid_dispatches":0,"inference_mode":"shared"}`. Its positive cycle, elapsed, and token
@@ -66,6 +84,178 @@ bounds and allowed scope are mandatory. A name's entire approved content is immu
 canonical definition digest is recorded on creation. Approve a new name for any amendment.
 Each approval authorizes one campaign creation, including an unresolved creation attempt;
 Mother cannot multiply the authorization by using fresh request IDs.
+
+## Durable launch handoff
+
+For an ordinary campaign, create a fresh top-level post in the campaign channel and obtain the
+immutable owner approval bound to that root. Mother then submits one request:
+
+```bash
+campaignctl launch --request-id pilot-launch-001 --args - <<'JSON'
+{"definition":"approved-pilot-name","reason":"Owner-approved bounded mechanics test"}
+JSON
+```
+
+The response is a durable **queued** intent, not confirmation that the campaign has started.
+Mother can end her turn immediately. The no-model `nostromo-campaign-launch.timer` runs every
+thirty seconds as Mother: create once, publish and verify a signed announcement in the approved
+thread, start once, then publish a start receipt. It reads only Mother's existing Buzz key;
+it never accesses provider keys or makes inference calls. Reviews, cutoff enforcement, and
+progress/closing reports keep their existing independent workers.
+
+`launches` takes `{}`. `launch-status` takes `{"launch":"pilot-launch-001"}` and reports the
+fixed campaign ID, operation IDs, thread, state, deadline, signed notices, and bounded diagnostic.
+States progress through `queued`, `creating`, `created`, `announcing`, `announced`, `starting`,
+and `started`; `blocked` requires owner inspection. Acceptance survives a lost client response:
+resubmit exactly the same launch ID and arguments to retrieve its current status.
+
+The launch deadline is fixed at acceptance: ten minutes or the approved automation `not_after`,
+whichever is earlier. No later create/start is authorized. A transport failure after reserving
+a write triggers read-only campaign/control-log reconciliation; the worker never repeats an
+ambiguous campaign write. Buzz announcements use a private disk outbox: publication retries
+reuse the exact signed kind-9 event ID, with at most three attempts per notice. Relay failure
+is retained in `launch-status`; an unverified announcement cannot unlock start. A failure notice
+is attempted in the same campaign thread. Inspect status and runtime evidence if delivery fails.
+If creation has an ambiguous response and the approval includes a scenario suite, the create
+log alone cannot prove the subsequent suite pin. The workflow requires owner inspection and
+does not start automatically from that evidence.
+
+The workflow preserves the exact approved scope, runtime limits, paid dispatch count, and shared
+review allowance. It grants no new gate authority. A reserved definition/root cannot be reused
+by another launch, and manual create/start cannot bypass its workflow. Do not mint new request
+IDs to recover a blocked intent. Legacy manual operations remain available for definitions
+that have no durable launch reservation.
+
+Install the tested source with the existing root installer and the existing
+`$HOME/.config/nostromo/campaign-provision` staging directory; an upgrade does not require
+rerunning auth preparation. Verify `nostromo-campaign-launch.timer` is active and inspect
+`journalctl -u nostromo-campaign-launch.service`. The installer commissions the launch interface
+and backs up existing broker state. It does not restart Mother's harness; the updated prompt
+applies to her next turn. Validate with fault tests before attempting another long campaign.
+
+## Bounded review opt-in
+
+Before commissioning, verify the provider projects have enough remaining headroom within the
+monthly owner budget. The role keys cannot read provider billing administration; local usage
+reports are estimates, not proof of remaining credits. No claim here extends to unrelated
+manual harness usage on the same provider project.
+
+The local owner first uses `approve-budget` with an object such as:
+
+```json
+{"name":"review-pilot-20261025","cap_microusd":5000000,"max_dispatches":8,"expires_at":"2026-10-26T12:00:00Z"}
+```
+
+This is an example, not an installed approval. A budget name is immutable. Both the attended
+test and later overnight definition should reference the **same** allowance so they cannot
+each spend its full value independently. First-pilot caps above $10 or twenty calls are refused.
+An opted-in definition adds:
+
+```json
+{"crew":{"require_dallas":true,"inference_mode":"shared","paid_dispatches":8,"automation":{"budget":"review-pilot-20261025","not_after":"2026-10-26T11:00:00Z"}}}
+```
+
+The earlier absolute `not_after` or start-intent time plus `policy.max_elapsed_s` is persisted
+before start. It cannot reset on restart. The no-model Mother timer checks it every thirty
+seconds and requests campaign abort (including active-cycle cancellation) through the existing
+API. API unavailability can delay abort; it is reported as unreadable, never safe completion.
+SquadOps' own token bound remains additional protection. The shared TensorFold engine stays up.
+
+Ripley and Dallas have separate timer-driven workers under their actual Unix UIDs. Each claims
+one durable job, which reserves **563,200 microdollars ($0.5632)** before accessing its private
+provider key. Accounting uses at most 65,536 serialized request bytes plus 4,096 framing tokens,
+8,192 output tokens including reasoning, $5/M input, $20/M output and 10% regional allowance.
+No tools, conversation history, automatic provider retry, premium service tier, model fallback,
+or additional agent mention is allowed. Actual usage is retained separately; reservations are
+never refunded automatically. One call's allowance is preserved for closing interpretation.
+
+The pinned models are `gpt-5.6-sol` and `claude-opus-5-5`; pricing was verified on October 24,
+2026 and this implementation refuses new calls after November 1 until reviewed. Sources:
+[OpenAI model pricing](https://developers.openai.com/api/docs/models/gpt-5.6-sol),
+[OpenAI token limits](https://developers.openai.com/api/docs/guides/token-counting),
+[Claude model pricing](https://platform.claude.com/docs/en/models/opus-5-5/overview), and
+[Claude Messages API](https://platform.claude.com/docs/en/api/messages/create).
+
+At a live gate, Ripley proposes a verdict citing packet evidence. Dallas reviews that exact
+decision and binding independently. Only a non-blocking, signed Dallas response permits
+Ripley's deterministic submission. There is no automatic disagreement/revision loop. Missing
+evidence, an oversized complete packet, a reserved owner choice, blocking review, provider
+failure, stale/uncertain writes or exhausted allowance parks the campaign for owner inspection.
+The remaining runtime cutoff still applies. Never resume around a parked control state.
+
+For any parked, expired, failed, or uncertain review, Mother starts with:
+
+```bash
+campaignctl triage --args - <<'JSON'
+{"campaign":"cmp_..."}
+JSON
+```
+
+This deterministic report combines SquadOps evidence available through the `campaign-evidence`
+(`campaign-triage`) principal with broker state and sanitized worker failure metadata. It does not
+call a model, resume a campaign, or retry a review. `result_validation` reason codes identify the
+failed contract check without storing the proposed answer. Provider HTTP statuses are reported
+separately from schema failures. If the job predates structured diagnostics, the report says the
+precise cause is unavailable; a reserved call alone cannot recover its response. Mother may route
+the report to Brett for deterministic evidence inspection, but only the owner can authorize a new
+immutable definition or budget change.
+
+### Recovering a validated response after Buzz publication failure
+
+When triage reports `stage=buzz_publication`, the role worker has already validated and persisted
+the provider response in its private recovery directory. Do not rerun the provider call. First
+search the campaign's Buzz thread for the exact job ID and `campaign-job-result` marker. The owner
+can authorize adoption of an existing signed result by event ID, without publishing again:
+
+```bash
+campaignctl review-recovery-authorize --args - <<'JSON'
+{"job":"job_...","existing_event_id":"<64-hex-event-id>"}
+JSON
+```
+
+If no matching event exists, the owner may authorize one no-provider publication:
+
+```bash
+campaignctl review-recovery-authorize --args - <<'JSON'
+{"job":"job_...","no_matching_event_verified":true}
+JSON
+```
+
+The authorization is bound to that uncertain job. It is allowed while the campaign is parked before
+its deadline, or after deadline expiry solely to retain the result as an audit record. The assigned
+role's existing review timer reads and validates the private saved response, publishes it once with
+a two-minute transport bound, and submits the role-signed event to the broker. This makes zero
+provider calls and never retries automatically. If publication still fails, inspect Buzz again
+before any new authorization. If Buzz accepted the event but the relay read is delayed, the event ID
+is persisted first; a later authorization must adopt that same event and cannot republish it. Triage
+reports the recovery state. Recovery records the result only;
+it keeps the campaign parked and does not resume the campaign, queue another paid review, or submit
+a SquadOps gate. A deadline-expired campaign remains terminal; this recovery cannot reopen it.
+Non-publication failures remain owner-inspection cases.
+
+The publisher explicitly limits Tokio to two worker threads. Spark exposes 20 CPUs while the
+review unit permits 16 tasks; the default CLI thread pool exhausts that allowance and prevents
+DNS work from running. A larger subprocess timeout does not correct this resource mismatch.
+
+The review packet includes selected authoritative planning, proposal and verification records
+in full, with hashes, and discloses its selection. It does not include all source files. A
+proposal ruling authorizes implementation; it does not certify the resulting source or UI.
+Source requiring closer inspection is available via `artifact`. A reviewer must hold when the
+selected evidence is insufficient. No test result may be invented to fill that gap.
+
+Successful closure queues one signed Ripley interpretation and the watcher updates the canonical
+Buzz post. A late cutoff or parked/failed review can leave interpretation explicitly pending;
+the factual report still records the outcome and retained reservations. Validated provider responses
+survive in the role's private `~/.local/state/nostromo-reviews/job_*.json` recovery files. Rejected
+responses are not stored; only a bounded stage, exception class, fixed reason code, and optional
+HTTP status are recorded for triage. These records never authorize another provider call. Review
+workers add no sudo/polkit grant.
+
+Check `nostromo-campaign-advance.timer`, `nostromo-campaign-review@ripley.timer`, and
+`nostromo-campaign-review@dallas.timer` after installation. Existing zero-paid approvals retain
+their prior behavior. Passing unit tests is not live commissioning: exercise one attended
+feature increment, its independent review, actual implementation acceptance and closing analysis
+before enabling an unattended definition.
 
 For remote owner approval, `campaignctl approve-definition --args approval.json --explain`
 prints the `campaign-definition: {...}` line. The owner publishes that exact line in an
@@ -93,6 +283,26 @@ broker completes the action and stores its receipt even if the role-side client 
 
 ## Gate protocol
 
+Each bounded proposal review includes a deterministic `decision_contract` derived from the
+immutable approved policy, runtime campaign policy, effective cycle `campaign_proposal` block,
+and stored run history. SquadOps resolves cycle config with overrides replacing defaults and
+counts cancelled proposal runs as superseded revisions. Those same rules determine the
+remaining allowance here; missing or conflicting evidence cannot authorize a revision.
+
+When no proposal revisions remain, `returned_for_revision` is omitted from Ripley's response
+schema. If acceptance evidence needs revision, she chooses `needs_owner` and explains the gap.
+Approval must still be earned; a revision request is never silently changed into approval or
+rejection. SquadOps itself counts an exhausted revision request as rejection. Nostromo's
+bounded interface instead requires an explicit owner hold when revision is needed but
+unavailable. This does not expand the existing approval or change the campaign's limits.
+
+The worker and broker both enforce the contract. Remaining revision authority is checked
+again before dispatching Dallas and at gate submission. A forbidden or unverifiable revision
+parks the campaign without an automatic provider retry or policy amendment. `triage` retains
+the fixed `decision_policy_forbidden` finding and can also identify incompatible pre-fix
+saved judgments from their policy and run records, without paid calls or replaying a ruling.
+Otherwise valid decisions continue to require Dallas's independent review of the exact ruling.
+
 Ripley prepares a JSON file with `campaign`, `cycle`, `run`, `decision`, and substantive
 `notes`; increment rulings also carry the SquadOps `binding` and, when required,
 `classification` and `classification_rationale`. Use the exact current runtime gate binding.
@@ -105,7 +315,8 @@ The output gives two exact single lines: `campaign-decision: {...}` and
 `campaign-review: {...}`. Ripley publishes the first under her own Buzz identity. Dallas
 independently examines the packet and publishes the second only if that exact decision has
 no blocking finding. A signature on a different decision, campaign, cycle, or run is refused.
-If Dallas has a blocking finding, report it in the thread and revise; do not sign a false
+If Dallas has a blocking finding, report it in the thread and hold for owner inspection. Any
+revision or additional paid review requires remaining explicit authority; do not sign a false
 nonblocking review. Ripley then submits:
 
 ```bash

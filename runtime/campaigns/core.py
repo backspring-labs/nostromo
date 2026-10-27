@@ -47,11 +47,35 @@ class Store:
                 status TEXT, failures INTEGER DEFAULT 0, report TEXT);
             CREATE TABLE IF NOT EXISTS analyses(campaign TEXT PRIMARY KEY, body TEXT);
             CREATE TABLE IF NOT EXISTS launches(definition TEXT PRIMARY KEY, request TEXT UNIQUE, campaign TEXT);
+            CREATE TABLE IF NOT EXISTS review_budgets(name TEXT PRIMARY KEY, body TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS automation(campaign TEXT PRIMARY KEY, deadline REAL NOT NULL,
+                state TEXT NOT NULL, reason TEXT);
+            CREATE TABLE IF NOT EXISTS review_jobs(id TEXT PRIMARY KEY, campaign TEXT NOT NULL,
+                role TEXT NOT NULL, kind TEXT NOT NULL, state TEXT NOT NULL, payload TEXT NOT NULL,
+                reserved INTEGER NOT NULL DEFAULT 0, claimed REAL, result TEXT, proof TEXT, usage TEXT,
+                failure_diagnostic TEXT);
+            CREATE TABLE IF NOT EXISTS review_recoveries(job TEXT PRIMARY KEY, state TEXT NOT NULL,
+                authorized REAL NOT NULL, claimed REAL, failure TEXT, event_id TEXT);
+            CREATE TABLE IF NOT EXISTS launch_workflows(
+                id TEXT PRIMARY KEY, definition TEXT NOT NULL UNIQUE, fingerprint TEXT NOT NULL,
+                body TEXT NOT NULL, campaign TEXT NOT NULL UNIQUE, channel TEXT NOT NULL, thread TEXT NOT NULL,
+                create_request TEXT NOT NULL UNIQUE, start_request TEXT NOT NULL UNIQUE,
+                state TEXT NOT NULL, created REAL NOT NULL, deadline REAL NOT NULL, diagnostic TEXT,
+                notice_phase TEXT, notice_claimed REAL, notice_attempts INTEGER NOT NULL DEFAULT 0,
+                notice_event TEXT, announcement_event TEXT, completion_event TEXT, delivery_error TEXT);
         """)
         columns = {row[1] for row in self.db.execute("PRAGMA table_info(definitions)")}
         if "inference_mode" not in columns:
             # Never reinterpret an approval made before shared inference was introduced.
             self.db.execute("ALTER TABLE definitions ADD COLUMN inference_mode TEXT NOT NULL DEFAULT 'exclusive'")
+            self.db.commit()
+        job_columns = {row[1] for row in self.db.execute("PRAGMA table_info(review_jobs)")}
+        if "failure_diagnostic" not in job_columns:
+            self.db.execute("ALTER TABLE review_jobs ADD COLUMN failure_diagnostic TEXT")
+            self.db.commit()
+        recovery_columns = {row[1] for row in self.db.execute("PRAGMA table_info(review_recoveries)")}
+        if "event_id" not in recovery_columns:
+            self.db.execute("ALTER TABLE review_recoveries ADD COLUMN event_id TEXT")
             self.db.commit()
 
     def definition(self, name):
@@ -93,6 +117,15 @@ class Broker:
         command, args = request["command"], request["args"]
         if not isinstance(args, dict):
             raise Refused("args must be an object")
+        from .launch import COMMANDS as LAUNCH_COMMANDS, Launches
+        if command in LAUNCH_COMMANDS:
+            return Launches(self).handle(caller, command, args, request)
+        from .evidence import COMMANDS, Evidence
+        if command in COMMANDS:
+            return Evidence(self).handle(command, args)
+        from .automation import COMMANDS as AUTOMATION_COMMANDS, Automation
+        if command in AUTOMATION_COMMANDS:
+            return Automation(self).handle(caller, command, args, request)
         if command == "tracked":
             exact(args, set())
             return [dict(row) for row in self.store.db.execute("SELECT * FROM campaigns ORDER BY id")]
@@ -187,6 +220,12 @@ class Broker:
             self.verify_event(request.get("decision_event"), "ripley", "campaign-decision", expected)
         # Construct and validate before reserving an action. A validation refusal has no side effect.
         principal, method, path, body, after = self.operation(command, args, rid, request)
+        if command == "start":
+            Automation(self).arm(args["campaign"])
+        if command == "resume":
+            control = self.store.db.execute("SELECT state FROM automation WHERE campaign=?", (args["campaign"],)).fetchone()
+            if control and control[0] != "active":
+                raise Refused("bounded automation is parked or expired; no automatic override")
         if command == "start" and self.window is not None:
             record = self.store.campaign(args["campaign"])
             if self.store.inference_mode(record["definition"]) == "shared":
@@ -241,14 +280,16 @@ class Broker:
             if type(policy.get(field)) is not int or policy[field] < 1:
                 raise Refused(f"policy.{field} needs a positive bound")
         crew = definition.get("crew", {})
-        exact(crew, set(), {"require_dallas", "paid_dispatches", "inference_mode"})
+        exact(crew, set(), {"require_dallas", "paid_dispatches", "inference_mode", "automation"})
         inference_mode = crew.get("inference_mode", "shared")
         if inference_mode not in {"shared", "exclusive"}:
             raise Refused("inference_mode must be shared or exclusive")
         if type(crew.get("require_dallas", True)) is not bool:
             raise Refused("require_dallas must be boolean")
-        # Version one never automatically dispatches metered roles. Owner can request them in Buzz.
-        if crew.get("paid_dispatches", 0) != 0:
+        if "automation" in crew:
+            from .automation import Automation
+            Automation(self).validate_spec(crew["automation"], crew)
+        elif crew.get("paid_dispatches", 0) != 0:
             raise Refused("automatic paid dispatch is not commissioned")
         stored = {**args, "definition": definition}
         sha = digest(definition)
@@ -277,6 +318,9 @@ class Broker:
                 result["crew_policy"] = {**result["crew_policy"], "inference_mode": self.store.inference_mode(item["definition"])}
             except Refused:
                 result["crew_policy"] = {"paid_dispatches": 0}
+            from .automation import Automation
+            if self.store.db.execute("SELECT 1 FROM automation WHERE campaign=?", (cid,)).fetchone():
+                result["automation"] = Automation(self).status(cid)
             return result
         return self.api("read", "GET", base + ("" if command == "status" else f"/{READ_PATHS.get(command, command)}"), None)
 
@@ -284,6 +328,10 @@ class Broker:
         if command == "create":
             exact(args, {"definition", "reason"})
             approved, sha = self.store.definition(args["definition"])
+            workflow = self.store.db.execute("SELECT state,create_request,deadline FROM launch_workflows WHERE definition=?",
+                                             (args["definition"],)).fetchone()
+            if workflow and (workflow["state"] != "creating" or workflow["create_request"] != rid or time.time() >= workflow["deadline"]):
+                raise Refused("definition belongs to a durable launch; inspect launch-status")
             if self.store.db.execute("SELECT 1 FROM launches WHERE definition=?", (args["definition"],)).fetchone():
                 raise Refused("definition already reserved for one campaign; a new campaign needs fresh owner approval")
             spec = approved["definition"]
@@ -301,6 +349,10 @@ class Broker:
             return "control", "POST", "/api/v1/campaigns", body, remember
         cid = identifier(args.get("campaign"))
         record = self.store.campaign(cid)
+        if command == "start":
+            workflow = self.store.db.execute("SELECT state,start_request,deadline FROM launch_workflows WHERE campaign=?", (cid,)).fetchone()
+            if workflow and (workflow["state"] != "starting" or workflow["start_request"] != rid or time.time() >= workflow["deadline"]):
+                raise Refused("campaign belongs to a durable launch; inspect launch-status")
         approved, _ = self.store.definition(record["definition"])
         campaign = self.api("read", "GET", f"/api/v1/campaigns/{cid}", None)
         if command in GATES:
@@ -336,6 +388,14 @@ class Broker:
             raise Refused("unsupported gate decision")
         if not isinstance(args["notes"], str) or not args["notes"].strip():
             raise Refused("a gate decision needs substantive notes")
+        if command == "increment":
+            exact(args["binding"], {"proposal_id", "version", "content_hash", "baseline_tree"})
+            identifier(args["binding"]["proposal_id"])
+            if type(args["binding"]["version"]) is not int or args["binding"]["version"] < 1:
+                raise Refused("proposal binding requires a positive version")
+            if not all(isinstance(args["binding"][key], str) and args["binding"][key]
+                       for key in ("content_hash", "baseline_tree")):
+                raise Refused("proposal binding requires content and baseline identities")
         project = identifier(campaign["project_id"])
         base = f"/api/v1/projects/{project}/cycles/{args['cycle']}"
         cycle = self.api("read", "GET", base, None)
@@ -344,6 +404,10 @@ class Broker:
         run = self.api("read", "GET", f"{base}/runs/{args['run']}", None)
         if run.get("cycle_id") != args["cycle"]:
             raise Refused("run is not part of the named cycle")
+        if command == "increment" and args["decision"] == "returned_for_revision":
+            from .review_policy import POLICY_REFUSAL, proposal_revisions
+            if not proposal_revisions(campaign, cycle, approved["definition"]["policy"])["available"]:
+                raise Refused(POLICY_REFUSAL)
         gate_name = "progress_increment_ruling" if command == "increment" else "progress_plan_review"
         if any(g.get("gate_name") == gate_name for g in run.get("gate_decisions", [])):
             raise Refused("gate already has a decision")
