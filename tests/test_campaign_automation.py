@@ -37,6 +37,7 @@ class Runtime:
         self.meta = {"artifact_id": "art_test", "project_id": "group_run", "cycle_id": "cyc_test", "run_id": "run_test",
                      "artifact_type": "change_request", "filename": "change_request.yaml", "size_bytes": len(self.raw),
                      "content_hash": hashlib.sha256(self.raw).hexdigest()}
+        self.extra = {}  # artifact id -> (metadata, bytes): more artifacts in the gate's run
 
     def __call__(self, principal, method, path, payload):
         if method == "POST":
@@ -57,14 +58,19 @@ class Runtime:
         if path.endswith("/cycles/cyc_test"): return copy.deepcopy(self.cycle)
         if path.endswith("/runs/run_test"): return copy.deepcopy(self.cycle["runs"][0])
         if path.endswith("/artifacts/art_test"): return copy.deepcopy(self.meta)
+        if "/artifacts/" in path and path.rsplit("/", 1)[-1] in self.extra:
+            return copy.deepcopy(self.extra[path.rsplit("/", 1)[-1]][0])
         if path.endswith("/lease"): return None
         if path == "/api/v1/campaigns/cmp_test": return copy.deepcopy(self.campaign)
         raise AssertionError(path)
 
     def request(self, principal, method, path, payload, **kwargs):
-        if path.endswith("/download"): return self.raw
+        if path.endswith("/download"):
+            aid = path.rsplit("/", 2)[-2]
+            return self.extra[aid][1] if aid in self.extra else self.raw
         assert path.endswith("/artifacts")
-        return json.dumps([self.meta] if kwargs["page"][0] == 0 else []).encode()
+        listing = [self.meta, *(meta for meta, _ in self.extra.values())]
+        return json.dumps(listing if kwargs["page"][0] == 0 else []).encode()
 
 
 @pytest.fixture
@@ -614,3 +620,156 @@ def test_unreadable_live_revision_authority_retains_signed_result_and_parks(worl
     assert rpc(broker, "dallas", "review-claim") is None
     assert rpc(broker, "mother", "triage", {"campaign": "cmp_test"})["findings"][0]["classification"] == "decision_policy_forbidden"
     assert len(api.posts) == 1 and api.posts[0][1].endswith("/pause")
+
+
+def _plan_gate(api, artifact_type="document", raw=b"# Consolidated plan\nReady for review.\n"):
+    api.cycle["applied_defaults"]["workload_sequence"] = [{"type": "proposal", "gate": "progress_plan_review"}]
+    api.raw = raw
+    api.meta.update({"artifact_type": artifact_type, "filename": "planning_artifact.md",
+                     "size_bytes": len(raw), "content_hash": hashlib.sha256(raw).hexdigest(),
+                     "metadata": {"producing_task_type": "governance.review_plan", "role": "lead"}})
+    plan = b"tasks: []\n"
+    api.extra["art_plan"] = ({"artifact_id": "art_plan", "project_id": "group_run", "cycle_id": "cyc_test",
+                              "run_id": "run_test", "artifact_type": "control_implementation_plan",
+                              "filename": "implementation_plan.yaml", "size_bytes": len(plan),
+                              "content_hash": hashlib.sha256(plan).hexdigest(),
+                              "metadata": {"producing_task_type": "governance.merge_plan"}}, plan)
+    return {"cycle": "cyc_test", "run": "run_test", "gate": "progress_plan_review",
+            "opened_at": "2026-10-24T23:00:00Z"}
+
+
+def test_plan_review_packet_includes_complete_hashed_document_and_reference(world):
+    broker, api, _ = world
+    gate = _plan_gate(api)
+    packet = Automation(broker).packet("cmp_test", gate)
+    artifact = next(a for a in packet["artifacts"] if a["artifact_id"] == "art_test")
+    assert artifact["content"] == api.raw.decode("utf-8")
+    assert artifact["sha256"] == hashlib.sha256(api.raw).hexdigest()
+    assert artifact["complete"] is True
+    assert artifact["artifact_id"] in packet["references"]
+    assert packet["evidence_selection"]["required_types"] == ["control_implementation_plan", "document:governance.review_plan"]
+
+
+def test_plan_review_without_required_document_parks_with_explicit_hold(world):
+    broker, api, store = world
+    _plan_gate(api, artifact_type="control_implementation_plan")
+    result = Automation(broker).advance("cmp_test")
+    control = store.db.execute("SELECT state,reason FROM automation WHERE campaign='cmp_test'").fetchone()
+    assert control["state"] == "parked"
+    assert "required evidence missing for progress_plan_review: document:governance.review_plan" in control["reason"]
+    assert store.db.execute("SELECT count(*) FROM review_jobs").fetchone()[0] == 0
+    assert any(post[1].endswith("/pause") for post in api.posts)
+    assert result["control"]["state"] == "parked"
+
+
+def test_plan_review_evidence_over_request_bound_parks_with_explicit_size_hold(world):
+    broker, api, store = world
+    _plan_gate(api, raw=b"x" * 70000)
+    Automation(broker).advance("cmp_test")
+    control = store.db.execute("SELECT state,reason FROM automation WHERE campaign='cmp_test'").fetchone()
+    assert control["state"] == "parked"
+    assert "evidence_size_hold" in control["reason"]
+    assert "single-call review limit" in control["reason"]
+    assert store.db.execute("SELECT count(*) FROM review_jobs").fetchone()[0] == 0
+
+
+def test_increment_gate_keeps_its_existing_evidence_selection(world):
+    broker, api, _ = world
+    api.raw = b"proposal evidence"
+    api.meta.update({"artifact_type": "change_request", "filename": "change_request.yaml",
+                     "size_bytes": len(api.raw), "content_hash": hashlib.sha256(api.raw).hexdigest()})
+    gate = {"cycle": "cyc_test", "run": "run_test", "gate": "progress_increment_ruling",
+            "opened_at": "2026-10-24T23:00:00Z"}
+    packet = Automation(broker).packet("cmp_test", gate)
+    assert [a["artifact_id"] for a in packet["artifacts"]] == ["art_test"]
+    assert packet["evidence_selection"]["included_types"] == sorted({
+        "interface_manifest", "verification_contract", "control_implementation_plan", "merge_decisions",
+        "change_request", "definition_of_done", "test_report", "accepted_tree"})
+    assert packet["evidence_selection"]["required_types"] == []
+
+
+# The plan gate that exposed #11: cmp_29048a00fdb3460c0675529a / run_1005936f0695, as SquadOps listed it.
+REAL_PLAN_RUN = [
+    ("run_report.md", "document", {"report_type": "run_report"}, 1113),
+    ("planning_artifact.md", "document", {"producing_task_type": "governance.review_plan", "role": "lead"}, 7030),
+    ("merge_decisions.yaml", "merge_decisions", {"producing_task_type": "governance.merge_plan"}, 1861),
+    ("implementation_plan.yaml", "control_implementation_plan", {"producing_task_type": "governance.merge_plan"}, 8653),
+    ("plan_authoring_brief.yaml", "plan_authoring_brief", {"producing_task_type": "governance.prepare_plan_authoring_brief"}, 7194),
+    ("test_strategy.md", "document", {"producing_task_type": "qa.define_test_strategy"}, 21284),
+    ("verification_contract.yaml", "verification_contract", {}, 6053),
+    ("interface_manifest.yaml", "interface_manifest", {}, 5117),
+    ("technical_design.md", "document", {"producing_task_type": "development.design_plan"}, 19881),
+    ("objective_frame.md", "document", {"producing_task_type": "strategy.frame_objective"}, 16524),
+    ("context_research.md", "document", {"producing_task_type": "data.research_context"}, 17598),
+]
+
+
+def _real_plan_run(api):
+    """Text of each real size, with quotes, backslashes and newlines so JSON escaping costs what it will."""
+    gate = _plan_gate(api, artifact_type="interface_manifest")  # the fake's own artifact stands in as one more
+    api.meta.update({"filename": "interface_manifest.yaml", "metadata": {}})
+    line = 'A planning line with "quoted" terms, a path\\like\\this, and an end of line.\n'
+    del api.extra["art_plan"]  # the real listing carries its own implementation_plan.yaml
+    for n, (filename, kind, metadata, size) in enumerate(REAL_PLAN_RUN):
+        raw = (line * (size // len(line) + 1))[:size].encode()
+        aid = f"art_real{n:02d}"
+        api.extra[aid] = ({"artifact_id": aid, "project_id": "group_run", "cycle_id": "cyc_test", "run_id": "run_test",
+                           "artifact_type": kind, "filename": filename, "size_bytes": len(raw),
+                           "content_hash": hashlib.sha256(raw).hexdigest(), "metadata": metadata}, raw)
+    return gate
+
+
+def test_a_real_plan_gate_gets_the_consolidated_plan_and_no_other_document(world):
+    broker, api, _ = world
+    packet = Automation(broker).packet("cmp_test", _real_plan_run(api))
+    names = sorted(a["filename"] for a in packet["artifacts"] if a["artifact_id"] != "art_test")
+    assert names == ["implementation_plan.yaml", "interface_manifest.yaml", "merge_decisions.yaml",
+                     "planning_artifact.md", "verification_contract.yaml"]
+    plan = next(a for a in packet["artifacts"] if a["artifact_id"] == "art_real01")
+    assert plan["sha256"] == api.extra["art_real01"][0]["content_hash"] and plan["artifact_id"] in packet["references"]
+
+
+def test_a_real_plan_gate_fits_one_review_call_for_ripley_and_dallas(world):
+    broker, api, _ = world
+    from runtime.campaigns.review import MAX_REQUEST_BYTES, body, decision_request
+    from runtime.campaigns.core import canonical, digest
+    personas = Path(__file__).resolve().parents[1] / "crew/personas"
+    gate = _real_plan_run(api)
+    packet = Automation(broker).packet("cmp_test", gate)
+    ripley = len(canonical(body("ripley", "decision", packet, (personas / "ripley.md").read_text())).encode())
+    # Dallas reviews the exact decision, so her request is the packet plus it: a long one here.
+    decision = {**DECISION, "notes": "n" * 2000, "evidence": ["art_real01", "ctl_launched"]}
+    review = {**packet, "proposed_decision": decision, "decision_job": "job_" + "0" * 32,
+              "decision_sha256": digest(decision),
+              "decision_request": decision_request("cmp_test", {"packet": packet, "gate": gate}, decision)}
+    dallas = len(canonical(body("dallas", "review", review, (personas / "dallas.md").read_text())).encode())
+    assert ripley < MAX_REQUEST_BYTES and dallas < MAX_REQUEST_BYTES, (ripley, dallas)
+
+
+def test_a_plan_gate_without_the_canonical_plan_holds(world):
+    broker, api, store = world
+    _plan_gate(api)
+    del api.extra["art_plan"]
+    Automation(broker).advance("cmp_test")
+    control = store.db.execute("SELECT state,reason FROM automation WHERE campaign='cmp_test'").fetchone()
+    assert control["state"] == "parked" and "control_implementation_plan" in control["reason"]
+    assert store.db.execute("SELECT count(*) FROM review_jobs").fetchone()[0] == 0
+
+
+@pytest.mark.parametrize("metadata", ["not an object", ["a", "list"], 7])
+def test_unreadable_metadata_is_not_evidence_and_does_not_crash(world, metadata):
+    broker, api, store = world
+    _plan_gate(api)
+    api.meta["metadata"] = metadata
+    Automation(broker).advance("cmp_test")
+    control = store.db.execute("SELECT state,reason FROM automation WHERE campaign='cmp_test'").fetchone()
+    assert control["state"] == "parked" and "document:governance.review_plan" in control["reason"]
+
+
+def test_a_failed_emission_is_not_evidence(world):
+    broker, api, store = world
+    _plan_gate(api)
+    api.meta["metadata"] = {"producing_task_type": "governance.review_plan", "emission_status": "failed"}
+    Automation(broker).advance("cmp_test")
+    control = store.db.execute("SELECT state,reason FROM automation WHERE campaign='cmp_test'").fetchone()
+    assert control["state"] == "parked" and "document:governance.review_plan" in control["reason"]

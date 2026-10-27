@@ -13,6 +13,39 @@ COMMANDS = {"approve-budget", "automation", "advance", "review-claim", "review-r
             "review-submit", "review-recovery-authorize", "review-recovery-claim", "review-recovery-result",
             "review-recovery-failed", "review-recovery-pending"}
 
+GATE_TYPES = {"interface_manifest", "verification_contract", "control_implementation_plan", "merge_decisions",
+              "change_request", "definition_of_done", "test_report", "accepted_tree"}
+# Evidence each gate review receives is an explicit contract over evidence keys (evidence_key below).
+# A planning run holds several `document` artifacts and only the consolidated plan belongs in a
+# plan-gate packet: on the 2026-10-26 plan gate all six documents came to 83 KB against a 64 KB
+# request, and the plan itself to 7 KB. SquadOps's planning sequence always ends in
+# governance.merge_plan (implementation_plan.yaml, the canonical plan) and governance.review_plan
+# (planning_artifact.md, its narrative), so a plan gate missing either holds.
+PLANNING_ARTIFACT = "document:governance.review_plan"
+GATE_EVIDENCE = {
+    "progress_plan_review": {"included": GATE_TYPES | {PLANNING_ARTIFACT},
+                             "required": {PLANNING_ARTIFACT, "control_implementation_plan"}},
+    "progress_increment_ruling": {"included": GATE_TYPES, "required": set()},
+}
+CLOSING_EVIDENCE_TYPES = {"definition_of_done", "test_report", "accepted_tree"}
+
+
+def artifact_metadata(meta):
+    """SquadOps's free-form metadata, or nothing when it is absent or not an object."""
+    value = meta.get("metadata")
+    return value if isinstance(value, dict) else {}
+
+
+def evidence_key(meta):
+    """An artifact's type; for the generic `document` type, also the SquadOps task that produced it.
+    A failed emission (SquadOps banks those with emission_status "failed") is never evidence."""
+    if artifact_metadata(meta).get("emission_status") == "failed":
+        return None
+    kind = meta.get("artifact_type")
+    if kind == "document":
+        return "document:" + str(artifact_metadata(meta).get("producing_task_type"))
+    return kind
+
 
 class Automation:
     def __init__(self, broker, now=None):
@@ -157,19 +190,35 @@ class Automation:
                 packet["cycles"].append({k: cycle.get(k) for k in
                                          ("cycle_id", "kind", "status", "runs", "cycle_outcome")})
         packet["artifacts"] = []
-        selected = {"interface_manifest", "verification_contract", "control_implementation_plan", "merge_decisions",
-                    "change_request", "definition_of_done", "test_report", "accepted_tree"}
         if gate is None:
-            selected = {"definition_of_done", "test_report", "accepted_tree"}
-        for cycle in progress["cycles"]:
+            selected = CLOSING_EVIDENCE_TYPES
+            required = set()
+        else:
+            contract = GATE_EVIDENCE.get(gate.get("gate"))
+            if contract is None:
+                raise Refused("uncommissioned gate; no evidence contract")
+            selected = contract["included"]
+            required = contract["required"]
+        present = set()
+        # A gate's evidence is its own run's; listing other cycles only adds reads that can fail.
+        cycles = [c for c in progress["cycles"] if not gate or c["cycle_id"] == gate["cycle"]]
+        for cycle in cycles:
             for meta in evidence.listing(f"/api/v1/projects/{identifier(p['campaign']['project_id'])}/cycles/{cycle['cycle_id']}/artifacts"):
                 if gate and meta.get("run_id") != gate["run"]:
                     continue
-                if meta.get("artifact_type") in selected:
-                    full = evidence.content(p["campaign"], meta["artifact_id"])
+                key = evidence_key(meta)
+                if key in selected:
+                    try:
+                        full = evidence.content(p["campaign"], meta["artifact_id"])
+                    except Refused as error:
+                        raise Refused(f"evidence hold: {error}") from None
                     packet["artifacts"].append({"artifact_id": meta["artifact_id"], "filename": meta["filename"],
                                                  "sha256": full["sha256"], "content": full["content"], "complete": True})
-        packet["evidence_selection"] = {"included_types": sorted(selected),
+                    present.add(key)
+        missing = required - present
+        if missing:
+            raise Refused(f"required evidence missing for {gate['gate']}: {', '.join(sorted(missing))}")
+        packet["evidence_selection"] = {"included_types": sorted(selected), "required_types": sorted(required),
             "source_files_included": False, "note": "A proposal ruling authorizes work, not acceptance of implemented code. Full source is available through campaignctl artifact. Hold if needed evidence is absent."}
         if gate:
             packet["gate"] = gate

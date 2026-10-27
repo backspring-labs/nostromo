@@ -90,7 +90,7 @@ def body(role, kind, packet, persona):
     else:
         raise Refused("only Ripley and Dallas receive metered review jobs")
     if len(canonical(result).encode()) > MAX_REQUEST_BYTES:
-        raise Refused("complete evidence exceeds the single-call review limit; owner inspection required")
+        raise Refused("evidence_size_hold: complete evidence exceeds the single-call review limit; owner inspection required")
     return result
 
 
