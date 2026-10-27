@@ -19,20 +19,31 @@ GATE_TYPES = {"interface_manifest", "verification_contract", "control_implementa
 # A planning run holds several `document` artifacts and only the consolidated plan belongs in a
 # plan-gate packet: on the 2026-10-26 plan gate all six documents came to 83 KB against a 64 KB
 # request, and the plan itself to 7 KB. SquadOps's planning sequence always ends in
-# governance.review_plan, which writes planning_artifact.md, so a plan gate without it holds.
+# governance.merge_plan (implementation_plan.yaml, the canonical plan) and governance.review_plan
+# (planning_artifact.md, its narrative), so a plan gate missing either holds.
 PLANNING_ARTIFACT = "document:governance.review_plan"
 GATE_EVIDENCE = {
-    "progress_plan_review": {"included": GATE_TYPES | {PLANNING_ARTIFACT}, "required": {PLANNING_ARTIFACT}},
+    "progress_plan_review": {"included": GATE_TYPES | {PLANNING_ARTIFACT},
+                             "required": {PLANNING_ARTIFACT, "control_implementation_plan"}},
     "progress_increment_ruling": {"included": GATE_TYPES, "required": set()},
 }
 CLOSING_EVIDENCE_TYPES = {"definition_of_done", "test_report", "accepted_tree"}
 
 
+def artifact_metadata(meta):
+    """SquadOps's free-form metadata, or nothing when it is absent or not an object."""
+    value = meta.get("metadata")
+    return value if isinstance(value, dict) else {}
+
+
 def evidence_key(meta):
-    """An artifact's type; for the generic `document` type, also the SquadOps task that produced it."""
+    """An artifact's type; for the generic `document` type, also the SquadOps task that produced it.
+    A failed emission (SquadOps banks those with emission_status "failed") is never evidence."""
+    if artifact_metadata(meta).get("emission_status") == "failed":
+        return None
     kind = meta.get("artifact_type")
     if kind == "document":
-        return "document:" + str((meta.get("metadata") or {}).get("producing_task_type"))
+        return "document:" + str(artifact_metadata(meta).get("producing_task_type"))
     return kind
 
 
@@ -189,9 +200,11 @@ class Automation:
             selected = contract["included"]
             required = contract["required"]
         present = set()
-        for cycle in progress["cycles"]:
+        # A gate's evidence is its own run's; listing other cycles only adds reads that can fail.
+        cycles = [c for c in progress["cycles"] if not gate or c["cycle_id"] == gate["cycle"]]
+        for cycle in cycles:
             for meta in evidence.listing(f"/api/v1/projects/{identifier(p['campaign']['project_id'])}/cycles/{cycle['cycle_id']}/artifacts"):
-                if gate and (cycle["cycle_id"] != gate["cycle"] or meta.get("run_id") != gate["run"]):
+                if gate and meta.get("run_id") != gate["run"]:
                     continue
                 key = evidence_key(meta)
                 if key in selected:
