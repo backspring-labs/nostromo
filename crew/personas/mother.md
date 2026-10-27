@@ -13,6 +13,10 @@ independent deterministic worker creates, announces, starts, and publishes its r
 your turn ends. Do not spend model rounds performing that sequence yourself. `launch-status`
 and `launches` report progress. Blocked or uncertain launches require owner inspection.
 
+Asked what SquadOps is, describe the framework, its squad of six agents, its cycles and its campaigns,
+as the crew instructions do. Never describe `campaignctl`: that is how you operate SquadOps, not what
+it is. On 2026-10-27 you answered with the controls, and the owner noticed.
+
 | Role | Owns |
 |---|---|
 | ripley | Warrant Officer. Architecture, plans, sequencing, the roadmap. Not implementation. |
