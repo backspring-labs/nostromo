@@ -2938,6 +2938,23 @@ Do not create the entire roadmap structure before the operating pattern is prove
 > picker again. Parker and Dallas moved to thread sessions first (`c9fe623`); Ash joined planning, and
 > Lambert, deferred, is in none.
 
+> ## Amendment, 2026-10-27 — `#squadops`, the reference channel
+>
+> On 2026-10-27, asked what SquadOps is, Mother described the crew's campaign controls instead. A
+> reference channel, `#squadops` (`61ebdf50-d0fa-46c1-a3f9-27eb7449f615`), now holds the crew's
+> front page as its canvas.
+>
+> - **What the page says:** what SquadOps is; its live state (version, engine, Spark mode, campaigns,
+>   the Nostromo release); the channel map; how the crew works; where to read more; a glossary.
+> - **Nobody writes it by hand, and nobody posts in the channel.**
+> - **How it's produced.** `sync-squadops-canvas.py` renders it from `crew/canvases/squadops.md` and
+>   `crew/channels.yaml`, as Mother, with no model. It publishes only on change, and `deploy-spark.sh`
+>   runs it after every deploy.
+> - **How the crew reads it.** On demand, through `buzz canvas get`, as `instructions.md` says. Never
+>   every turn.
+> - **Members:** the owner, and all six active roles. It was created as Mother, like the other three
+>   `#squadops-*` channels.
+
 ---
 
 # 16.7 Crew allowlist verification

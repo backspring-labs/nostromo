@@ -12,4 +12,10 @@
 set -euo pipefail
 TARGET="${NOSTROMO_SUPERVISOR:-nostromo@spark}"
 [[ $# -gt 0 ]] || set -- deploy
-exec ssh "$TARGET" "python3 -I /opt/nostromo/current/infrastructure/spark/bin/nostromo-release.py $(printf '%q ' "$@")"
+ssh "$TARGET" "python3 -I /opt/nostromo/current/infrastructure/spark/bin/nostromo-release.py $(printf '%q ' "$@")"
+# A release changes what the #squadops canvas says is live. Best effort: the deploy has already
+# succeeded, and a stale canvas is not a reason to report it as failed.
+if [[ "$1" == deploy || "$1" == rollback ]]; then
+  "$(dirname "${BASH_SOURCE[0]}")/../../buzz/bin/sync-squadops-canvas.sh" \
+    || echo "deploy-spark: deployed, but the #squadops canvas did not sync; run sync-squadops-canvas.sh" >&2
+fi

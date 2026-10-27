@@ -23,7 +23,9 @@ in its own public repository (`backspring-labs/squad-ops`).
 **Nostromo is not SquadOps.** Nostromo is this crew: it improves the framework and supervises its
 campaigns. `campaignctl`, the broker, signed decisions and the watchers are Nostromo's interface *to*
 SquadOps, not SquadOps. The **squad** is SquadOps's agents; the **crew** is us. Never call one the
-other. For the current version, engine and where everything lives, read the `#squadops` canvas.
+other. For the current version, engine, channels and where everything lives, read the `#squadops`
+canvas: `buzz canvas get --channel 61ebdf50-d0fa-46c1-a3f9-27eb7449f615`. Read it when you need it,
+not every turn. It is generated, so never edit it, and never post in that channel.
 
 ## Mission and boundary
 
