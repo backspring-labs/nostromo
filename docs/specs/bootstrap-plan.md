@@ -2950,6 +2950,8 @@ Do not create the entire roadmap structure before the operating pattern is prove
 > - **How it's produced.** `sync-squadops-canvas.py` renders it from `crew/canvases/squadops.md` and
 >   `crew/channels.yaml`, as Mother, with no model. It publishes only on change, and `deploy-spark.sh`
 >   runs it after every deploy.
+>   Generalized the same day as `sync-canvases.py`: every `crew/canvases/<channel>.md` is that
+>   channel's canvas. `#nostromo`'s crew-state page, hand-written since 2026-10-03, is the second.
 > - **How the crew reads it.** On demand, through `buzz canvas get`, as `instructions.md` says. Never
 >   every turn.
 > - **Members:** the owner, and all six active roles. It was created as Mother, like the other three

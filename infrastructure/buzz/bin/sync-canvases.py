@@ -1,21 +1,25 @@
 #!/usr/bin/python3 -I
-"""Render the #squadops canvas from its template and live facts, and publish it as Mother.
+"""Render the crew's channel canvases from their templates and live facts, and publish them as Mother.
 
-Runs ON the Spark, as mother: her key publishes, and she co-owns the channel. From the Mac:
-
-  infrastructure/buzz/bin/sync-squadops-canvas.sh [--dry-run]
-
-deploy-spark.sh runs it after every successful deploy or rollback. It publishes only when the
-content changed, not counting the as-of line, so the canvas history records changes rather than
-runs. The prose is crew/canvases/squadops.md, changed by pull request. This adds only the facts:
+Every crew/canvases/<name>.md is the canvas of the channel <name> in crew/channels.yaml. The
+template holds the prose, changed by pull request. {{fact}} placeholders are filled from live
+sources, and only the facts a template names are read:
 - the SquadOps version, from the runtime API's /health;
 - the engine and its health;
 - the Spark mode;
 - campaigns, through campaignctl as Mother;
+- the crew's state, through crewctl;
 - the live Nostromo release;
-- the channel map, from crew/channels.yaml;
+- the channel map;
 - the installed runbooks.
 No model is involved, and nothing here writes outside Buzz.
+
+Runs ON the Spark, as mother: her key publishes, and she co-owns every crew channel. From the Mac:
+
+  infrastructure/buzz/bin/sync-canvases.sh [--dry-run] [--only NAME]
+
+deploy-spark.sh runs it after every deploy or rollback. A canvas is published only when its content
+changed, not counting the as-of line, so its history records changes rather than runs.
 """
 import argparse
 import json
@@ -33,7 +37,8 @@ ROOT = Path(__file__).resolve().parents[3]
 SHARE = Path('/usr/local/share/nostromo')
 MODE = Path('/opt/nostromo/state/spark-mode')
 RUNTIME_HEALTH = 'http://127.0.0.1:8001/health'
-BUDGET = 9000  # characters, about 2K tokens: every reader pays for the whole page
+CREWCTL = '/opt/nostromo/runtime/bin/crewctl'
+BUDGET = 9000  # characters per canvas, about 2K tokens: every reader pays for the whole page
 AS_OF = re.compile(r'^\*As of .*$', re.M)
 
 
@@ -59,6 +64,7 @@ class Facts:
     def __init__(self, root=ROOT, share=SHARE, mode=MODE, get=get_json, run=run):
         self.root, self.share, self.mode, self.get, self.run = Path(root), Path(share), Path(mode), get, run
         self.manifest = yaml.safe_load((self.root / 'crew/manifest.yaml').read_text())
+        self.budgets = yaml.safe_load((self.root / 'crew/budgets.yaml').read_text())['profiles']
         self.channels = yaml.safe_load((self.root / 'crew/channels.yaml').read_text())['channels']
 
     def squadops_version(self):
@@ -97,12 +103,49 @@ class Facts:
             return 'unavailable: campaignctl did not answer'
         return f"{len(tracked)} tracked, " + (', '.join(open_) + ' open' if open_ else 'none open')
 
+    def budget(self, role):
+        profile = self.budgets.get(self.manifest['agents'][role].get('budget_profile'), {})
+        return {'provider_hard_limit': f"${profile.get('amount_usd')} a month, hard limit",
+                'fixed': f"${profile.get('amount_usd')} a month, subscription",
+                'local_inference': 'local, no metered spend',
+                'excluded_existing_subscription': 'existing subscription'}.get(profile.get('type'), 'unknown')
+
+    def crew(self):
+        try:
+            units = {row['role']: row for row in json.loads(self.run([CREWCTL, '--json', 'status']))['crew']}
+        except Exception:
+            units = None
+        rows = ['| Role | Status | Backing | Budget |', '|---|---|---|---|']
+        for role, agent in self.manifest['agents'].items():
+            unit = (units or {}).get(role)
+            if units is None:
+                status = 'unknown: crewctl did not answer'
+            elif not unit or not unit.get('installed'):
+                status = 'not installed'
+            elif unit.get('paused_until') or unit.get('paused_for'):
+                status = f"paused by budget-watch until {unit.get('paused_until') or 'its configuration changes'}"
+            elif unit.get('active') == 'active':
+                status = 'running'
+            elif unit.get('enabled') == 'disabled':
+                status = 'not running: unit disabled'
+            else:
+                status = f"not running: {unit.get('active')}"
+            rows.append(f"| {agent.get('display_name', role.title())} | {status} | "
+                        f"{agent.get('model_label', agent.get('model'))} | {self.budget(role)} |")
+        return '\n'.join(rows)
+
     def release(self):
         try:
             info = json.loads((self.root / 'RELEASE.json').read_text())
         except (OSError, ValueError):
-            return 'unreleased tree', 'unreleased'
-        return f"`{info['commit'][:12]}` {info['subject']}", info['commit'][:12]
+            return 'unreleased tree'
+        return f"`{info['commit'][:12]}` {info['subject']}"
+
+    def nostromo_commit(self):
+        try:
+            return json.loads((self.root / 'RELEASE.json').read_text())['commit'][:12]
+        except (OSError, ValueError, KeyError):
+            return 'unreleased'
 
     def channel_map(self):
         rows = ['| Channel | Id | For |', '|---|---|---|']
@@ -124,33 +167,30 @@ class Facts:
             rows.append(f'- `{path.name}`' + (f': {title}' if title else ''))
         return '\n'.join(rows) or '- none installed'
 
-    def channel_id(self, name='squadops', required=True):
+    def channel_id(self, name, required=True):
         found = next((c['id'] for c in self.channels if c['name'] == name), None)
         if not found and required:
             raise Refused(f'#{name} has no id in crew/channels.yaml')
         return found
 
 
-def render(template, facts, now=None):
-    release, commit = facts.release()
-    values = {
-        'channel_id': facts.channel_id(required=False) or 'not-yet-created',
-        'squadops_version': facts.squadops_version(),
-        'engine': facts.engine(),
-        'spark_mode': facts.spark_mode(),
-        'campaigns': facts.campaigns(),
-        'nostromo_release': release,
-        'nostromo_commit': commit,
-        'channel_map': facts.channel_map(),
-        'runbooks': facts.runbooks(),
-        'as_of': time.strftime('%Y-%m-%d %H:%M UTC', time.gmtime(now)),
+def render(template, facts, channel, now=None):
+    """Fill only the facts this template names, so one canvas never pays for another's reads."""
+    sources = {
+        'channel_id': lambda: facts.channel_id(channel, required=False) or 'not-yet-created',
+        'squadops_version': facts.squadops_version, 'engine': facts.engine, 'spark_mode': facts.spark_mode,
+        'campaigns': facts.campaigns, 'crew': facts.crew, 'nostromo_release': facts.release,
+        'nostromo_commit': facts.nostromo_commit, 'channel_map': facts.channel_map, 'runbooks': facts.runbooks,
+        'as_of': lambda: time.strftime('%Y-%m-%d %H:%M UTC', time.gmtime(now)),
     }
-    page = re.sub(r'\{\{(\w+)\}\}', lambda m: values.get(m[1], m[0]), template)
-    unfilled = sorted(set(re.findall(r'\{\{(\w+)\}\}', page)))
-    if unfilled:
-        raise Refused(f'the template names unknown facts: {", ".join(unfilled)}')
+    named = set(re.findall(r'\{\{(\w+)\}\}', template))
+    unknown = sorted(named - set(sources))
+    if unknown:
+        raise Refused(f'{channel}: the template names unknown facts: {", ".join(unknown)}')
+    values = {name: sources[name]() for name in named}
+    page = re.sub(r'\{\{(\w+)\}\}', lambda m: values[m[1]], template)
     if len(page) > BUDGET:
-        raise Refused(f'the page is {len(page)} characters, over its {BUDGET} budget: shorten the template')
+        raise Refused(f'{channel}: the page is {len(page)} characters, over its {BUDGET} budget: shorten the template')
     return page
 
 
@@ -179,21 +219,36 @@ def publish(channel, page, env, run=run):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('--dry-run', action='store_true', help='print the page; publish nothing')
+    parser.add_argument('--dry-run', action='store_true', help='print the pages; publish nothing')
+    parser.add_argument('--only', metavar='NAME', help='one canvas, by channel name')
     args = parser.parse_args(argv)
     facts = Facts()
-    page = render((ROOT / 'crew/canvases/squadops.md').read_text(), facts)
-    if args.dry_run:
-        print(page)
-        return 0
-    result = publish(facts.channel_id(), page, buzz_env(facts.manifest))
-    print(f'#squadops canvas {result} ({len(page)} characters)')
-    return 0
+    templates = sorted((ROOT / 'crew/canvases').glob('*.md'))
+    if args.only:
+        templates = [t for t in templates if t.stem == args.only]
+        if not templates:
+            raise Refused(f'no template crew/canvases/{args.only}.md')
+    env = None if args.dry_run else buzz_env(facts.manifest)
+    failed = False
+    for template in templates:
+        channel = template.stem
+        try:
+            page = render(template.read_text(), facts, channel)
+            if args.dry_run:
+                print(f'===== #{channel} ({len(page)} characters)\n{page}')
+                continue
+            result = publish(facts.channel_id(channel), page, env)
+            print(f'#{channel} canvas {result} ({len(page)} characters)')
+        except Refused as error:
+            # One canvas failing never stops the others.
+            print(f'sync-canvases: {error}', file=sys.stderr)
+            failed = True
+    return 1 if failed else 0
 
 
 if __name__ == '__main__':
     try:
         sys.exit(main())
     except Refused as error:
-        print(f'sync-squadops-canvas: {error}', file=sys.stderr)
+        print(f'sync-canvases: {error}', file=sys.stderr)
         sys.exit(1)
