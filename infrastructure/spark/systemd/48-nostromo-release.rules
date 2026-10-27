@@ -1,6 +1,6 @@
 // Let the supervisor (nostromo) restart the units that run release code, and nothing else.
 //
-// Install:  install-release-deploy.sh (once, as root). Used by nostromo-release.py, which deploys a
+// Install:  install-release-deploy.py (once, as root). Used by nostromo-release.py, which deploys a
 // release by repointing /opt/nostromo/current and restarting these units. The supervisor already
 // owns that release tree, so this grants no new reach into code; it replaces a root helper and a
 // password-free sudo rule with a list of unit names.

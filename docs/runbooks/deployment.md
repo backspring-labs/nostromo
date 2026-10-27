@@ -52,7 +52,7 @@ for code, prompts, personas, the manifest, runbooks, and the campaign runtime al
 ```bash
 infrastructure/spark/bin/deploy-spark.sh                  # deploy the head of GitHub main
 infrastructure/spark/bin/deploy-spark.sh status           # live commit, main, units, stale harnesses
-infrastructure/spark/bin/deploy-spark.sh rollback         # back to the previous release
+infrastructure/spark/bin/deploy-spark.sh rollback         # back to the previous release, if it's on main
 infrastructure/spark/bin/deploy-spark.sh deploy <commit>  # an earlier commit on main
 infrastructure/spark/bin/rollout.sh                       # then restart the crew, canary first
 ```
@@ -61,6 +61,51 @@ infrastructure/spark/bin/rollout.sh                       # then restart the cre
   run as `nostromo`.
 - Five releases are kept, plus the live one and the previous one.
 - Each deploy is appended to `/opt/nostromo/state/releases.jsonl`.
+
+`rollback` passes the same gate as a deploy, checked against main as it is now. If the previous
+release was an unmerged trial, `rollback --allow-unmerged "<reason>"` needs the owner's approval
+again. Without that, deploy the main commit you want instead.
+
+## Root steps run from a fresh clone, never from `/opt/nostromo`
+
+The supervisor owns `/opt/nostromo`, and AI sessions work as the supervisor. So a script there could
+change between the owner reading it and root running it. Any root step (the one-time adoption below,
+or a later `install-*.sh`) runs from a private root-owned clone of GitHub at the exact commit:
+
+```bash
+sudo bash -c 'set -e; D=$(mktemp -d); git -C "$D" init -q
+  git -C "$D" fetch -q --depth 1 https://github.com/backspring-labs/nostromo.git COMMIT
+  git -C "$D" checkout -q FETCH_HEAD; cd "$D"; exec "$@"' _ <command> [args]
+```
+
+## First adoption (once)
+
+1. Stage the release as the supervisor, from the Mac. Before adoption there is no `current` to run
+   the tool from:
+
+   ```bash
+   ssh nostromo@spark 'python3 -I - stage' < infrastructure/spark/bin/nostromo-release.py
+   ```
+
+2. Adopt it as root, from a fresh clone of the same commit. `COMMIT` appears twice:
+
+   ```bash
+   sudo bash -c 'set -e; D=$(mktemp -d); git -C "$D" init -q
+     git -C "$D" fetch -q --depth 1 https://github.com/backspring-labs/nostromo.git COMMIT
+     git -C "$D" checkout -q FETCH_HEAD
+     python3 -I "$D/infrastructure/spark/bin/install-release-deploy.py" COMMIT'
+   ```
+
+The installer does these, in order:
+- refuses unless the staged release is byte-identical to that clone;
+- drains;
+- switches the paths to links;
+- installs the polkit rule and `nostromo@.service`;
+- moves `nostromo-deploy`, its sudoers rule and its state to `/var/backups/nostromo-release-adopt-*`;
+- starts and checks the daemons.
+
+A failure at any step after the drain puts every change back in reverse order, restarts the daemons
+that were running, and resumes the timers it paused.
 
 ## Stored state
 
@@ -74,5 +119,5 @@ From 2026-10-26 to 2026-10-27 the campaign code was deployed by a root helper, `
 through a password-free sudo rule. Prompts were deployed separately, by `push-repo.sh` from
 whatever branch the Mac had checked out. That allowed two different commits to be live at once. It
 also allowed an unmerged branch to run the crew, and changes to the manifest or the helper itself
-required the sudo setup to be run again. `install-release-deploy.sh` moved the Spark to releases once,
+required the sudo setup to be run again. `install-release-deploy.py` moved the Spark to releases once,
 and moved the helper, its sudoers rule and its state to `/var/backups/nostromo-release-adopt-*`.

@@ -4,12 +4,12 @@
   nostromo-release.py status [--json]
   nostromo-release.py deploy [COMMIT] [--allow-unmerged REASON]
   nostromo-release.py stage  [COMMIT] [--allow-unmerged REASON]
-  nostromo-release.py rollback
+  nostromo-release.py rollback [--allow-unmerged REASON]
 
 A release is one commit, `git archive`d read-only into /opt/nostromo/releases/<sha>.
 /opt/nostromo/current names the live release, and everything reads through it: the harness
 launcher, prompts, personas, the manifest, crewctl, budget-watch, and (through root-owned links
-under /usr/local, installed once by install-release-deploy.sh) the campaign code and runbooks.
+under /usr/local, installed once by install-release-deploy.py) the campaign code and runbooks.
 One commit is live for all of it, and `status` says which.
 
 Only commits on GitHub main deploy. The repository is public, so the fetch needs no credential and
@@ -256,7 +256,7 @@ def resume(spark, paused):
 
 def switch(spark, sha, merged, reason, drain_timeout=120):
     if not spark.linked.is_symlink():
-        raise Refused('this Spark is not on release deploys yet; run install-release-deploy.sh once (docs/runbooks/deployment.md)')
+        raise Refused('this Spark is not on release deploys yet; run install-release-deploy.py once (docs/runbooks/deployment.md)')
     old = live(spark)
     if old == sha:
         return {'commit': sha, 'unchanged': True}
@@ -325,7 +325,7 @@ def show(info):
         print(f"main      {info['github_main'][:12]}  " + (
             'up to date' if not info['behind_main'] else f"{info['behind_main']} commit(s) ahead of live, as last fetched"))
     print(f"previous  {(info['previous'] or '-')[:12]}")
-    print(f"adopted   {'yes' if info['adopted'] else 'no: run install-release-deploy.sh once'}")
+    print(f"adopted   {'yes' if info['adopted'] else 'no: run install-release-deploy.py once'}")
     for unit, state in info['units'].items():
         print(f"  {state:<10} {unit}")
     if info['stale_harnesses']:
@@ -357,8 +357,11 @@ def main(argv=None, spark=None):
             sha = live(spark, spark.previous)
             if not sha:
                 raise Refused('there is no previous release')
-            result = switch(spark, sha, merged=json.loads((spark.releases / sha / 'RELEASE.json').read_text())['merged'],
-                            reason='rollback')
+            # The previous release passes the same gate as any deploy, against main as it is now: a
+            # trial that was once approved needs approving again, never a silent return to production.
+            sha, merged, _main = resolve(spark, sha, args.allow_unmerged)
+            reason = 'rollback' + (f': {args.allow_unmerged}' if args.allow_unmerged else '')
+            result = switch(spark, sha, merged, reason)
         else:
             sha, merged, _main = resolve(spark, args.commit, args.allow_unmerged)
             path = stage(spark, sha, merged, args.allow_unmerged)

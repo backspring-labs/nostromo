@@ -43,11 +43,11 @@ if path.exists():
     print('Saved campaign state backup: '+str(backup))
 PY
 # Code, entry points, campaignctl and the runbooks are not copied here. They are root-owned links
-# into /opt/nostromo/current, made once by install-release-deploy.sh, and nostromo-release.py
+# into /opt/nostromo/current, made once by install-release-deploy.py, and nostromo-release.py
 # deploys them (docs/runbooks/deployment.md). Copying through those links would write into a
 # read-only release, so refuse until they exist.
 [[ -L /usr/local/lib/nostromo/campaigns ]] \
-  || { echo "run install-release-deploy.sh first: campaign code is deployed as a release" >&2; exit 1; }
+  || { echo "run install-release-deploy.py first: campaign code is deployed as a release" >&2; exit 1; }
 for role in ripley dallas; do
   install -d -m 700 -o "$role" -g "$role" "/home/$role/.local/state/nostromo-reviews"
 done

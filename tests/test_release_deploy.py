@@ -64,12 +64,13 @@ class Upstream:
 
 
 class FakeSpark(rel.Spark):
-    def __init__(self, tmp, github, adopted=True):
+    def __init__(self, tmp, github, adopted=True, root=None):
         linked = tmp / 'usr-local-lib-nostromo-campaigns'
         if adopted:
             os.symlink(tmp / 'opt/current/runtime/campaigns', linked)
-        (tmp / 'opt').mkdir()
-        super().__init__(root=tmp / 'opt', github=str(github), linked=linked)
+        root = root or tmp / 'opt'
+        root.mkdir(parents=True)
+        super().__init__(root=root, github=str(github), linked=linked)
         self.units = {unit: 'active' for unit in (*rel.DAEMONS, *rel.TIMERS)}
         self.units.update({unit: 'inactive' for unit in rel.WORKERS})
         self.calls, self.bad, self.clock, self.harness_start = [], set(), 1000.0, {}
@@ -241,7 +242,7 @@ def test_a_spark_not_yet_adopted_stages_but_will_not_switch(tmp_path, upstream):
     spark = FakeSpark(tmp_path, upstream.bare, adopted=False)
     assert rel.main(['stage'], spark=spark) == 0
     assert (spark.releases / upstream.first / 'RELEASE.json').is_file()
-    with pytest.raises(rel.Refused, match='install-release-deploy.sh'):
+    with pytest.raises(rel.Refused, match='install-release-deploy.py'):
         deploy(spark)
 
 
@@ -252,6 +253,20 @@ def test_rollback_returns_to_the_previous_release(spark, upstream):
     rel.main(['rollback'], spark=spark)
     assert rel.live(spark) == upstream.first
     assert records(spark)[-1]['reason'] == 'rollback'
+
+
+def test_rollback_will_not_quietly_restore_an_unmerged_trial(spark, upstream):
+    trial = upstream.commit({'notes.md': 'x\n'}, branch='feat/trial')
+    deploy(spark, trial, '--allow-unmerged', 'idle-pool trial')
+    later = upstream.commit({'runtime/campaigns/service.py': 'VALUE = 7\n'})
+    deploy(spark)
+    assert rel.live(spark, spark.previous) == trial
+    with pytest.raises(rel.Refused, match='not on GitHub main'):
+        rel.main(['rollback'], spark=spark)
+    assert rel.live(spark) == later
+    rel.main(['rollback', '--allow-unmerged', 'owner re-approved the trial'], spark=spark)
+    assert rel.live(spark) == trial
+    assert records(spark)[-1]['reason'] == 'rollback: owner re-approved the trial'
 
 
 def test_prune_keeps_live_previous_and_the_newest(spark, upstream):
@@ -307,26 +322,158 @@ def test_no_unit_runs_release_code_as_root():
             assert not re.search(r'^Exec\w+=[-@:]*[+!]', text, re.M), path.name
 
 
+def load_installer():
+    spec = importlib.util.spec_from_file_location('install_release_deploy', BIN / 'install-release-deploy.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+adopt = load_installer()
+
+
 def test_the_installer_links_everything_the_units_and_crew_read():
-    installer = (BIN / 'install-release-deploy.sh').read_text()
-    entrypoints = set(re.search(r'ENTRYPOINTS=\(([^)]*)\)', installer)[1].split())
-    runbooks = set(re.search(r'RUNBOOKS=\(([^)]*)\)', installer)[1].split())
     used = set()
     for path in unit_files():
         used |= set(re.findall(r'/usr/local/lib/nostromo/([\w-]+\.py)', path.read_text()))
-    assert used and used <= entrypoints
-    assert all((BIN / name).is_file() for name in entrypoints)
-    assert all((ROOT / 'docs/runbooks' / name).is_file() for name in runbooks)
+    assert used and used <= set(adopt.ENTRYPOINTS)
+    assert all((BIN / name).is_file() for name in adopt.ENTRYPOINTS)
+    assert all((ROOT / 'docs/runbooks' / name).is_file() for name in adopt.RUNBOOKS)
     shared = set()
     for path in [*ROOT.glob('crew/**/*.md'), ROOT / 'instructions.md', *BIN.glob('*')]:
         if path.is_file():
             shared |= set(re.findall(r'/usr/local/share/nostromo/([\w.-]+\.md)', path.read_text(errors='ignore')))
-    assert shared <= runbooks | {'campaign-ripley.md', 'campaign-dallas.md'}, shared
-    assert rel.DAEMONS == tuple(re.search(r'DAEMONS=\(([^)]*)\)', installer)[1].split())
-    assert rel.TIMERS == tuple(re.search(r'TIMERS=\(([^)]*)\)', installer)[1].split())
+    assert shared <= set(adopt.RUNBOOKS) | {f'campaign-{role}.md' for role in adopt.PERSONAS}, shared
 
 
 def test_the_campaign_installer_no_longer_copies_code():
     installer = (BIN / 'install-campaign-control.sh').read_text()
     assert 'runtime/campaigns/*.py' not in installer
     assert not re.search(r'install .*/usr/local/(lib|share)/nostromo|install .*/usr/local/bin/campaignctl', installer)
+
+
+# The one-time adoption, against a fake filesystem root, the same fake systemd, and a real staged release.
+
+import pwd  # noqa: E402
+
+UNIT_FILES = {
+    'infrastructure/spark/systemd/48-nostromo-release.rules': '// rule\n',
+    'infrastructure/spark/systemd/nostromo@.service': '[Service]\nUser=%i\nSuccessExitStatus=75\n',
+}
+OLD = {
+    'opt/nostromo/nostromo-src/old-tree.txt': 'working tree\n',
+    'usr/local/lib/nostromo/campaigns/core.py': 'old copy\n',
+    'usr/local/lib/nostromo/campaign-broker.py': 'old entry point\n',
+    'usr/local/bin/campaignctl': 'old client\n',
+    'usr/local/share/nostromo/campaign-control.md': 'old runbook\n',
+    'etc/systemd/system/nostromo@.service': '[Service]\nUser=%i\n',
+    'etc/sudoers.d/nostromo-deploy': 'jladd ALL=(root) NOPASSWD: /usr/local/sbin/nostromo-deploy\n',
+    'usr/local/sbin/nostromo-deploy': 'helper\n',
+    'etc/nostromo/deploy.json': '{}\n',
+    'var/lib/nostromo-deploy/current.json': '{}\n',
+}
+
+
+def snapshot(top):
+    """Everything outside the backups and the release store, so a rollback can be compared exactly."""
+    out = {}
+    for path in sorted(top.rglob('*')):
+        name = str(path.relative_to(top))
+        if name.startswith(('var/backups', 'opt/nostromo/backups/', 'opt/nostromo/releases')):
+            continue
+        out[name] = ('link', os.readlink(path)) if path.is_symlink() else (
+            ('file', path.read_bytes()) if path.is_file() else 'dir')
+    return out
+
+
+@pytest.fixture
+def site(tmp_path, upstream):
+    sha = upstream.commit(UNIT_FILES, 'units')
+    fs = tmp_path / 'fs'
+    spark = FakeSpark(tmp_path, upstream.bare, adopted=False, root=fs / 'opt/nostromo')
+    rel.main(['stage'], spark=spark)
+    for name, content in OLD.items():
+        (fs / name).parent.mkdir(parents=True, exist_ok=True)
+        (fs / name).write_text(content)
+    for name in ('opt/nostromo/backups', 'etc/polkit-1/rules.d', 'var/backups'):
+        (fs / name).mkdir(parents=True, exist_ok=True)
+    visudo, status = [], {'visudo': 0}
+
+    def run(argv, **_):
+        visudo.append(argv)
+        return subprocess.CompletedProcess(argv, status['visudo'])
+    me = pwd.getpwuid(os.getuid()).pw_name
+    make = lambda cls=adopt.Adopt: cls(sha, spark, root=fs, source=upstream.work, supervisor=me, run=run, stamp='T')
+    return type('Site', (), {'sha': sha, 'fs': fs, 'spark': spark, 'make': staticmethod(make), 'visudo': visudo,
+                            'status': status})
+
+
+def test_adoption_links_everything_into_current_and_retires_the_helper(site):
+    site.make().adopt()
+    fs, opt = site.fs, site.fs / 'opt/nostromo'
+    assert os.readlink(opt / 'current') == f'releases/{site.sha}'
+    assert os.readlink(opt / 'nostromo-src') == 'current'
+    assert (opt / 'backups/nostromo-src-pre-release-T/old-tree.txt').read_text() == 'working tree\n'
+    assert os.readlink(fs / 'usr/local/lib/nostromo/campaigns') == '/opt/nostromo/current/runtime/campaigns'
+    assert os.readlink(fs / 'usr/local/lib/nostromo/campaign-broker.py') == '/opt/nostromo/current/infrastructure/spark/bin/campaign-broker.py'
+    assert os.readlink(fs / 'usr/local/bin/campaignctl') == '/opt/nostromo/current/infrastructure/spark/bin/campaignctl'
+    assert os.readlink(fs / 'usr/local/share/nostromo/campaign-ripley.md') == '/opt/nostromo/current/crew/personas/ripley.md'
+    assert (fs / 'etc/systemd/system/nostromo@.service').read_text() == UNIT_FILES['infrastructure/spark/systemd/nostromo@.service']
+    assert (fs / 'etc/polkit-1/rules.d/48-nostromo-release.rules').is_file()
+    assert not any((fs / name).exists() for name in ('etc/sudoers.d/nostromo-deploy', *adopt.RETIRED))
+    assert (fs / 'var/backups/nostromo-release-adopt-T/etc_sudoers.d_nostromo-deploy').is_file()
+    assert site.visudo == [['visudo', '-c']]
+    assert all(site.spark.units[unit] == 'active' for unit in (*rel.DAEMONS, *rel.TIMERS))
+
+
+@pytest.mark.parametrize('failing', ['current and nostromo-src', '/usr/local links', 'polkit rule and crew unit',
+                                     'retire nostromo-deploy', 'start'])
+def test_a_failure_after_the_drain_puts_everything_back(site, failing):
+    before = snapshot(site.fs)
+
+    class Failing(adopt.Adopt):
+        def step(self, name):
+            if name == failing:
+                raise RuntimeError(f'injected failure at {name}')
+
+    with pytest.raises(RuntimeError, match='injected'):
+        site.make(Failing).adopt()
+    assert snapshot(site.fs) == before
+    assert all(site.spark.units[unit] == 'active' for unit in (*rel.DAEMONS, *rel.TIMERS))
+
+
+def test_a_failed_sudoers_check_puts_everything_back(site):
+    before = snapshot(site.fs)
+    site.status['visudo'] = 1
+    with pytest.raises(adopt.Refused, match='visudo'):
+        site.make().adopt()
+    assert snapshot(site.fs) == before
+    assert all(site.spark.units[unit] == 'active' for unit in (*rel.DAEMONS, *rel.TIMERS))
+
+
+def test_unhealthy_daemons_on_the_new_layout_put_everything_back(site):
+    before = snapshot(site.fs)
+    site.spark.bad.add(site.sha)
+    with pytest.raises(adopt.Refused, match='healthy'):
+        site.make().adopt()
+    assert snapshot(site.fs) == before
+    assert all(site.spark.units[unit] == 'active' for unit in (*rel.DAEMONS, *rel.TIMERS))
+
+
+def test_a_staged_release_that_differs_from_github_is_refused_before_anything_stops(site):
+    target = site.fs / 'opt/nostromo/releases' / site.sha / 'crew/manifest.yaml'
+    target.chmod(0o644)
+    target.write_text('agents: {tampered: true}\n')
+    target.chmod(0o444)
+    with pytest.raises(adopt.Refused, match='differs from GitHub'):
+        site.make().adopt()
+    assert not any(call[0] == 'stop' for call in site.spark.calls)
+
+
+def test_a_running_worker_stops_adoption_before_anything_changes(site):
+    before = snapshot(site.fs)
+    site.spark.units['nostromo-campaign-launch.service'] = 'activating'
+    with pytest.raises(adopt.Refused, match='still running'):
+        site.make().adopt()
+    assert snapshot(site.fs) == before
+    assert all(site.spark.units[timer] == 'active' for timer in rel.TIMERS)
