@@ -107,7 +107,8 @@ echo "== retired nostromo-deploy and its sudoers rule"
 systemctl start "${DAEMONS[@]}"
 for t in "${PAUSED[@]}"; do systemctl start "$t"; done
 sleep 5
-systemctl is-active "${DAEMONS[@]}" "${TIMERS[@]}" | paste -sd' ' | sed 's/^/== units: /'
+# Report, don't abort: a unit that failed to start is what the status below is for.
+echo "== units: $(systemctl is-active "${DAEMONS[@]}" "${TIMERS[@]}" | paste -sd' ' || true)"
 echo
 runuser -u nostromo -- python3 -I "$BIN/nostromo-release.py" status
 echo
