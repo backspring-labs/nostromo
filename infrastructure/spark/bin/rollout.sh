@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Restart crew roles onto whatever is now installed on the Spark — new buzz binaries (build-buzz.sh),
-# a manifest, persona or prompt change (push-repo.sh), a model pin — a canary first. From the Mac.
+# a manifest, persona or prompt change (deploy-spark.sh), a model pin — a canary first. From the Mac.
 #
 #   rollout.sh [--wait N] [role...]     default: every enabled role, Mother first
 #

@@ -55,7 +55,7 @@ def die(msg, as_json=False):
 # ---- manifest -------------------------------------------------------------------------------
 def manifest_text():
     if not os.access(MANIFEST, os.R_OK):
-        die(f"cannot read {MANIFEST} — run push-repo.sh from the Mac")
+        die(f"cannot read {MANIFEST} — run deploy-spark.sh from the Mac")
     return MANIFEST.read_text()
 
 

@@ -67,7 +67,7 @@ yaml_agent_text() {  # yaml_agent_text <key> — the whole value, for the one fi
 }
 
 for f in "$MANIFEST" "$ALLOWFILE" "$PERSONA" "$INSTRUCTIONS" "$BASE_PROMPT"; do
-  [[ -r "$f" ]] || die "missing or unreadable: $f  (run push-repo.sh from the Mac)"
+  [[ -r "$f" ]] || die "missing or unreadable: $f  (run deploy-spark.sh from the Mac)"
 done
 
 [[ -n "$HARNESS" ]] || HARNESS="$(yaml_agent harness)"
@@ -375,7 +375,7 @@ TEAM_INSTRUCTIONS="$(cat "$INSTRUCTIONS")"
 
 cat <<INFO
 launch-$ROLE: resolved configuration
-  repo            $REPO @ $(git -c safe.directory="$REPO" -C "$REPO" log --oneline -1 2>/dev/null || echo unknown)
+  repo            $REPO @ $(python3 -I -c 'import json,sys; r=json.load(open(sys.argv[1])); print(r["commit"][:12], r["subject"])' "$REPO/RELEASE.json" 2>/dev/null || git -c safe.directory="$REPO" -C "$REPO" log --oneline -1 2>/dev/null || echo unknown)
   identity        $MANIFEST_PUB
   relay           $RELAY_URL
   respond-to      $RESPOND_TO ($(awk -F, '{print NF}' <<<"$ALLOWLIST") allowlisted + owner)
@@ -601,7 +601,8 @@ GEMINI
         bwrap --ro-bind / / --unshare-user /bin/true 2>/dev/null \
           || die "bubblewrap cannot build a sandbox as $ROLE, so every shell command this role runs" \
                  "would be refused before it starts. Install the AppArmor profile:" \
-                 "sudo install -m 644 $REPO/infrastructure/spark/apparmor/usr.bin.bwrap" \
+                 "from a root-owned clone \"\$C\" (docs/runbooks/deployment.md):" \
+                 "sudo install -m 644 \"\$C/infrastructure/spark/apparmor/usr.bin.bwrap\"" \
                  "/etc/apparmor.d/usr.bin.bwrap && sudo apparmor_parser -r /etc/apparmor.d/usr.bin.bwrap"
       fi
     fi

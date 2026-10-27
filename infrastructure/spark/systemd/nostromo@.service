@@ -8,7 +8,8 @@
 # process as `parker` without holding privilege over `parker`? It does not. systemd does, and
 # start/stop can be delegated for these units alone via polkit.
 #
-# Install:  infrastructure/spark/bin/install-units.sh   (as root)
+# Install:  sudo bash "$C/infrastructure/spark/bin/install-units.sh", from a root-owned clone "$C"
+#           (docs/runbooks/deployment.md), never from /opt/nostromo
 # Use:      systemctl enable --now nostromo@mother
 #           systemctl status nostromo@mother
 #           journalctl -u nostromo@mother -f
