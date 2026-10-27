@@ -1,5 +1,5 @@
-# The crew's Buzz channels (Bootstrap Plan §16.6). Read by sync-squadops-canvas.py for the channel
-# map on the #squadops canvas. Members are role names from crew/manifest.yaml, plus `owner`.
+# The crew's Buzz channels (Bootstrap Plan §16.6). Read by sync-canvases.py: a
+# channel's canvas is crew/canvases/<name>.md, and the map appears on the #squadops canvas. Members are role names from crew/manifest.yaml, plus `owner`.
 channels:
   - name: nostromo
     id: 9f4ab953-d3ce-4335-be39-3a5f6db007c3
