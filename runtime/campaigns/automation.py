@@ -13,6 +13,24 @@ COMMANDS = {"approve-budget", "automation", "advance", "review-claim", "review-r
             "review-submit", "review-recovery-authorize", "review-recovery-claim", "review-recovery-result",
             "review-recovery-failed", "review-recovery-pending"}
 
+# Evidence selected for each gate is an explicit contract. The consolidated planning artifact
+# is identified by SquadOps artifact_type, not a filename convention.
+GATE_EVIDENCE = {
+    "progress_plan_review": {
+        "included_types": {"interface_manifest", "verification_contract", "control_implementation_plan",
+                           "merge_decisions", "change_request", "definition_of_done", "test_report",
+                           "accepted_tree", "document"},
+        "required_types": {"document"},
+    },
+    "progress_increment_ruling": {
+        "included_types": {"interface_manifest", "verification_contract", "control_implementation_plan",
+                           "merge_decisions", "change_request", "definition_of_done", "test_report",
+                           "accepted_tree"},
+        "required_types": set(),
+    },
+}
+CLOSING_EVIDENCE_TYPES = {"definition_of_done", "test_report", "accepted_tree"}
+
 
 class Automation:
     def __init__(self, broker, now=None):
@@ -157,19 +175,33 @@ class Automation:
                 packet["cycles"].append({k: cycle.get(k) for k in
                                          ("cycle_id", "kind", "status", "runs", "cycle_outcome")})
         packet["artifacts"] = []
-        selected = {"interface_manifest", "verification_contract", "control_implementation_plan", "merge_decisions",
-                    "change_request", "definition_of_done", "test_report", "accepted_tree"}
         if gate is None:
-            selected = {"definition_of_done", "test_report", "accepted_tree"}
+            selected = CLOSING_EVIDENCE_TYPES
+            required = set()
+        else:
+            contract = GATE_EVIDENCE.get(gate.get("gate"))
+            if contract is None:
+                raise Refused("uncommissioned gate; no evidence contract")
+            selected = contract["included_types"]
+            required = contract["required_types"]
+        present = set()
         for cycle in progress["cycles"]:
             for meta in evidence.listing(f"/api/v1/projects/{identifier(p['campaign']['project_id'])}/cycles/{cycle['cycle_id']}/artifacts"):
-                if gate and meta.get("run_id") != gate["run"]:
+                if gate and (cycle["cycle_id"] != gate["cycle"] or meta.get("run_id") != gate["run"]):
                     continue
-                if meta.get("artifact_type") in selected:
-                    full = evidence.content(p["campaign"], meta["artifact_id"])
+                artifact_type = meta.get("artifact_type")
+                if artifact_type in selected:
+                    try:
+                        full = evidence.content(p["campaign"], meta["artifact_id"])
+                    except Refused as error:
+                        raise Refused(f"evidence hold: {error}") from None
                     packet["artifacts"].append({"artifact_id": meta["artifact_id"], "filename": meta["filename"],
                                                  "sha256": full["sha256"], "content": full["content"], "complete": True})
-        packet["evidence_selection"] = {"included_types": sorted(selected),
+                    present.add(artifact_type)
+        missing = required - present
+        if missing:
+            raise Refused(f"required evidence missing for {gate['gate']}: artifact_type {', '.join(sorted(missing))}")
+        packet["evidence_selection"] = {"included_types": sorted(selected), "required_types": sorted(required),
             "source_files_included": False, "note": "A proposal ruling authorizes work, not acceptance of implemented code. Full source is available through campaignctl artifact. Hold if needed evidence is absent."}
         if gate:
             packet["gate"] = gate

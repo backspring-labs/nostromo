@@ -614,3 +614,62 @@ def test_unreadable_live_revision_authority_retains_signed_result_and_parks(worl
     assert rpc(broker, "dallas", "review-claim") is None
     assert rpc(broker, "mother", "triage", {"campaign": "cmp_test"})["findings"][0]["classification"] == "decision_policy_forbidden"
     assert len(api.posts) == 1 and api.posts[0][1].endswith("/pause")
+
+
+def _plan_gate(api, artifact_type="document", raw=b"# Consolidated plan\nReady for review.\n"):
+    api.cycle["applied_defaults"]["workload_sequence"] = [{"type": "proposal", "gate": "progress_plan_review"}]
+    api.raw = raw
+    api.meta.update({"artifact_type": artifact_type, "filename": "planning_artifact.md",
+                     "size_bytes": len(raw), "content_hash": hashlib.sha256(raw).hexdigest()})
+    return {"cycle": "cyc_test", "run": "run_test", "gate": "progress_plan_review",
+            "opened_at": "2026-10-24T23:00:00Z"}
+
+
+def test_plan_review_packet_includes_complete_hashed_document_and_reference(world):
+    broker, api, _ = world
+    gate = _plan_gate(api)
+    packet = Automation(broker).packet("cmp_test", gate)
+    artifact = next(a for a in packet["artifacts"] if a["artifact_id"] == "art_test")
+    assert artifact["content"] == api.raw.decode("utf-8")
+    assert artifact["sha256"] == hashlib.sha256(api.raw).hexdigest()
+    assert artifact["complete"] is True
+    assert artifact["artifact_id"] in packet["references"]
+    assert packet["evidence_selection"]["required_types"] == ["document"]
+
+
+def test_plan_review_without_required_document_parks_with_explicit_hold(world):
+    broker, api, store = world
+    _plan_gate(api, artifact_type="control_implementation_plan")
+    result = Automation(broker).advance("cmp_test")
+    control = store.db.execute("SELECT state,reason FROM automation WHERE campaign='cmp_test'").fetchone()
+    assert control["state"] == "parked"
+    assert "required evidence missing for progress_plan_review: artifact_type document" in control["reason"]
+    assert store.db.execute("SELECT count(*) FROM review_jobs").fetchone()[0] == 0
+    assert any(post[1].endswith("/pause") for post in api.posts)
+    assert result["control"]["state"] == "parked"
+
+
+def test_plan_review_evidence_over_request_bound_parks_with_explicit_size_hold(world):
+    broker, api, store = world
+    _plan_gate(api, raw=b"x" * 70000)
+    Automation(broker).advance("cmp_test")
+    control = store.db.execute("SELECT state,reason FROM automation WHERE campaign='cmp_test'").fetchone()
+    assert control["state"] == "parked"
+    assert "evidence_size_hold" in control["reason"]
+    assert "single-call review limit" in control["reason"]
+    assert store.db.execute("SELECT count(*) FROM review_jobs").fetchone()[0] == 0
+
+
+def test_increment_gate_keeps_its_existing_evidence_selection(world):
+    broker, api, _ = world
+    api.raw = b"proposal evidence"
+    api.meta.update({"artifact_type": "change_request", "filename": "change_request.yaml",
+                     "size_bytes": len(api.raw), "content_hash": hashlib.sha256(api.raw).hexdigest()})
+    gate = {"cycle": "cyc_test", "run": "run_test", "gate": "progress_increment_ruling",
+            "opened_at": "2026-10-24T23:00:00Z"}
+    packet = Automation(broker).packet("cmp_test", gate)
+    assert [a["artifact_id"] for a in packet["artifacts"]] == ["art_test"]
+    assert packet["evidence_selection"]["included_types"] == sorted({
+        "interface_manifest", "verification_contract", "control_implementation_plan", "merge_decisions",
+        "change_request", "definition_of_done", "test_report", "accepted_tree"})
+    assert packet["evidence_selection"]["required_types"] == []
