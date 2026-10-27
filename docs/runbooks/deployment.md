@@ -30,7 +30,8 @@ for code, prompts, personas, the manifest, runbooks, and the campaign runtime al
   budget-watch.
   - It checks they stay up and that the broker answers on its socket.
   - If they don't, it switches back to the previous release, restarts again, and says so.
-  - Either way it resumes the timers it paused.
+  - Either way it restarts the timers it paused. Any timer that won't restart is named in the error
+    and in the deploy record (`timers_not_restarted`). It is never reported as success.
 - **No root.** Root never runs release code. The supervisor restarts exactly those units through
   `48-nostromo-release.rules`, a list of unit names. Every unit that runs release code runs as a crew
   or service account, never root (`tests/test_release_deploy.py` checks this).
@@ -104,8 +105,10 @@ The installer does these, in order:
 - moves `nostromo-deploy`, its sudoers rule and its state to `/var/backups/nostromo-release-adopt-*`;
 - starts and checks the daemons.
 
-A failure at any step after the drain puts every change back in reverse order, restarts the daemons
-that were running, and resumes the timers it paused.
+A failure at any step after the drain stops what may be running the new layout, puts every change
+back in reverse order, and restarts the daemons and timers that were running. It then reads back
+each unit's state. Anything not as it was, including a unit it could not stop, is listed under
+"restoring it is INCOMPLETE", together with the backup directory to inspect.
 
 ## Stored state
 

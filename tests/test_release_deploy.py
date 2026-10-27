@@ -77,11 +77,16 @@ class FakeSpark(rel.Spark):
         # Which release each running unit loaded (None: the pre-release layout), and units whose
         # next start fails once.
         self.loaded, self.fail_start = {}, set()
+        self.fail_always, self.fail_stop, self.fail_reload = set(), set(), False
 
     def systemctl(self, *args):
         self.calls.append(args)
         verb, units = args[0], args[1:]
+        if verb == 'daemon-reload' and self.fail_reload:
+            raise rel.Refused('systemctl daemon-reload: injected failure')
         for unit in units:
+            if verb in ('start', 'stop') and unit in (self.fail_always if verb == 'start' else self.fail_stop):
+                raise rel.Refused(f'systemctl {verb} {unit}: injected persistent failure')
             if verb == 'stop':
                 self.units[unit] = 'inactive'
             elif verb == 'start' and unit in self.fail_start:
@@ -534,9 +539,105 @@ def test_a_timer_that_will_not_restart_after_a_healthy_deploy_is_recorded_and_re
     deploy(spark)
     second = upstream.commit({'runtime/campaigns/service.py': 'VALUE = 8\n'})
     spark.fail_start.add('nostromo-campaign-launch.timer')
-    with pytest.raises(rel.Refused, match='live and healthy, but these timers did not restart: nostromo-campaign-launch.timer'):
+    with pytest.raises(rel.Refused, match='live and healthy. These timers did not restart and are stopped: nostromo-campaign-launch.timer'):
         deploy(spark)
     assert rel.live(spark) == second
     assert records(spark)[-1]['timers_not_restarted'] == ['nostromo-campaign-launch.timer']
     # Every other paused timer was still started.
     assert all(spark.units[t] == 'active' for t in rel.TIMERS if t != 'nostromo-campaign-launch.timer')
+
+
+
+# Every recovery path reports what it could not restore; none claims success it did not verify.
+
+def test_a_timer_that_never_restarts_makes_adoption_recovery_say_it_is_incomplete(site, capsys):
+    site.spark.fail_always.add('nostromo-campaign-advance.timer')
+    with pytest.raises(adopt.Refused, match='would not start'):
+        site.make().adopt()
+    err = capsys.readouterr().err
+    assert 'INCOMPLETE' in err and 'nostromo-campaign-advance.timer is inactive' in err
+    assert 'every unit is running as before' not in err
+
+
+def test_a_daemon_that_will_not_stop_is_reported_as_maybe_running_the_new_release(site, capsys):
+    site.spark.bad.add(site.sha)
+    original = site.spark.systemctl
+
+    def systemctl(*args):
+        # Stops succeed during the drain; the broker refuses to stop once the new layout is up.
+        if args[0] == 'stop' and 'nostromo-campaign-broker.service' in args and site.spark.current.is_symlink():
+            raise rel.Refused('systemctl stop nostromo-campaign-broker.service: injected')
+        return original(*args)
+    site.spark.systemctl = systemctl
+    with pytest.raises(adopt.Refused, match='healthy'):
+        site.make().adopt()
+    err = capsys.readouterr().err
+    assert 'INCOMPLETE' in err and 'may still be running the new release' in err
+
+
+def test_a_failed_daemon_reload_during_recovery_is_reported(site, capsys):
+    class Failing(adopt.Adopt):
+        def step(self, name):
+            if name == 'retire nostromo-deploy':
+                self.spark.fail_reload = True
+                raise RuntimeError('injected')
+    with pytest.raises(RuntimeError):
+        site.make(Failing).adopt()
+    err = capsys.readouterr().err
+    assert 'INCOMPLETE' in err and 'daemon-reload' in err
+
+
+def test_a_clean_recovery_says_so(site, capsys):
+    site.spark.bad.add(site.sha)
+    with pytest.raises(adopt.Refused):
+        site.make().adopt()
+    assert 'every unit is running as before' in capsys.readouterr().err
+
+
+def test_a_timer_that_will_not_stop_during_the_drain_restarts_the_ones_already_stopped(spark, upstream):
+    deploy(spark)
+    upstream.commit({'runtime/campaigns/service.py': 'VALUE = 9\n'})
+    spark.fail_stop.add(rel.TIMERS[2])
+    with pytest.raises(rel.Refused, match='nothing changed'):
+        deploy(spark)
+    assert rel.live(spark) == upstream.first
+    assert all(spark.units[timer] == 'active' for timer in rel.TIMERS)
+
+
+def test_a_drain_timeout_names_a_timer_that_would_not_restart(spark, upstream):
+    deploy(spark)
+    upstream.commit({'runtime/campaigns/service.py': 'VALUE = 10\n'})
+    spark.units['nostromo-campaign-review@dallas.service'] = 'activating'
+    spark.fail_always.add('nostromo-campaign-window.timer')
+    with pytest.raises(rel.Refused, match='still running.*did not restart and are stopped: nostromo-campaign-window.timer'):
+        deploy(spark)
+
+
+def test_an_unhealthy_deploy_still_reports_timers_that_would_not_restart(spark, upstream):
+    deploy(spark)
+    bad = upstream.commit({'runtime/campaigns/service.py': 'VALUE = 11\n'})
+    spark.bad.add(bad)
+    spark.fail_always.add('nostromo-campaign-launch.timer')
+    with pytest.raises(rel.Refused, match='is live again. These timers did not restart and are stopped: nostromo-campaign-launch.timer'):
+        deploy(spark)
+    assert records(spark)[-1]['result'] == 'rolled back'
+    assert records(spark)[-1]['timers_not_restarted'] == ['nostromo-campaign-launch.timer']
+
+
+def test_an_unexpected_error_mid_switch_restarts_timers_and_says_what_is_live(spark, upstream, monkeypatch):
+    deploy(spark)
+    upstream.commit({'runtime/campaigns/service.py': 'VALUE = 12\n'})
+    monkeypatch.setattr(rel, 'point', lambda *a: (_ for _ in ()).throw(OSError(28, 'No space left on device')))
+    with pytest.raises(rel.Refused, match=f'stopped by OSError.*Live now: {upstream.first[:12]}'):
+        deploy(spark)
+    assert all(spark.units[timer] == 'active' for timer in rel.TIMERS)
+    assert records(spark)[-1]['result'] == 'error: OSError'
+
+
+def test_a_release_that_cannot_be_pruned_does_not_fail_a_good_deploy(spark, upstream, monkeypatch, capsys):
+    for n in range(rel.KEEP + 2):
+        upstream.commit({'runtime/campaigns/service.py': f'VALUE = {100 + n}\n'})
+        rel.main(['stage'], spark=spark)
+    monkeypatch.setattr(rel, 'remove', lambda path: (_ for _ in ()).throw(PermissionError(13, 'Permission denied')))
+    assert deploy(spark) == 0
+    assert 'prune_problems' in json.loads(capsys.readouterr().out.strip().splitlines()[-1])

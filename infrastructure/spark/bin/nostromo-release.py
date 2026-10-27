@@ -70,7 +70,7 @@ class Spark:
 
     def systemctl(self, *args):
         result = subprocess.run(['systemctl', '--no-ask-password', *args], capture_output=True, text=True, timeout=120)
-        if result.returncode and args[0] in ('start', 'stop', 'restart'):
+        if result.returncode and args[0] in ('start', 'stop', 'restart', 'daemon-reload'):
             raise Refused(f'systemctl {" ".join(args)}: {(result.stderr or result.stdout).strip()[:300]}')
         return result.stdout.strip()
 
@@ -236,17 +236,33 @@ def restart(spark):
 
 
 def drain(spark, timeout):
-    """Pause the campaign timers and wait for any worker already running. Never kills one."""
-    paused = [timer for timer in TIMERS if spark.state(timer) in BUSY]
-    for timer in paused:
-        spark.systemctl('stop', timer)
-    deadline = spark.now() + timeout
-    while busy := [unit for unit in WORKERS if spark.state(unit) in BUSY]:
-        if spark.now() >= deadline:
-            resume(spark, paused)
-            raise Refused(f'{", ".join(busy)} still running after {timeout}s; nothing changed. Retry later')
-        spark.sleep(2)
+    """Pause the campaign timers and wait for any worker already running. Never kills one.
+
+    On any failure, every timer it paused is started again, and any that would not start is named."""
+    paused = []
+    try:
+        for timer in TIMERS:
+            if spark.state(timer) in BUSY:
+                spark.systemctl('stop', timer)
+                paused.append(timer)
+        deadline = spark.now() + timeout
+        while busy := [unit for unit in WORKERS if spark.state(unit) in BUSY]:
+            if spark.now() >= deadline:
+                raise Refused(f'{", ".join(busy)} still running after {timeout}s')
+            spark.sleep(2)
+    except BaseException as error:
+        unresumed = resume(spark, paused)
+        if not isinstance(error, Exception):
+            raise
+        raise Refused(f'{error}; nothing changed. Retry later' + timers_note(unresumed)) from error
     return paused
+
+
+def timers_note(unresumed):
+    if not unresumed:
+        return ''
+    return (f'. These timers did not restart and are stopped: {", ".join(unresumed)}; '
+            'start them by hand (systemctl start) and inspect their journals')
 
 
 def resume(spark, paused):
@@ -260,6 +276,20 @@ def resume(spark, paused):
     return failed
 
 
+def attempt(spark, sha, old):
+    """Point current at sha and restart. Unhealthy: point back and restart. Returns what is live."""
+    if old:
+        point(spark.previous, f'releases/{old}')
+    point(spark.current, f'releases/{sha}')
+    if restart(spark):
+        return 'live'
+    if old:
+        point(spark.current, f'releases/{old}')
+        if restart(spark):
+            return 'rolled back'
+    return 'failed'
+
+
 def switch(spark, sha, merged, reason, drain_timeout=120):
     if not spark.linked.is_symlink():
         raise Refused('this Spark is not on release deploys yet; run install-release-deploy.py once (docs/runbooks/deployment.md)')
@@ -267,27 +297,28 @@ def switch(spark, sha, merged, reason, drain_timeout=120):
     if old == sha:
         return {'commit': sha, 'unchanged': True}
     paused = drain(spark, drain_timeout)
-    stopped = []
+    entry = {'commit': sha, 'previous': old, 'merged': merged, 'reason': reason}
     try:
-        if old:
-            point(spark.previous, f'releases/{old}')
-        point(spark.current, f'releases/{sha}')
-        if not restart(spark):
-            restored = False
-            if old:
-                point(spark.current, f'releases/{old}')
-                restored = restart(spark)
-            record(spark, commit=sha, previous=old, merged=merged, reason=reason, result='rolled back' if restored else 'failed')
-            raise Refused(f'{sha[:12]} failed its health check; ' + (
-                f'{old[:12]} is live again' if restored else 'and the previous release did not recover: inspect journalctl -u nostromo-campaign-broker'))
-    finally:
-        stopped = resume(spark, paused)
-    # A healthy release stays live; a timer that would not restart is recorded and reported, not hidden.
-    record(spark, commit=sha, previous=old, merged=merged, reason=reason, result='live',
-           **({'timers_not_restarted': stopped} if stopped else {}))
-    if stopped:
-        raise Refused(f'{sha[:12]} is live and healthy, but these timers did not restart: {", ".join(stopped)}. '
-                      'Start them by hand (systemctl start), and inspect their journals')
+        outcome = attempt(spark, sha, old)
+    except BaseException as error:
+        # Something other than a health check failed mid-switch. Restart the timers, say what is live.
+        unresumed = resume(spark, paused)
+        record(spark, **entry, result=f'error: {type(error).__name__}', live=live(spark),
+               **({'timers_not_restarted': unresumed} if unresumed else {}))
+        if isinstance(error, Exception):
+            raise Refused(f'deploy of {sha[:12]} stopped by {type(error).__name__}: {error}. Live now: '
+                          f'{(live(spark) or "none")[:12]}' + timers_note(unresumed)) from error
+        raise
+    # A timer that would not restart is recorded and reported, never hidden, whatever the outcome.
+    unresumed = resume(spark, paused)
+    record(spark, **entry, result=outcome, **({'timers_not_restarted': unresumed} if unresumed else {}))
+    if outcome == 'rolled back':
+        raise Refused(f'{sha[:12]} failed its health check; {old[:12]} is live again' + timers_note(unresumed))
+    if outcome == 'failed':
+        raise Refused(f'{sha[:12]} failed its health check and ' + (f'{old[:12]} did not recover' if old else
+                      'there was no previous release') + ': inspect journalctl -u nostromo-campaign-broker' + timers_note(unresumed))
+    if unresumed:
+        raise Refused(f'{sha[:12]} is live and healthy' + timers_note(unresumed))
     return {'commit': sha, 'previous': old, 'stale_harnesses': stale(spark)}
 
 
@@ -299,14 +330,17 @@ def stale(spark):
 
 
 def prune(spark):
+    """Best effort: a release that cannot be removed is reported, and never fails a good deploy."""
     keep = {live(spark), live(spark, spark.previous)}
     kept = sorted((p for p in spark.releases.iterdir() if p.is_dir() and len(p.name) == 40),
                   key=lambda p: p.stat().st_mtime, reverse=True)
-    for path in kept[KEEP:]:
-        if path.name not in keep:
+    problems = []
+    for path in [*(p for p in kept[KEEP:] if p.name not in keep), *spark.releases.glob('.staging-*')]:
+        try:
             remove(path)
-    for path in spark.releases.glob('.staging-*'):
-        remove(path)
+        except OSError as error:
+            problems.append(f'{path.name}: {error.strerror or error}')
+    return problems
 
 
 def status(spark):
@@ -381,7 +415,9 @@ def main(argv=None, spark=None):
                 print(path)
                 return 0
             result = switch(spark, sha, merged, args.allow_unmerged)
-        prune(spark)
+        problems = prune(spark)
+        if problems:
+            result['prune_problems'] = problems
     print(json.dumps(result))
     return 0
 

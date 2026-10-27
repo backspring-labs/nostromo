@@ -137,9 +137,10 @@ class Adopt:
         self.step('drain')
         paused = rel.drain(self.spark, 300)  # resumes and refuses by itself if a worker won't finish
         running = [unit for unit in rel.DAEMONS if self.spark.state(unit) == 'active']
-        # Pushed first, so they run last: files back, then units reloaded, started and resumed.
+        # Pushed first, so they run last: files back, then units reloaded, started and resumed. Starting
+        # is best effort here; verify() below is what decides whether the units really came back.
         self.undo.append(lambda: rel.resume(self.spark, paused))
-        self.undo.append(lambda: [self.spark.systemctl('start', unit) for unit in running])
+        self.undo.append(lambda: rel.resume(self.spark, running))
         self.undo.append(lambda: self.spark.systemctl('daemon-reload'))
         try:
             self.spark.systemctl('stop', *rel.DAEMONS)
@@ -155,16 +156,13 @@ class Adopt:
             if failed:
                 raise Refused(f'these timers would not start on the new layout: {", ".join(failed)}')
         except BaseException:
-            # Quiesce first. A daemon or timer already running on the new layout must not keep running
-            # it after the files go back, and `systemctl start` on a running unit does nothing.
-            for unit in (*paused, *rel.DAEMONS):
-                try:
-                    self.spark.systemctl('stop', unit)
-                except Exception:
-                    pass
-            errors = self.rollback()
-            print('== adoption failed; ' + ('everything was put back as it was' if not errors else
-                  'restoring hit errors, inspect ' + str(self.backup) + ': ' + '; '.join(errors)), file=sys.stderr)
+            errors = self.quiesce(paused) + self.rollback() + self.verify(running, paused)
+            if errors:
+                print(f'== adoption failed, and restoring it is INCOMPLETE. Inspect {self.backup}:', file=sys.stderr)
+                for error in errors:
+                    print(f'   - {error}', file=sys.stderr)
+            else:
+                print('== adoption failed; every file was put back, and every unit is running as before', file=sys.stderr)
             raise
         self.undo.clear()
 
@@ -209,6 +207,23 @@ class Adopt:
             path = self.at(name)
             if path.exists() or path.is_symlink():
                 self.aside(path)
+
+    def quiesce(self, paused):
+        """Stop what may be running the new layout: after the files go back it would keep the new code,
+        and `systemctl start` on a running unit does nothing."""
+        errors = []
+        for unit in (*paused, *rel.DAEMONS):
+            try:
+                self.spark.systemctl('stop', unit)
+            except Exception as error:
+                errors.append(f'could not stop {unit} before restoring ({error}); '
+                              + ('it may still be running the new release' if unit in rel.DAEMONS else 'it may fire during the restore'))
+        return errors
+
+    def verify(self, running, paused):
+        """The units' final state, read back rather than assumed."""
+        return [f'{unit} is {self.spark.state(unit)}, not active as it was before adoption'
+                for unit in (*running, *paused) if self.spark.state(unit) != 'active']
 
     def rollback(self):
         errors = []
