@@ -773,3 +773,39 @@ def test_a_failed_emission_is_not_evidence(world):
     Automation(broker).advance("cmp_test")
     control = store.db.execute("SELECT state,reason FROM automation WHERE campaign='cmp_test'").fetchone()
     assert control["state"] == "parked" and "document:governance.review_plan" in control["reason"]
+
+
+# Prices: a checked table, and no cliff. Stale or post-promotion prices double the reservation.
+
+def test_current_prices_reserve_what_they_always_did():
+    from runtime.campaigns.review import RESERVATION_MICROUSD, price_basis, reservation_microusd
+    now = timestamp("2026-10-30T12:00:00Z")
+    assert RESERVATION_MICROUSD == 563200 and reservation_microusd(now) == 563200 and price_basis(now) == []
+
+
+def test_an_ended_promotion_doubles_the_reservation_instead_of_stopping_reviews():
+    from runtime.campaigns.review import price_basis, reservation_microusd
+    after = timestamp("2026-11-22T00:00:00Z")
+    assert price_basis(after) == ["gpt-5.6-sol promotion ended 2026-11-21"]
+    assert reservation_microusd(after) == 2 * 563200
+
+
+def test_a_price_unchecked_for_ninety_days_doubles_the_reservation(monkeypatch):
+    from runtime.campaigns import review
+    monkeypatch.setitem(review.PRICES, "gpt-5.6-sol", {**review.PRICES["gpt-5.6-sol"], "promotional_until": None})
+    later = timestamp("2027-02-01T00:00:00Z")
+    assert set(review.price_basis(later)) == {"gpt-5.6-sol last checked 2026-10-30", "claude-opus-5-5 last checked 2026-10-30"}
+    assert review.reservation_microusd(later) == 2 * 563200
+
+
+def test_a_higher_published_price_raises_the_reservation(monkeypatch):
+    from runtime.campaigns import review
+    monkeypatch.setitem(review.PRICES, "claude-opus-5-5", {**review.PRICES["claude-opus-5-5"], "output": 30.00})
+    assert review.reservation_microusd(timestamp("2026-10-30T12:00:00Z")) > 563200
+
+
+def test_an_allowance_may_run_past_the_old_price_date(world):
+    broker, _, _ = world
+    result = rpc(broker, "owner", "approve-budget", {"name": "winter", "cap_microusd": 5000000, "max_dispatches": 8,
+                                                      "expires_at": "2026-12-31T00:00:00Z"})
+    assert result["approved"] is True and result["price_basis"] == "current"

@@ -21,7 +21,7 @@ models:
     long_context_input_x: 2.0
     long_context_output_x: 1.5
     source: https://developers.openai.com/api/docs/models/gpt-5.6-sol
-    checked: 2026-10-02
+    checked: 2026-10-30
     promotional_until: 2026-11-21  # "available at least through November 21, 2026"
 
   # Anthropic, for Dallas (claude-agent-acp). The report prices each Claude call by the model the API
@@ -36,7 +36,7 @@ models:
     fast_input_x: 2.0              # fast mode $8 / $40
     fast_output_x: 2.0
     source: https://platform.claude.com/docs/en/about-claude/pricing
-    checked: 2026-10-03
+    checked: 2026-10-30
   claude-opus-5:
     input: 5.00
     cached_input: 0.50
