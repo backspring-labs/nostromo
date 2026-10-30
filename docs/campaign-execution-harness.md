@@ -233,8 +233,17 @@ provider access. The reservation calculation includes bounded input bytes/framin
 reasoning tokens, the configured model prices, and a regional allowance. A reservation is
 conservative accounting, not a provider invoice; actual usage is retained separately. Ambiguous,
 failed, or incomplete calls are not refunded automatically. The scheduler preserves enough budget
-for one closing interpretation before it claims another review. Pricing expiry disables new calls
-until the schedule is reviewed.
+for one closing interpretation before it claims another review.
+
+Prices come from `PRICES` in `runtime/campaigns/review.py`. Each review model's published price is
+recorded there with its source, the date it was checked, and the end of any promotion.
+- **A reservation never assumes less than** $5 per million input tokens or $20 per million output.
+- **A price is no longer trusted** once its promotion has ended or its check is more than 90 days
+  old.
+- **An untrusted price doubles the reservation.** It never stops reviews. The
+  provider consoles' hard limits are the spending boundary; the reservation only keeps the
+  allowance's accounting honest. `approve-budget` reports the price basis it used.
+- **To clear it,** re-check the source and update the entry.
 
 Campaign token and elapsed limits are SquadOps runtime bounds, not a provider billing cap. The
 broker cannot inspect provider billing administration, so owner allowance and local usage are not

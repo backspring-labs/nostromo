@@ -8,12 +8,47 @@ from .review_policy import POLICY_REFUSAL, decision_contract, validate_decision
 
 MAX_REQUEST_BYTES = 65536
 MAX_OUTPUT_TOKENS = 8192
-# Conservative input accounting: one token per serialized UTF-8 byte plus framing.
-# 5 USD/M covers GPT cache writes; 20 USD/M includes hidden reasoning output.
-# A 10% regional allowance is included. No tools, cache controls, fast or priority tier.
-RESERVATION_MICROUSD = ((MAX_REQUEST_BYTES + 4096) * 5 + MAX_OUTPUT_TOKENS * 20) * 110 // 100
-PRICE_EXPIRES = "2026-11-01T00:00:00Z"
 MODELS = {"ripley": "gpt-5.6-sol", "dallas": "claude-opus-5-5"}
+# Published prices, USD per million tokens, for the two review models: standard tier, no fast or
+# priority tier, no tools or cache controls. Re-check each against its source and update `checked`.
+PRICES = {
+    "gpt-5.6-sol": {"input": 4.00, "output": 20.00, "checked": "2026-10-30T00:00:00Z",
+                    "promotional_until": "2026-11-21T00:00:00Z",  # "at least through November 21, 2026"
+                    "source": "https://developers.openai.com/api/docs/models/gpt-5.6-sol"},
+    "claude-opus-5-5": {"input": 4.00, "output": 20.00, "checked": "2026-10-30T00:00:00Z",
+                        "promotional_until": None,
+                        "source": "https://platform.claude.com/docs/en/about-claude/pricing"},
+}
+PRICE_STALE_AFTER_S = 90 * 86400
+# Conservative input accounting: one token per serialized UTF-8 byte plus framing. A reservation
+# never assumes less than 5 USD/M input (covers GPT cache writes) or 20 USD/M output (includes hidden
+# reasoning), and adds a 10% regional allowance.
+FLOOR = {"input": 5.00, "output": 20.00}
+
+
+def price_basis(now):
+    """Why the reservation is what it is. A price whose promotion has ended, or whose check is more
+    than 90 days old, is no longer trusted. That doubles the reservation; it never stops reviews.
+    The provider consoles' hard limits are the spending boundary; this keeps the allowance honest."""
+    stale = []
+    for model, price in PRICES.items():
+        if price["promotional_until"] and now >= timestamp(price["promotional_until"]):
+            stale.append(f"{model} promotion ended {price['promotional_until'][:10]}")
+        elif now >= timestamp(price["checked"]) + PRICE_STALE_AFTER_S:
+            stale.append(f"{model} last checked {price['checked'][:10]}")
+    return stale
+
+
+def reservation_microusd(now):
+    rate_in = max(FLOOR["input"], *(p["input"] for p in PRICES.values()))
+    rate_out = max(FLOOR["output"], *(p["output"] for p in PRICES.values()))
+    base = ((MAX_REQUEST_BYTES + 4096) * rate_in + MAX_OUTPUT_TOKENS * rate_out) * 110 / 100
+    return round(base * (2 if price_basis(now) else 1))
+
+
+# What one reservation is while every price is current (563,200 microUSD at today's prices).
+RESERVATION_MICROUSD = round(((MAX_REQUEST_BYTES + 4096) * max(FLOOR["input"], *(p["input"] for p in PRICES.values()))
+                            + MAX_OUTPUT_TOKENS * max(FLOOR["output"], *(p["output"] for p in PRICES.values()))) * 110 / 100)
 
 REFUSAL_CODES = {
     "missing or unexpected request fields": "result_shape_invalid",

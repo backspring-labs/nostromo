@@ -6,7 +6,7 @@ from pathlib import Path
 
 from .core import Refused, canonical, digest, exact, identifier
 from .evidence import Evidence
-from .review import PRICE_EXPIRES, RESERVATION_MICROUSD, body, timestamp, validate, decision_request
+from .review import body, price_basis, reservation_microusd, timestamp, validate, decision_request
 from .review_policy import POLICY_REFUSAL, decision_contract, validate_decision
 
 COMMANDS = {"approve-budget", "automation", "advance", "review-claim", "review-result", "review-failed",
@@ -66,8 +66,8 @@ class Automation:
     def validate_spec(self, spec, crew):
         exact(spec, {"budget", "not_after"})
         budget = self.budget(spec["budget"])
-        if not self.now < timestamp(spec["not_after"]) <= timestamp(budget["expires_at"]) <= timestamp(PRICE_EXPIRES):
-            raise Refused("automation needs a future cutoff within the approved budget and verified price window")
+        if not self.now < timestamp(spec["not_after"]) <= timestamp(budget["expires_at"]):
+            raise Refused("automation needs a future cutoff within the approved budget")
         if type(crew.get("paid_dispatches")) is not int or not 1 <= crew["paid_dispatches"] <= budget["max_dispatches"]:
             raise Refused("automation needs an explicit bounded paid dispatch count")
         if crew.get("require_dallas", True) is not True:
@@ -316,9 +316,10 @@ class Automation:
         crew = self.b.store.definition(self.b.store.campaign(cid)["definition"])[0]["definition"]["crew"]
         campaign_count = self.db.execute("SELECT count(*) FROM review_jobs WHERE campaign=? AND reserved>0", (cid,)).fetchone()[0]
         # Preserve one complete call for closing analysis until it is claimed.
-        closing = 0 if row["kind"] == "analysis" else RESERVATION_MICROUSD
-        if (self.now >= timestamp(PRICE_EXPIRES) or self.now >= timestamp(budget["expires_at"])
-                or total + RESERVATION_MICROUSD + closing > budget["cap_microusd"]
+        reserve = reservation_microusd(self.now)
+        closing = 0 if row["kind"] == "analysis" else reserve
+        if (self.now >= timestamp(budget["expires_at"])
+                or total + reserve + closing > budget["cap_microusd"]
                 or count + 1 + bool(closing) > budget["max_dispatches"]
                 or campaign_count + 1 + bool(closing) > crew["paid_dispatches"]):
             self.park(cid, "review allowance exhausted; no provider call made")
@@ -340,7 +341,7 @@ class Automation:
                     self.policy_hold(cid, row["id"], "proposed revision authority could not be verified; no Dallas call made")
                     return None
         self.db.execute("UPDATE review_jobs SET state='claimed',claimed=?,reserved=? WHERE id=?",
-                        (self.now, RESERVATION_MICROUSD, row["id"]))
+                        (self.now, reserve, row["id"]))
         self.b.store.save()  # Reservation is durable BEFORE any provider access.
         return {"id": row["id"], "campaign": cid, "role": role, "kind": row["kind"],
                 "payload": payload, "deadline": min(control["deadline"], self.now + 840)}
@@ -566,14 +567,15 @@ class Automation:
                 raise Refused("first-pilot review allowance must be at most ten dollars")
             if type(args["max_dispatches"]) is not int or not 1 <= args["max_dispatches"] <= 20:
                 raise Refused("first-pilot allowance needs at most twenty calls")
-            if not self.now < timestamp(args["expires_at"]) <= timestamp(PRICE_EXPIRES):
-                raise Refused("review allowance extends beyond verified pricing")
+            if not self.now < timestamp(args["expires_at"]):
+                raise Refused("review allowance must expire in the future")
             old = self.db.execute("SELECT body FROM review_budgets WHERE name=?", (args["name"],)).fetchone()
             if old and old[0] != canonical(args):
                 raise Refused("review allowances are immutable")
             self.db.execute("INSERT OR IGNORE INTO review_budgets VALUES(?,?)", (args["name"], canonical(args)))
             self.b.store.save()
-            return {"approved": True, "reservation_per_call_microusd": RESERVATION_MICROUSD}
+            return {"approved": True, "reservation_per_call_microusd": reservation_microusd(self.now),
+                    "price_basis": price_basis(self.now) or "current"}
         if command in {"automation", "advance"}:
             exact(args, {"campaign"})
             if command == "advance" and caller != "mother":
