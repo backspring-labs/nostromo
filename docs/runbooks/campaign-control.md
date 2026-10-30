@@ -153,7 +153,11 @@ The local owner first uses `approve-budget` with an object such as:
 
 This is an example, not an installed approval. A budget name is immutable. Both the attended
 test and later overnight definition should reference the **same** allowance so they cannot
-each spend its full value independently. First-pilot caps above $10 or twenty calls are refused.
+each spend its full value independently. Allowances above $25 or sixty calls are refused, a guard against a mistyped approval; the provider
+consoles' hard limits are the spending boundary. Each call reserves for its own request size plus the
+full output cap, about $0.25 for a typical review. For a campaign of about five increments, approve
+about $20 and 40 calls, and set the campaign's `paid_dispatches` to about 35. That allows for
+revisions and an occasional uncertain call, whose reservation is never refunded.
 An opted-in definition adds:
 
 ```json

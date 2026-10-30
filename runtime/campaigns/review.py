@@ -39,10 +39,14 @@ def price_basis(now):
     return stale
 
 
-def reservation_microusd(now):
+def reservation_microusd(now, request_bytes=MAX_REQUEST_BYTES):
+    """One call's reservation. Input is counted as the request's actual serialized size (one token
+    per byte, a pessimistic count) plus framing. Output is always the full output cap. With no size
+    given, the largest possible request is assumed, as for the closing call kept in hand."""
     rate_in = max(FLOOR["input"], *(p["input"] for p in PRICES.values()))
     rate_out = max(FLOOR["output"], *(p["output"] for p in PRICES.values()))
-    base = ((MAX_REQUEST_BYTES + 4096) * rate_in + MAX_OUTPUT_TOKENS * rate_out) * 110 / 100
+    size = min(int(request_bytes), MAX_REQUEST_BYTES)
+    base = ((size + 4096) * rate_in + MAX_OUTPUT_TOKENS * rate_out) * 110 / 100
     return round(base * (2 if price_basis(now) else 1))
 
 
