@@ -226,11 +226,15 @@ size, disables redirects, sets a time bound, validates strict JSON output and ev
 then signs the result for Buzz. Tokens are short-lived at the provider boundary; provider keys
 remain in the role's private home.
 
-An owner separately approves a shared immutable allowance. The first-pilot validator caps that
-allowance at $10 and 20 dispatches; the campaign also sets a smaller per-campaign dispatch limit
-and cutoff. One dispatch reserves 563,200 microUSD ($0.5632 at the verified price schedule) before
-provider access. The reservation calculation includes bounded input bytes/framing, output and
-reasoning tokens, the configured model prices, and a regional allowance. A reservation is
+An owner separately approves a shared immutable allowance. The validator caps that allowance at $25
+and 60 dispatches, a guard against a mistyped approval rather than the spending boundary, which is
+each provider console's hard limit. The campaign also sets a smaller per-campaign dispatch limit and
+cutoff. Each dispatch reserves before provider access.
+- **What it covers:** the request's actual serialized size, counted pessimistically as one token
+  per byte, plus framing; the full output cap, including reasoning; the model prices; and a
+  regional allowance.
+- **Typical cost:** a typical review reserves about $0.25. Observed actual costs were $0.06–0.08.
+- **The closing call held back** reserves the largest possible request, $0.5632. A reservation is
 conservative accounting, not a provider invoice; actual usage is retained separately. Ambiguous,
 failed, or incomplete calls are not refunded automatically. The scheduler preserves enough budget
 for one closing interpretation before it claims another review.

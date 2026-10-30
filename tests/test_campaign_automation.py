@@ -12,12 +12,20 @@ from runtime.campaigns.automation import Automation
 from runtime.campaigns.core import Broker, Refused, Store, canonical
 from runtime.campaigns.decisions import helpers, verifier
 from runtime.campaigns.evidence import Evidence, waiting_gates
-from runtime.campaigns.review import RESERVATION_MICROUSD, attestations, body, decode, timestamp
+from runtime.campaigns.review import RESERVATION_MICROUSD, attestations, body, decode, reservation_microusd, timestamp
 from runtime.campaigns.worker import WorkerFailure, provider, run
 from runtime.campaigns.usage import observed
 
 NOW = timestamp("2026-10-25T00:00:00Z")
 KEYS = {"ripley": "0" * 63 + "1", "dallas": "0" * 63 + "2"}
+
+
+def sized(store):
+    """What the claimed jobs should have reserved: each for its own request's size."""
+    total = 0
+    for (payload,) in store.db.execute("SELECT payload FROM review_jobs WHERE reserved>0"):
+        total += reservation_microusd(NOW, len(canonical(json.loads(payload)["body"]).encode()))
+    return total
 
 
 class Runtime:
@@ -126,7 +134,7 @@ def test_signed_independent_handoff_submits_once_after_restart(world):
     assert store.db.execute("SELECT count(*) FROM review_jobs").fetchone()[0] == 1
     job = rpc(broker, "ripley", "review-claim")
     assert rpc(broker, "ripley", "review-claim") is None
-    assert store.db.execute("SELECT reserved FROM review_jobs").fetchone()[0] == RESERVATION_MICROUSD
+    assert store.db.execute("SELECT reserved FROM review_jobs").fetchone()[0] == sized(store)
     finish(broker, job, DECISION)
     assert api.posts == []
     dallas = rpc(broker, "dallas", "review-claim")
@@ -181,7 +189,7 @@ def test_worker_failure_never_repeats_provider_call(world, fault):
                ("unknown outcome", "publication response lost", "broker result lost"))
     run("ripley", request, infer, post)
     assert len(calls) == 1
-    assert store.db.execute("SELECT reserved,state FROM review_jobs").fetchone()[0] == RESERVATION_MICROUSD
+    assert store.db.execute("SELECT reserved,state FROM review_jobs").fetchone()[0] == sized(store)
     status = rpc(broker, "mother", "automation", {"campaign": "cmp_test"})
     assert status["control"]["state"] == "parked"
     assert status["jobs"][0]["failure_diagnostic"]["stage"] == expected_stage
@@ -320,7 +328,7 @@ def test_budget_is_shared_across_campaigns_and_never_refunded(world):
     # Another campaign naming the same owner allowance sees the first one's reservation.
     store.db.execute("INSERT INTO campaigns VALUES(?,?,?,?,?)", ("cmp_second", "pilot-test", "channel", "thread", "mother"))
     store.save()
-    assert Automation(broker).status("cmp_second")["shared_budget_reserved_microusd"] == RESERVATION_MICROUSD
+    assert Automation(broker).status("cmp_second")["shared_budget_reserved_microusd"] == sized(store)
 
 
 def test_worker_response_lost_after_broker_commit_does_not_repeat_call(world):
@@ -451,7 +459,7 @@ def test_recovery_keeps_accepted_event_across_read_failure_without_republishing(
     assert api.posts == original_posts
     assert store.db.execute("SELECT state FROM automation").fetchone()[0] == "expired"
     assert store.db.execute("SELECT count(*) FROM review_jobs").fetchone()[0] == 1
-    assert store.db.execute("SELECT state,reserved FROM review_jobs").fetchone()[:] == ("done", RESERVATION_MICROUSD)
+    assert store.db.execute("SELECT state,reserved FROM review_jobs").fetchone()[:] == ("done", sized(store))
 
 
 @pytest.mark.parametrize("stage", ["provider_request", "result_validation", "recovery_persist"])
@@ -527,7 +535,7 @@ def test_retained_zero_revision_failure_stops_before_dallas_or_gate_write(world)
     run("ripley", lambda req: broker.handle("ripley", req), infer, post)
     assert len(calls) == 1 and publications == []
     assert store.db.execute("SELECT count(*) FROM review_jobs WHERE role='dallas'").fetchone()[0] == 0
-    assert store.db.execute("SELECT sum(reserved) FROM review_jobs").fetchone()[0] == RESERVATION_MICROUSD
+    assert store.db.execute("SELECT sum(reserved) FROM review_jobs").fetchone()[0] == sized(store)
     assert all("/gates/" not in p[1] for p in api.posts)
     assert rpc(broker, "mother", "triage", {"campaign": "cmp_test"})["findings"][0]["classification"] == "decision_policy_forbidden"
 
@@ -809,3 +817,24 @@ def test_an_allowance_may_run_past_the_old_price_date(world):
     result = rpc(broker, "owner", "approve-budget", {"name": "winter", "cap_microusd": 5000000, "max_dispatches": 8,
                                                       "expires_at": "2026-12-31T00:00:00Z"})
     assert result["approved"] is True and result["price_basis"] == "current"
+
+
+def test_a_reservation_is_sized_to_its_request_and_never_below_the_output_cap():
+    from runtime.campaigns.review import MAX_OUTPUT_TOKENS, MAX_REQUEST_BYTES
+    now = timestamp("2026-10-30T12:00:00Z")
+    small, large = reservation_microusd(now, 10000), reservation_microusd(now, 10 ** 9)
+    assert small == round(((10000 + 4096) * 5 + MAX_OUTPUT_TOKENS * 20) * 1.1)
+    assert large == reservation_microusd(now) == 563200  # sizes cap at the largest request
+    assert small > MAX_OUTPUT_TOKENS * 20  # the full output cap is always reserved
+
+
+@pytest.mark.parametrize("field,value,ok", [("cap_microusd", 25000000, True), ("cap_microusd", 25000001, False),
+                                            ("max_dispatches", 60, True), ("max_dispatches", 61, False)])
+def test_the_allowance_ceiling_is_twenty_five_dollars_and_sixty_calls(world, field, value, ok):
+    broker, _, _ = world
+    args = {"name": "longer", "cap_microusd": 20000000, "max_dispatches": 40, "expires_at": "2026-12-31T00:00:00Z", field: value}
+    if ok:
+        assert rpc(broker, "owner", "approve-budget", args)["approved"] is True
+    else:
+        with pytest.raises(Refused, match="at most"):
+            rpc(broker, "owner", "approve-budget", args)

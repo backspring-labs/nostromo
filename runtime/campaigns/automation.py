@@ -316,8 +316,9 @@ class Automation:
         crew = self.b.store.definition(self.b.store.campaign(cid)["definition"])[0]["definition"]["crew"]
         campaign_count = self.db.execute("SELECT count(*) FROM review_jobs WHERE campaign=? AND reserved>0", (cid,)).fetchone()[0]
         # Preserve one complete call for closing analysis until it is claimed.
-        reserve = reservation_microusd(self.now)
-        closing = 0 if row["kind"] == "analysis" else reserve
+        # This call reserves for its own request; the closing call kept in hand is not built yet.
+        reserve = reservation_microusd(self.now, len(canonical(json.loads(row["payload"])["body"]).encode()))
+        closing = 0 if row["kind"] == "analysis" else reservation_microusd(self.now)
         if (self.now >= timestamp(budget["expires_at"])
                 or total + reserve + closing > budget["cap_microusd"]
                 or count + 1 + bool(closing) > budget["max_dispatches"]
@@ -563,10 +564,12 @@ class Automation:
                 raise Refused("review allowances belong to the owner")
             exact(args, {"name", "cap_microusd", "max_dispatches", "expires_at"})
             identifier(args["name"])
-            if type(args["cap_microusd"]) is not int or not 0 < args["cap_microusd"] <= 10000000:
-                raise Refused("first-pilot review allowance must be at most ten dollars")
-            if type(args["max_dispatches"]) is not int or not 1 <= args["max_dispatches"] <= 20:
-                raise Refused("first-pilot allowance needs at most twenty calls")
+            # A guard against a mistyped approval, not the spending boundary: that is each provider
+            # console's hard limit. Raised from the first pilots' $10 / 20 calls on 2026-10-30.
+            if type(args["cap_microusd"]) is not int or not 0 < args["cap_microusd"] <= 25000000:
+                raise Refused("a review allowance must be at most twenty-five dollars")
+            if type(args["max_dispatches"]) is not int or not 1 <= args["max_dispatches"] <= 60:
+                raise Refused("a review allowance needs at most sixty calls")
             if not self.now < timestamp(args["expires_at"]):
                 raise Refused("review allowance must expire in the future")
             old = self.db.execute("SELECT body FROM review_budgets WHERE name=?", (args["name"],)).fetchone()
