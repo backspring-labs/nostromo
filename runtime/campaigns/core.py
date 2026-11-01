@@ -150,6 +150,12 @@ class Broker:
         if command == "tracked":
             exact(args, set())
             return [dict(row) for row in self.store.db.execute("SELECT * FROM campaigns ORDER BY id")]
+        if command == "draft":
+            # Read-only: builds and validates a campaign from a plain-language goal; stores nothing.
+            if caller not in {"mother", "ripley", "owner"}:
+                raise Refused("drafting a campaign belongs to Mother, Ripley or the owner")
+            from .drafting import draft
+            return draft(self, args)
         if command == "shared-ready":
             exact(args, set())
             return {"contract": 1, "new_approvals_default": "shared", "legacy_approvals": "exclusive"}
@@ -298,6 +304,20 @@ class Broker:
             raise
 
     def approve(self, args):
+        name, definition, inference_mode = self.check_definition(args)
+        stored = {**args, "definition": definition}
+        sha = digest(definition)
+        previous = self.store.db.execute("SELECT body FROM definitions WHERE name=?", (name,)).fetchone()
+        if previous and previous["body"] != canonical(stored):
+            raise Refused("approved definitions are immutable; approve a new name")
+        self.store.db.execute("INSERT OR IGNORE INTO definitions(name,body,sha,inference_mode) VALUES(?,?,?,?)",
+                             (name, canonical(stored), sha, inference_mode))
+        self.store.save()
+        return {"name": name, "sha256": sha, "approved": True}
+
+    def check_definition(self, args, allowance=None):
+        """Everything approve() requires of a definition, storing nothing. The draft step runs it with
+        the allowance it proposes; approval runs it against the stored allowance."""
         exact(args, {"name", "definition", "channel", "thread"})
         name = identifier(args["name"])
         identifier(args["channel"])
@@ -322,18 +342,10 @@ class Broker:
             raise Refused("require_dallas must be boolean")
         if "automation" in crew:
             from .automation import Automation
-            Automation(self).validate_spec(crew["automation"], crew)
+            Automation(self).validate_spec(crew["automation"], crew, allowance)
         elif crew.get("paid_dispatches", 0) != 0:
             raise Refused("automatic paid dispatch is not commissioned")
-        stored = {**args, "definition": definition}
-        sha = digest(definition)
-        previous = self.store.db.execute("SELECT body FROM definitions WHERE name=?", (name,)).fetchone()
-        if previous and previous["body"] != canonical(stored):
-            raise Refused("approved definitions are immutable; approve a new name")
-        self.store.db.execute("INSERT OR IGNORE INTO definitions(name,body,sha,inference_mode) VALUES(?,?,?,?)",
-                             (name, canonical(stored), sha, inference_mode))
-        self.store.save()
-        return {"name": name, "sha256": sha, "approved": True}
+        return name, definition, inference_mode
 
     def read(self, command, args):
         exact(args, {"campaign"})

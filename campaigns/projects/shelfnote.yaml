@@ -1,5 +1,45 @@
-# ShelfNote, a product campaigns improve. The plain-language campaigns design
-# (docs/specs/plain-language-campaigns.md) fills in the rest of this entry. For now it only gives the
-# product's name as people write it.
+# ShelfNote: a product the crew's campaigns improve.
+#
+# One entry per product (docs/specs/plain-language-campaigns.md). The broker's `draft` command reads
+# it to build a campaign definition from a plain-language goal, so the owner never writes one.
+# Change it by pull request.
+
 display_name: ShelfNote
 project_id: prj-shelfnote
+# What the squad reads as the product's goals. Ripley drafts each campaign's goal from it.
+requirements: repo:file:docs/goals.md@current
+
+# Where a campaign may change the product. SquadOps places each criterion's test file under the
+# product's first test runner root, which on ShelfNote is the repository root
+# (test_criterion_<id>.py). On 2026-11-01 a scope without that pattern stopped campaign 1.
+allowed_scope:
+  - backend/**
+  - tests/**
+  - test_criterion_*.py
+
+work_class:
+  attendance: unattended
+  prd_tier: tier-1
+
+# Profiles and limits, from the owner-approved definition of 2026-11-01. A preset sets
+# target_accepted_increments, max_cycles, max_elapsed_s and budget_tokens; everything else here is
+# used as given.
+policy:
+  calibration_profile: campaign-increment-source
+  proposal_profile: campaign-increment-source
+  squad_profile: full-38-tf
+  plan_gate: tier
+  max_proposal_revisions: 2
+  max_proposal_run_retries: 1
+  max_rejected_proposals_in_row: 2
+  max_repair_cycles_per_increment: 1
+  max_retry_cycles_per_increment: 1
+  max_unaccepted_increments: 2
+  launch_blocked_attempts: 6
+  launch_blocked_interval_s: 300
+  lease_expiry_s: 3600
+  ruling_bound_s: 1800
+
+crew:
+  require_dallas: true
+  inference_mode: shared
