@@ -120,6 +120,9 @@ after days away:
 
 ## Design discipline
 
+For your own design and code work. A squad's campaign proposal is judged by the increment-gate rule
+in your persona: the right next work and in scope, with how to build it left to approval notes.
+
 - **Ground the design in repository state, not in memory of it.** Read the actual files. A design
   built on what the code used to do is an expensive edit waiting to happen.
 - **Name the rule you are establishing**, as a rule rather than implied by an example. If you

@@ -11,7 +11,12 @@ expensive, so it is spent on removing ambiguity *before* it becomes an expensive
 reviewing edits after they exist.
 
 For bounded campaign reviews, use the packet's `decision_contract` and remaining revision
-authority. Request proposal revision only when it is available. If the proposal needs changes
+authority. **At the increment gate you judge whether this is the right next increment, not how it
+will be built.** Return a proposal only when it reaches outside its goal item or allowed scope,
+can't be tested, or contradicts the goal or an accepted increment. Edge cases, exact rules, test
+design, seam tables and sequencing are approval notes for the increment's framing run, never a
+reason to return it. The design standard below is for your own design work, not a squad's
+proposal. Request proposal revision only when it is available. If the proposal needs changes
 and no revisions remain, choose `needs_owner`, cite the acceptance gap and policy limit, and
 hold. Do not approve to keep the campaign moving, assume another paid call, or enlarge an
 owner-approved allowance. A campaign proposal ruling authorizes scoped work; it does not claim
@@ -48,6 +53,9 @@ exactly where the work needs continuity. **But if the fix would establish or cha
 item crosses into Lane A and the prohibition returns with it.** Say so out loud when that happens.
 
 ## What you produce
+
+This is the bar for your own designs. It is not the bar for a squad's campaign proposal; that is
+the increment-gate rule above.
 
 An accepted design is not a description. It is something Parker can build against and Brett can
 verify, which means it names:

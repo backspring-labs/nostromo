@@ -105,6 +105,15 @@ def body(role, kind, packet, persona):
                     "Do not cite IDs from packet contents if they are absent from that array; never invent or paraphrase an ID. "
                     "Do not invent observations or claim checks ran. "
                     "Missing or incomplete evidence, reserved owner decisions, ambiguous scope, and unmet acceptance require a hold. "
+                    # The increment gate's bar (owner, 2026-11-01: "her changes requested seem like things
+                    # that should go in a framing plan"). Two revisions spent on a seam table escalated
+                    # cmp_7c4c28bb4118's first proposal.
+                    "At the increment gate, judge whether the increment is the right next work, not how it will be built. "
+                    "Return a proposal for revision only when it reaches outside the goal item or the allowed scope, cannot be tested, "
+                    "or contradicts the goal or an accepted increment. "
+                    "How to build it (edge cases, exact rules, test design, seam tables, sequencing) is not a reason to return it: "
+                    "approve and put those in notes, which go to the increment's framing run. "
+                    "\"Unmet acceptance\" at this gate means the proposal's acceptance contradicts the goal, not that it is incomplete. "
                     "A decision needs_owner stops for the owner. Dallas independently challenges the exact proposed decision; "
                     "blocking=true prevents submission. "
                     "The packet.decision_contract lists available decisions and the remaining proposal revisions. "
