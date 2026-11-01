@@ -123,6 +123,45 @@ approval. Under approval by reply, that signature is on a plain "approve".
 Fields such as event IDs, digests and request IDs stay in the record and out of the thread. An ID
 appears only when a person needs one, which this design aims to make never.
 
+## A readable control plane
+
+Owner, 2026-11-01: Buzz is a human-readable collaboration and control plane, not a system log.
+Beyond the English-only thread, that means:
+
+**Who is doing what**
+- **A separate identity for automatic posts.** The watcher and launch worker post today as Mother,
+  so "Mother" sometimes means her judgement and sometimes a script. A non-model identity, for
+  example "Campaign Desk", posts notices; Mother's name then means only Mother.
+- **The squad as one actor.** "The squad is working on search", "The squad is revising the search
+  proposal", with no breakdown by squad agent for now.
+- **Whose move it is.** Every notice ends with who acts next: the squad, Ripley, Dallas, or the
+  owner.
+
+**When something needs the owner**
+- **The owner is mentioned when it's the owner's move.** Escalations, parks, limit pauses and
+  proposal cards tag the owner, so Desktop notifies them. Mentioning the owner starts no paid crew
+  turn, while notices still mention no crew member.
+- **One clear ask per card:** what happened, the options, and the reply to give ("approve",
+  "continue", "stop"). Never a command.
+
+**What the words say**
+- **No IDs in what people read.** Campaigns are named for their product and number ("ShelfNote
+  campaign 1"), increments for their feature ("search"), artifacts by filename. PRs and related
+  messages are links.
+- **Plain states and verdicts.** "The squad is proposing the next increment", not `at_proposal`;
+  "sent back for revision", not `returned_for_revision`.
+- **Times in ET, durations in words:** "started 10:46 am ET, about 40 minutes in".
+- **Mother's own replies follow the same rules.** She gives an ID only when asked.
+
+**At a glance**
+- **A live campaigns canvas** in `#squadops-campaigns`, rendered by `sync-canvases.py` and refreshed
+  on each state change. It shows each campaign, its stage, increments accepted out of the target,
+  whose move it is (the owner's first), reviews used and hours left.
+
+**Volume**
+- **One post per meaningful change.** A ruling and Dallas's review become one "decided" post. A
+  quiet campaign posts nothing.
+
 ## Pieces to build
 
 | Piece | What | Where |
@@ -152,13 +191,14 @@ Each preset's review count and allowance follow the runbook's per-increment esti
 ## Order of work
 
 0. **Readable threads.** The watcher writes English. The review records move out of the message
-   body (render and verify). This comes first because it's the most visible, and it
+   body (render and verify). Also in this phase: the Campaign Desk identity, whose-move-it-is
+   lines, owner mentions on the owner's move, no IDs, plain states, ET times, and fewer posts. This comes first because it's the most visible, and it
    doesn't depend on the rest.
 1. **Registry and draft step.** ShelfNote becomes the first registry entry, and Mother can post cards.
    Approval still uses today's line, copied from the card's code block.
 2. **Approval by reply,** including the allowance and approve-and-launch. This retires owner-UID
    approvals.
-3. **Plain reads and decision cards,** plus status in words.
+3. **Plain reads and decision cards,** plus status in words, and the live campaigns canvas.
 
 ## Open questions
 
