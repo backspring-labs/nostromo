@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 
 from .cli import call
-from .core import canonical, digest
+from .core import digest
 
 
 def publication_result(command, stdout):
@@ -29,43 +29,144 @@ def publication_result(command, stdout):
     return result
 
 
-def notice(campaign, automated=False):
-    state = campaign["state"]
-    if state == "completed":
-        return "Campaign closed; evidence ready for analysis."
-    if state in {"awaiting_ruling", "escalated", "paused", "launch_blocked"}:
-        if automated:
-            return "Inspect the bounded review control and current evidence; owner decisions remain pending."
-        return "Action required; inspect the current evidence packet. No review has been dispatched automatically."
-    return "Campaign state changed."
+ET = "America/New_York"
+ROOT = Path(__file__).resolve().parents[2]
+# Plain words for what a campaign is doing. A state not listed reads as its own name, spaced.
+DOING = {
+    "at_proposal": "the squad is proposing the next increment",
+    "executing": "the squad is building the approved increment",
+    "awaiting_ruling": "a proposal is waiting for a ruling",
+    "escalated": "it has escalated and is waiting for you",
+    "paused": "it is paused",
+    "launch_blocked": "it could not launch its next cycle",
+}
+OUTCOMES = {"aborted": "it was aborted", "exhausted": "it reached one of its limits",
+            "succeeded": "it reached its target", "success": "it reached its target", "failure": "it failed"}
+YOURS = {"escalated", "paused", "launch_blocked"}
+FINISHED_JOBS = {"done", "submitted", "cancelled", "failed", "uncertain"}
 
 
-def report(packet, package):
+def product(project_id):
+    """A product's readable name: its registry entry if there is one, else from its project ID."""
+    slug = str(project_id or "").removeprefix("prj-")
+    entry = ROOT / "campaigns" / "projects" / (slug + ".yaml")
+    try:
+        for line in entry.read_text().splitlines():
+            if line.startswith("display_name:"):
+                return line.split(":", 1)[1].strip().strip("'\"")
+    except OSError:
+        pass
+    return " ".join(part.capitalize() for part in slug.replace("_", "-").split("-") if part) or "This"
+
+
+def when(iso):
+    """A runtime timestamp in ET, for people."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    try:
+        moment = datetime.fromisoformat(str(iso).replace("Z", "+00:00")).astimezone(ZoneInfo(ET))
+    except ValueError:
+        return None
+    return moment.strftime("%-I:%M %p ET, %b %-d").replace("AM", "am").replace("PM", "pm")
+
+
+def rows(packet):
+    ledger = packet.get("ledger")
+    return [row for row in ledger if isinstance(row, dict)] if isinstance(ledger, list) else []
+
+
+def accepted(packet):
+    return sum(1 for row in rows(packet) if str(row.get("outcome") or "").startswith("accept"))
+
+
+def progress(packet):
+    target = (packet["campaign"].get("objective") or {}).get("target_accepted_increments")
+    text = f"{accepted(packet)} of {target} increments accepted" if target else f"{accepted(packet)} increments accepted"
+    automation = packet.get("automation")
+    if automation:
+        used = sum(1 for job in automation.get("jobs") or [] if job.get("reserved"))
+        limit = (packet.get("crew_policy") or {}).get("paid_dispatches")
+        text += f"; {used} of {limit} reviews used" if limit else f"; {used} reviews used"
+    return text + "."
+
+
+def next_actor(packet):
+    """Whose move it is: the squad, Ripley, Dallas, the owner, or nobody."""
+    campaign, automation = packet["campaign"], packet.get("automation") or {}
+    control = automation.get("control") or {}
+    if campaign["state"] == "completed":
+        return "Ripley, for the closing analysis" if automation and not packet.get("analysis") else "nobody; it has closed"
+    if control.get("state") == "parked" or campaign["state"] in YOURS:
+        return "you"
+    if campaign["state"] == "awaiting_ruling":
+        pending = [job for job in automation.get("jobs") or [] if job.get("state") not in FINISHED_JOBS]
+        return pending[-1]["role"].title() if pending else "Ripley"
+    return "the squad"
+
+
+def notice(packet, label):
+    """One readable post: the campaign and what happened, where it stands, and whose move it is."""
     campaign = packet["campaign"]
-    # Reporting stored values is deliberately separate from a crew interpretation of those values.
+    control = (packet.get("automation") or {}).get("control") or {}
+    if campaign["state"] == "completed":
+        what = "closed. " + OUTCOMES.get(campaign.get("outcome"), f"Its outcome is {campaign.get('outcome')}").capitalize()
+    elif control.get("state") == "parked":
+        what = "paused for you. " + str(control.get("reason") or "It needs a decision").rstrip(".")
+    else:
+        what = DOING.get(campaign["state"], str(campaign["state"]).replace("_", " "))
+    who = next_actor(packet)
+    return f"{label}: {what}. {progress(packet)} Next: {who}.", who == "you"
+
+
+def fingerprint(packet):
+    """Only what a person would want a new post for. Review jobs being queued or claimed are not news."""
+    campaign, automation = packet["campaign"], packet.get("automation") or {}
+    control = automation.get("control") or {}
+    return digest({"state": campaign["state"], "outcome": campaign.get("outcome"),
+                   "control": [control.get("state"), control.get("reason")], "accepted": accepted(packet),
+                   "rulings": sum(1 for row in rows(packet) if row.get("ruling")),
+                   "escalations": len(packet.get("escalations") or []), "analysis": bool(packet.get("analysis"))})
+
+
+def report(packet, package, label):
+    """The closing record, for people. The full SquadOps records stay with the broker."""
+    campaign = packet["campaign"]
+    objective = campaign.get("objective") or {}
+    started, closed = when(campaign.get("created_at")), when(campaign.get("updated_at"))
+    lines = [f"# {label}: closed", "",
+             f"**Outcome:** {OUTCOMES.get(campaign.get('outcome'), str(campaign.get('outcome')))}.",
+             f"**Goal:** {objective.get('statement') or 'not stated'}."]
+    if started and closed:
+        lines.append(f"**Ran:** {started} to {closed}.")
+    aborts = [entry for entry in packet.get("log") or [] if isinstance(entry, dict) and entry.get("operation") == "abort"]
+    if aborts and aborts[-1].get("reason"):
+        lines.append(f"**Why it was stopped:** {str(aborts[-1]['reason']).rstrip('.')}.")
+    lines += [f"**Progress:** {progress(packet)}", "", "## Rulings", ""]
+    rulings = [row for row in rows(packet) if row.get("ruling")]
+    for number, row in enumerate(rulings, 1):
+        ruling = row["ruling"]
+        reason = (str(ruling.get("reason") or "").splitlines() or [""])[0].split(". ")[0].rstrip(".")
+        lines.append(f"{number}. {str(ruling.get('decision', '')).replace('_', ' ').capitalize()}. {reason}.")
+    if not rulings:
+        lines.append("No proposal was ruled on.")
     analysis = packet.get("analysis")
-    interpretation = (analysis["analysis"] + "\n\nEvidence: " + canonical(analysis["evidence"]) +
-                      "\n\nRipley decision event: " + analysis["decision_event"]) if analysis else (
-                      "Pending. This factual record is not an app-quality verdict. "
-                      "A reviewer must add what improved, failures, interventions, unknowns, actual crew cost, "
-                      "and recommendations, with evidence references. " + (
-                      "Bounded review control is recorded below; no interpretation has been completed."
-                      if packet.get("automation") else "No automatic paid review was dispatched."))
-    records = {"campaign": campaign, "ledger": packet["ledger"], "package": package}
-    if packet.get("automation"):
-        records["review_control"] = packet["automation"]
-    raw = json.dumps(records, indent=2, ensure_ascii=False)
-    evidence = ("```json\n" + raw + "\n```" if len(raw.encode()) <= 18000 else
-                "The runtime records exceed the Buzz excerpt limit. Retrieve them with "
-                "`campaignctl status`, `ledger`, and `package` using this campaign ID.\n\n"
-                "Canonical combined record SHA-256: `" + digest(records) + "`.\n\n"
-                "Record sizes in bytes: " + canonical({k: len(canonical(v).encode()) for k, v in records.items()}))
-    return (f"# Campaign closing record: {campaign['campaign_id']}\n\n"
-            f"Project: `{campaign['project_id']}`\n\n"
-            f"Stored state: `{campaign['state']}`; stored outcome: `{campaign.get('outcome')}`.\n\n"
-            "## SquadOps records\n\n"
-            + evidence + "\n\n"
-            "## Crew analysis\n\n" + interpretation + "\n")
+    lines += ["", "## Ripley's closing analysis", "",
+              analysis["analysis"] if analysis else "Pending. Ripley's analysis will be added here when it is done."]
+    lines += ["", "The full SquadOps records (campaign, ledger, package) are kept by the broker."]
+    return "\n".join(lines) + "\n"
+
+
+def labels(packets):
+    """'ShelfNote campaign 2': the product, and the campaign's order among that product's campaigns."""
+    by_product = {}
+    for cid, packet in packets.items():
+        by_product.setdefault(packet["campaign"].get("project_id"), []).append(
+            (packet["campaign"].get("created_at") or "", cid))
+    names = {}
+    for project, rows in by_product.items():
+        for number, (_created, cid) in enumerate(sorted(rows), 1):
+            names[cid] = f"{product(project)} campaign {number}"
+    return names
 
 
 class Watcher:
@@ -76,37 +177,42 @@ class Watcher:
 
     def poll(self):
         tracked = self.rpc({"command": "tracked", "args": {}})
+        packets, unread = {}, {}
+        for item in tracked:
+            try:
+                packets[item["id"]] = self.rpc({"command": "packet", "args": {"campaign": item["id"]}})
+            except Exception as error:
+                unread[item["id"]] = error
+        names = labels(packets)
         for item in tracked:
             cid = item["id"]
             old = self.db.execute("SELECT fingerprint,failures,report FROM watched WHERE id=?", (cid,)).fetchone()
             previous, failures, posted = old if old else (None, 0, None)
             try:
-                packet = self.rpc({"command": "packet", "args": {"campaign": cid}})
+                if cid in unread:
+                    raise unread[cid]
+                packet = packets[cid]
                 campaign = packet["campaign"]
-                automation = packet.get("automation")
                 if campaign["state"] == "awaiting_ruling":
                     self.rpc({"command": "open-window", "args": {"campaign": cid}})
-                fingerprint = digest({"state": campaign["state"], "outcome": campaign.get("outcome"),
-                                      "escalations": packet["escalations"], "ledger": packet["ledger"],
-                                      "analysis": packet.get("analysis")})
-                if automation:
-                    fingerprint = digest({"campaign": fingerprint, "automation": automation})
-                if campaign["state"] == "completed" and (not posted or fingerprint != previous):
+                current = fingerprint(packet)
+                if campaign["state"] == "completed" and (not posted or current != previous):
                     package = self.rpc({"command": "package", "args": {"campaign": cid}})
                     # Stable NIP-23 name makes a retry update the same post after a crash.
-                    posted = self.publish_report(cid, report(packet, package))
-                if fingerprint != previous:
-                    text = f"{cid}: {campaign['state']}. {notice(campaign, bool(automation))}"
-                    if automation:
-                        text += " Review control: " + canonical(automation)
-                    if posted:
-                        text += " Closing record: " + posted
-                    self.publish(item, text)
-                self.db.execute("INSERT OR REPLACE INTO watched VALUES(?,?,?,?)", (cid, fingerprint, 0, posted))
+                    posted = self.publish_report(cid, report(packet, package, names[cid]), names[cid])
+                if current != previous:
+                    text, yours = notice(packet, names[cid])
+                    if yours:
+                        text = "@jladd " + text
+                    if posted and campaign["state"] == "completed":
+                        text += " The closing record is in this channel's notes."
+                    self.publish(item, text, yours)
+                self.db.execute("INSERT OR REPLACE INTO watched VALUES(?,?,?,?)", (cid, current, 0, posted))
             except Exception:
                 failures += 1
                 if failures == 3:
-                    self.publish(item, f"{cid}: UNREADABLE after three failed readings. No success or idleness inferred; owner inspection required.")
+                    self.publish(item, "@jladd I couldn't read this campaign's state three times in a row, so nothing is "
+                                       "assumed about whether it is still working. Next: you.", True)
                 self.db.execute("INSERT OR REPLACE INTO watched VALUES(?,?,?,?)", (cid, previous, failures, posted))
             self.db.commit()
 
@@ -133,13 +239,19 @@ def main():
             raise RuntimeError("Buzz publication failed")
         return publication_result(command, result.stdout)
 
-    def publish(item, text):
-        # No @mentions: every named agent would start a paid turn. Humans can inspect the thread.
-        return run(["messages", "send", "--channel", item["channel"], "--reply-to", item["thread"]], text)
+    owner = config["public_keys"]["owner"]
 
-    def publish_report(cid, text):
+    def publish(item, text, mention_owner=False):
+        # Never a crew mention: every named agent would start a paid turn. The owner is mentioned only
+        # when it is the owner's move, which starts no turn and makes Desktop notify them.
+        command = ["messages", "send", "--channel", item["channel"], "--reply-to", item["thread"]]
+        if mention_owner:
+            command += ["--mention", owner]
+        return run(command, text)
+
+    def publish_report(cid, text, label):
         name = "closing-" + cid
-        result = run(["notes", "set", "--name", name, "--title", "Campaign closing record " + cid], text)
+        result = run(["notes", "set", "--name", name, "--title", label + ": closing record"], text)
         expected = "30023:" + helpers_pubkey(env["BUZZ_PRIVATE_KEY"]) + ":" + name
         if result["coordinate"] != expected:
             raise RuntimeError("Buzz note was published under an unexpected coordinate")

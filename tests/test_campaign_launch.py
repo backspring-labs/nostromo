@@ -172,7 +172,7 @@ def test_unknown_create_outcome_never_gets_reposted_and_expires_visibly(world):
     tick(restart(), lambda job: notices.append(job) or proof(job))
     assert status(broker)["state"] == "blocked"
     assert notices[0]["phase"] == "failure"
-    assert "launch incomplete" in notices[0]["content"]
+    assert notices[0]["content"].startswith("@jladd The campaign didn't start: launch deadline reached") and notices[0]["mention_owner"] is True
     assert status(broker)["completion_event"]
     assert len(api.writes) == 1
 

@@ -15,10 +15,10 @@ from runtime.campaigns.watch import Watcher, report, publication_result
 def test_large_closing_record_keeps_runtime_references_and_bounded_buzz_content():
     packet = {"campaign": {"campaign_id": "cmp_test", "project_id": "group_run", "state": "completed"},
               "ledger": {"large": "x" * 100000}}
-    body = report(packet, {"artifact_digest": "fixture"})
-    assert len(body.encode()) < 20000
-    assert "SHA-256" in body and "campaignctl status" in body
-    assert "Pending" in body and "cmp_test" in body
+    body = report(packet, {"artifact_digest": "fixture"}, "Group Run campaign 1")
+    # A readable summary, bounded whatever the records' size: the records themselves stay with the broker.
+    assert len(body.encode()) < 20000 and "x" * 100 not in body
+    assert "Pending" in body and "kept by the broker" in body and "cmp_test" not in body
 
 
 def test_notes_cli_reference_table_is_accepted_but_unaccepted_messages_are_not():
@@ -380,13 +380,13 @@ def test_watcher_posts_once_and_survives_restart_without_paid_dispatch():
     def rpc(req):
         requests.append(req)
         return [item] if req["command"] == "tracked" else {"identity": "pkg_test"} if req["command"] == "package" else packet
-    def post(cid, text):
+    def post(cid, text, label):
         posts.append((cid, text))
         return "30023:pubkey:closing-cmp_test"
     for _ in range(2):
-        Watcher(db, rpc, lambda item, text: notices.append(text), post).poll()
+        Watcher(db, rpc, lambda item, text, yours: notices.append(text), post).poll()
     assert len(posts) == len(notices) == 1
-    assert "Crew analysis" in posts[0][1] and "Pending" in posts[0][1]
+    assert "Ripley's closing analysis" in posts[0][1] and "Pending" in posts[0][1]
     assert not any("@" in n for n in notices)
     assert {r["command"] for r in requests} == {"tracked", "packet", "package"}
 
@@ -398,7 +398,7 @@ def test_watcher_calls_an_unreadable_source_unreadable_once():
         if req["command"] == "tracked":
             return [{"id": "cmp_test"}]
         raise OSError("unavailable")
-    watcher = Watcher(db, rpc, lambda item, text: notices.append(text), lambda *_: None)
+    watcher = Watcher(db, rpc, lambda item, text, yours: notices.append((text, yours)), lambda *_: None)
     for _ in range(4):
         watcher.poll()
-    assert len(notices) == 1 and "UNREADABLE" in notices[0]
+    assert len(notices) == 1 and "three times in a row" in notices[0][0] and notices[0][1] is True
