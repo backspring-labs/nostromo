@@ -96,16 +96,23 @@ Owner, 2026-11-01: Ripley and Dallas write to the thread in normal English, with
 `campaign-definition:` lines in the content of signed Buzz events. The watcher also pastes its
 "Review control: {…}" state into its notices.
 
-**Proposed:** the body of every crew or worker message in a campaign thread is plain English. The
-machine record moves out of sight but stays signed. Two ways, in order of preference:
-1. **The record as a separate event of a non-chat kind,** in the same channel and thread
-   (`buzz messages send --kind`). Signed records stay on the relay as they are today. This needs a
-   measurement first: that our relay accepts the kind with the channel's `h` tag, and that Desktop
-   doesn't display it. Test it in a scratch channel, never a live one.
-2. **Otherwise, the record signed locally and kept by the broker.** The worker signs the record with
-   the role's key (`nostr_keys.sign_event`), without publishing it, and submits it to the broker. The
-   broker verifies it as today and stores it, and `campaignctl` shows it. Buzz gets only the English
-   message.
+**Proposed: render and verify.** The full machine record isn't needed in Buzz. The signature exists to
+make the thread a faithful public record: the words people read are the words the broker acted on.
+Within the broker, the kernel's caller identity (`SO_PEERCRED`) already authenticates each worker.
+- **The worker renders the English** as a fixed, deterministic function of its result: the verdict,
+  the reasons and the next step. It posts it as a normal signed Buzz message.
+- **It submits the full result to the broker** with that message's event ID.
+- **The broker renders the same English from the result** and checks that the signed event says
+  exactly that, and is signed by the role in the campaign's thread. Different words fail.
+- **The binding** (campaign, gate, run, and for Dallas the ruling's digest) lives in the broker's
+  record, matched by event ID. `campaignctl` shows it.
+
+So the thread is all English, every message is signed, and there is no hidden tag, no second event
+kind, and no relay change. A companion event of a non-chat kind (`buzz messages send --kind`) stays
+a fallback, only if a record ever has to be verifiable on the relay alone.
+
+**Owner approvals** still need the owner's signature, because the owner's key is the only proof of
+approval. Under approval by reply, that signature is on a plain "approve".
 
 **What the English says:**
 - **Ripley:** the ruling and why, in a few sentences, with what the squad should do next.
@@ -145,7 +152,7 @@ Each preset's review count and allowance follow the runbook's per-increment esti
 ## Order of work
 
 0. **Readable threads.** The watcher writes English. The review records move out of the message
-   body, after the `--kind` measurement. This comes first because it's the most visible, and it
+   body (render and verify). This comes first because it's the most visible, and it
    doesn't depend on the rest.
 1. **Registry and draft step.** ShelfNote becomes the first registry entry, and Mother can post cards.
    Approval still uses today's line, copied from the card's code block.
