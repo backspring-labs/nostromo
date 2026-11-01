@@ -207,7 +207,7 @@ Beyond the English-only thread, that means:
 | medium | 6 | 6 | 31 | $17.46 |
 | large | 8 | 8 | 41 | $23.10 |
 
-- **Ten increments don't fit:** 51 reviews, $28.72. A request for more than the largest preset gets a
+- **Ten increments don't fit:** 51 reviews, $28.73. A request for more than the largest preset gets a
   card that says so, and offers eight increments now and a follow-up campaign, or a ceiling change
   that only the owner can make.
 - **If prices go stale,** the doubled reservation (from #20) shrinks what fits. The draft step
