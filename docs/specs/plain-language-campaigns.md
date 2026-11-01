@@ -150,9 +150,9 @@ Owner, 2026-11-01: Buzz is a human-readable collaboration and control plane, not
 Beyond the English-only thread, that means:
 
 **Who is doing what**
-- **Automatic posts stay Mother's.** Owner, 2026-11-01: the watcher, the launch worker and review
-  summaries keep posting with Mother's identity, as a deterministic ability of hers. No separate
-  identity, account or key.
+- **Mother's deterministic campaign controller.** Owner, 2026-11-01: the watcher, the launch worker
+  and the review summaries are one capability of Mother's, her campaign controller, which runs
+  without her model and posts with her identity. There is no separate identity, account or key.
   - **They're recognizable by form:** they open with the campaign and what happened ("ShelfNote
     campaign 2: reading status approved for building") and close with "Next: …".
   - **Her model replies read as conversation.**
