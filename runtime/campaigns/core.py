@@ -87,6 +87,13 @@ class Store:
         if "failure_diagnostic" not in job_columns:
             self.db.execute("ALTER TABLE review_jobs ADD COLUMN failure_diagnostic TEXT")
             self.db.commit()
+        if "proof_event" not in job_columns:
+            # The signed message accepted as a job's proof. Unique: one event proves one job, once.
+            self.db.execute("ALTER TABLE review_jobs ADD COLUMN proof_event TEXT")
+            self.db.commit()
+        self.db.execute("CREATE UNIQUE INDEX IF NOT EXISTS review_jobs_proof_event ON review_jobs(proof_event) "
+                        "WHERE proof_event IS NOT NULL")
+        self.db.commit()
         recovery_columns = {row[1] for row in self.db.execute("PRAGMA table_info(review_recoveries)")}
         if "event_id" not in recovery_columns:
             self.db.execute("ALTER TABLE review_recoveries ADD COLUMN event_id TEXT")
@@ -231,7 +238,17 @@ class Broker:
             raise Refused("previous attempt is unresolved; inspect SquadOps before any further action")
         if command in GATES:
             expected = {"command": command, "args": args, "request_id": rid}
-            self.verify_event(request.get("decision_event"), "ripley", "campaign-decision", expected)
+            job = self.proven(request.get("decision_event"), "ripley", "decision")
+            if job:
+                # An automated ruling: Ripley signed its English rendering, and the broker holds the
+                # result and the gate binding. The request must be exactly what they derive.
+                from .review import decision_request
+                if job["campaign"] != args.get("campaign") or decision_request(
+                        job["campaign"], json.loads(job["payload"]), json.loads(job["result"])) != expected:
+                    raise Refused("the decision proof binds a different ruling")
+            else:
+                # The manual path: Ripley's own signed message carrying the decision line.
+                self.verify_event(request.get("decision_event"), "ripley", "campaign-decision", expected)
         # Construct and validate before reserving an action. A validation refusal has no side effect.
         principal, method, path, body, after = self.operation(command, args, rid, request)
         if command == "start":
@@ -338,6 +355,16 @@ class Broker:
             return result
         return self.api("read", "GET", base + ("" if command == "status" else f"/{READ_PATHS.get(command, command)}"), None)
 
+    def proven(self, event, role, kind):
+        """The review job whose accepted proof is exactly this event, or None. The binding exists only
+        in the broker's database, so a caller can't fabricate it: at most it can present a proof the
+        broker already accepted, which still has to match the request."""
+        if not isinstance(event, dict) or not isinstance(event.get("id"), str):
+            return None
+        row = self.store.db.execute("SELECT * FROM review_jobs WHERE proof_event=? AND role=? AND kind=?",
+                                    (event["id"], role, kind)).fetchone()
+        return row if row and json.loads(row["proof"]) == event else None
+
     def operation(self, command, args, rid, request):
         if command == "create":
             exact(args, {"definition", "reason"})
@@ -426,9 +453,21 @@ class Broker:
         if any(g.get("gate_name") == gate_name for g in run.get("gate_decisions", [])):
             raise Refused("gate already has a decision")
         if approved["definition"].get("crew", {}).get("require_dallas", True):
-            self.verify_event(request.get("review_event"), "dallas", "campaign-review",
-                              {"campaign": args["campaign"], "cycle": args["cycle"], "run": args["run"],
-                               "decision_sha256": digest({"command": command, "args": args}), "blocking": False})
+            review = self.proven(request.get("review_event"), "dallas", "review")
+            if review:
+                # Dallas's job was bound, when it was queued, to the exact ruling it reviews, and to
+                # the decision job that produced it.
+                payload = json.loads(review["payload"])
+                reviewed = payload["packet"]["decision_request"]
+                parent = self.store.db.execute("SELECT proof_event FROM review_jobs WHERE id=?", (payload.get("parent"),)).fetchone()
+                if (review["campaign"] != args["campaign"] or json.loads(review["result"]).get("blocking") is not False
+                        or digest({"command": reviewed["command"], "args": reviewed["args"]}) != digest({"command": command, "args": args})
+                        or not parent or parent[0] != (request.get("decision_event") or {}).get("id")):
+                    raise Refused("the review proof binds a different ruling, or is blocking")
+            else:
+                self.verify_event(request.get("review_event"), "dallas", "campaign-review",
+                                  {"campaign": args["campaign"], "cycle": args["cycle"], "run": args["run"],
+                                   "decision_sha256": digest({"command": command, "args": args}), "blocking": False})
         body = {"decision": args["decision"], "notes": args["notes"], "decided_by_kind": "agent"}
         sources = ["Decision event: " + str(request["decision_event"].get("id", "test-fixture"))]
         if request.get("review_event"):

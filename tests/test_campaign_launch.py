@@ -269,7 +269,8 @@ def test_wrong_thread_signed_notice_cannot_unlock_start(world):
     queue(broker)
     rpc(broker, "mother", "launch-advance")
     job = rpc(broker, "mother", "launch-notice-claim")
-    with pytest.raises(Refused, match="approved campaign thread"):
+    # Refused by render and verify (the message isn't in the campaign's thread) or the thread check.
+    with pytest.raises(Refused, match="mismatched or invalid mother message|approved campaign thread"):
         rpc(broker, "mother", "launch-notice-result", {"launch": job["id"], "phase": job["phase"]},
             decision_event=proof(job, thread="b" * 64))
     rpc(broker, "mother", "launch-advance")

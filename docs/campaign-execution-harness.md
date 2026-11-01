@@ -206,6 +206,24 @@ automation section means no paid dispatch.
    send the gate decision to SquadOps. Submission includes signed Ripley and Dallas events and,
    for increment decisions, the proposal ID/version/content hash/baseline tree binding.
 
+**Render and verify.** Ripley's and Dallas's messages in the thread are English only. Each is a fixed
+rendering of the result: the verdict, the notes, and Ripley's reason. Mentions are neutralized, and
+no line can read as a record line. The broker accepts a result only when the signed message:
+- says exactly what the broker renders from the job and result it holds;
+- is signed by that role;
+- is in the campaign's channel, as a reply in its thread;
+- was created after the job was claimed.
+
+The event is then stored as that job's proof (`review_jobs.proof_event`, unique), so one message can
+never prove a second review, even when two results render identically.
+
+At gate submission the broker accepts a proof only if it is bound to its job. Ripley's request must
+be exactly what the stored result and gate binding derive. Dallas's proof must belong to the review
+job queued for that exact ruling, and to the decision job presented with it. A caller cannot
+fabricate a binding: it exists only in the broker's database. The manual path (`campaignctl plan` or
+`increment --explain`, below) keeps its signed record lines. The launch announcement is verified the
+same way, not before the launch was accepted.
+
 There is no automatic disagreement, revision, repair, or retry loop. Missing evidence, an owner
 decision, policy mismatch, blocking review, worker error, stale gate, ambiguous submission, or
 exhausted allowance parks the campaign for inspection. A parked or expired campaign cannot be

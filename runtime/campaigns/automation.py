@@ -1,12 +1,13 @@
 """Durable bounded review queue. Mother routes; Ripley judges; Dallas challenges."""
 import json
+import sqlite3
 import re
 import time
 from pathlib import Path
 
 from .core import Refused, canonical, digest, exact, identifier
 from .evidence import Evidence
-from .review import body, price_basis, reservation_microusd, timestamp, validate, decision_request
+from .review import body, price_basis, render, reservation_microusd, timestamp, validate, decision_request
 from .review_policy import POLICY_REFUSAL, decision_contract, validate_decision
 
 COMMANDS = {"approve-budget", "automation", "advance", "review-claim", "review-result", "review-failed",
@@ -358,9 +359,9 @@ class Automation:
             raise Refused("review arrived after its active authorization window")
         payload = json.loads(job["payload"])
         result = validate(job["kind"], args["result"], payload["packet"]["references"], payload["packet"])
-        self.b.verify_event(event, role, "campaign-job-result", {"job": job["id"], "result": result})
-        self.db.execute("UPDATE review_jobs SET state='done',result=?,proof=?,usage=? WHERE id=?",
-                        (canonical(result), canonical(event), canonical(args["usage"]), job["id"]))
+        self.accept_proof(job, payload, result, event)
+        self.db.execute("UPDATE review_jobs SET state='done',result=?,usage=? WHERE id=?",
+                        (canonical(result), canonical(args["usage"]), job["id"]))
         self.b.store.save()
         if job["kind"] == "analysis":
             # A signed result is the analysis record; the watcher publishes it in Buzz.
@@ -389,6 +390,21 @@ class Automation:
             self.park(cid, "Dallas has blocking findings; owner inspection required")
         # Successful Dallas review is exposed to Ripley's deterministic submission worker.
         return {"stored": True}
+
+    def accept_proof(self, job, payload, result, event):
+        """Render and verify. The signed message must say exactly what this job and result render to,
+        be the job role's, sit in the campaign's thread, and be created after the job was claimed. It
+        becomes this job's proof and can never prove another: the unique index refuses a reuse."""
+        rendered = render({"id": job["id"], "role": job["role"], "kind": job["kind"], "campaign": job["campaign"],
+                           "payload": payload}, result)
+        destination = payload["destination"]
+        eid = self.b.verify_event.rendered(event, job["role"], rendered, destination["channel"],
+                                           destination["thread"], job["claimed"])
+        try:
+            self.db.execute("UPDATE review_jobs SET proof=?,proof_event=? WHERE id=?", (canonical(event), eid, job["id"]))
+        except sqlite3.IntegrityError:
+            raise Refused("this signed message already proves another review") from None
+        return eid
 
     def authorize_recovery(self, caller, args):
         if caller != "owner":
@@ -470,10 +486,9 @@ class Automation:
         result = validate(row["kind"], args["result"], payload["packet"]["references"], payload["packet"])
         if not isinstance(args["usage"], dict) or len(canonical(args["usage"]).encode()) > 4096:
             raise Refused("saved review usage is invalid")
-        self.b.verify_event(event, role, "campaign-job-result", {"job": jid, "result": result},
-                            not_before=row["claimed"] - 30)
-        self.db.execute("UPDATE review_jobs SET state='done',result=?,proof=?,usage=? WHERE id=?",
-                        (canonical(result), canonical(event), canonical(args["usage"]), jid))
+        self.accept_proof(row, payload, result, event)
+        self.db.execute("UPDATE review_jobs SET state='done',result=?,usage=? WHERE id=?",
+                        (canonical(result), canonical(args["usage"]), jid))
         self.db.execute("UPDATE review_recoveries SET state='done',failure=NULL WHERE job=?", (jid,))
         self.b.store.save()
         # Keep the campaign parked. Recovery records the saved result but never resumes work,
