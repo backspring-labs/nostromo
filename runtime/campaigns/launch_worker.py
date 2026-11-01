@@ -102,11 +102,21 @@ def relay_approvals(rpc, thread_events, owner):
     verifies every one, signature included, so this only narrows the search; it decides nothing."""
     from .proposals import unqualified_approval
     results = []
-    for proposal in rpc({"command": "proposals", "args": {"state": "posted"}}):
+    try:
+        posted = rpc({"command": "proposals", "args": {"state": "posted"}})
+    except Exception as error:
+        return [{"unreadable": type(error).__name__}]
+    for proposal in posted:
         try:
             events = thread_events(proposal["channel"], proposal["thread"])
         except Exception as error:
             results.append({"proposal": proposal["id"], "unreadable": type(error).__name__})
+            continue
+        # Campaigns start from the owner's own request. A thread someone else started gets no relay.
+        # The listing may leave out the root, so only a root that is listed and not the owner's counts.
+        root = next((e for e in events if e.get("id") == proposal["thread"]), None)
+        if root is not None and root.get("pubkey") != owner:
+            results.append({"proposal": proposal["id"], "refused": "the thread was not started by the owner"})
             continue
         for event in sorted(events, key=lambda e: e.get("created_at", 0)):
             if event.get("pubkey") != owner or not unqualified_approval(event.get("content")):
@@ -115,8 +125,8 @@ def relay_approvals(rpc, thread_events, owner):
                 results.append(rpc({"command": "proposal-approve", "args": {"proposal": proposal["id"]},
                                     "decision_event": event}))
                 break
-            except Refused as error:
-                results.append({"proposal": proposal["id"], "refused": str(error)})
+            except Exception as error:  # one refusal or failure never stops the run's launch steps
+                results.append({"proposal": proposal["id"], "refused": str(error) if isinstance(error, Refused) else type(error).__name__})
     return results
 
 
@@ -164,7 +174,7 @@ def thread_reader():
 
     def read(channel, thread):
         result = subprocess.run(["/opt/nostromo/runtime/bin/buzz", "messages", "thread", "--channel", channel,
-                                 "--event", thread, "--limit", "200"], capture_output=True, text=True, env=env, timeout=60)
+                                 "--event", thread, "--limit", "1000"], capture_output=True, text=True, env=env, timeout=60)
         if result.returncode:
             raise Refused("thread unreadable")
         found = []

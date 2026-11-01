@@ -33,6 +33,24 @@ class Launches:
         return {**{key: row[key] for key in keys},
                 "diagnostic": json.loads(row["diagnostic"]) if row["diagnostic"] else None}
 
+    def preflight(self, definition, approval):
+        """Every launch precondition that doesn't need the definition approved yet: checked at propose
+        and again before an approval writes anything."""
+        if not self.b.policy.get("launch_enabled"):
+            raise Refused("durable launch worker is not commissioned")
+        if approval["channel"] not in self.b.policy.get("decision_channels", []):
+            raise Refused("launch destination is not an admitted campaign channel")
+        if not re.fullmatch(r"[0-9a-f]{64}", approval["thread"]):
+            raise Refused("launch needs an approved Buzz root event ID")
+        if self.db.execute("SELECT 1 FROM launches WHERE definition=?", (definition,)).fetchone():
+            raise Refused("definition already reserved for a campaign")
+        if self.db.execute("SELECT 1 FROM launch_workflows WHERE definition=? OR (channel=? AND thread=?)",
+                           (definition, approval["channel"], approval["thread"])).fetchone():
+            raise Refused("this thread already belongs to another launch; a new campaign needs its own thread")
+        if self.db.execute("SELECT 1 FROM campaigns WHERE channel=? AND thread=?",
+                           (approval["channel"], approval["thread"])).fetchone():
+            raise Refused("a new launch needs its own campaign thread")
+
     def submit(self, args, rid):
         exact(args, {"definition", "reason"})
         rid = identifier(rid)

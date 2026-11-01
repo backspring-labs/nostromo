@@ -67,7 +67,7 @@ def test_names_never_collide_with_an_earlier_definition_or_allowance(broker):
 @pytest.mark.parametrize("args,match", [
     ({"project": "nonesuch", "goal": GOAL, "thread": THREAD}, "not in the project registry"),
     ({"project": "../crew/manifest", "goal": GOAL, "thread": THREAD}, "registry name"),
-    ({"project": "shelfnote", "goal": {"title": "", "statement": "x"}, "thread": THREAD}, "needs a title"),
+    ({"project": "shelfnote", "goal": {"title": "", "statement": "x"}, "thread": THREAD}, "title is required"),
     ({"project": "shelfnote", "goal": GOAL, "thread": THREAD, "size": "huge"}, "small, medium or large"),
     ({"project": "shelfnote", "goal": GOAL, "thread": THREAD, "hours": 12}, "between 1 and 8"),
 ])

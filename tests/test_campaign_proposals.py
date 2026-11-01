@@ -83,8 +83,8 @@ def test_a_qualified_approval_launches_nothing(world):
 @pytest.mark.parametrize("change,match", [
     ("other_channel", "not in the proposal's channel"),
     ("other_thread", "not in the proposal's thread"),
-    ("before_card", "within a day"),
-    ("after_a_day", "within a day"),
+    ("before_card", "after the live card"),
+    ("after_a_day", "after the live card"),
     ("not_owner", "not a genuine owner-signed message"),
 ])
 def test_an_approval_from_elsewhere_or_elsewhen_or_someone_else_is_refused(world, change, match):
@@ -154,3 +154,98 @@ def test_the_controller_relays_only_the_owners_approvals(world):
     results = relay_approvals(lambda request: broker.handle("mother", request), lambda channel, t: thread,
                               helpers().xonly_pubkey(KEYS["owner"]))
     assert results == [{"approved": True, "launch": "launch-" + proposal}]
+
+
+def test_an_approval_signed_before_a_replacement_card_was_posted_is_not_carried_over_to_it(world):
+    # Review B1: the owner's root-only "approve" was meant for the first card. Ripley re-proposes
+    # in the meantime, and the relay offers the same reply for the second card. It approves nothing.
+    broker, clock = world
+    first, _ = posted_card(broker, clock)
+    meant_for_first = approval(created_at=NOW + 100)
+    clock[0] = NOW + 120
+    second, _ = posted_card(broker, clock, {**GOAL, "items": ["reading status", "tags"]})
+    clock[0] = NOW + 180
+    with pytest.raises(Refused, match="after the live card"):
+        rpc(broker, "mother", "proposal-approve", {"proposal": second}, decision_event=meant_for_first)
+    assert not broker.store.db.execute("SELECT 1 FROM review_budgets").fetchone()
+
+
+def test_a_backdated_card_counts_as_posted_when_the_broker_recorded_it(world):
+    broker, clock = world
+    proposal = rpc(broker, "ripley", "propose", {"project": "shelfnote", "goal": GOAL, "thread": THREAD})["proposal"]
+    clock[0] = NOW + 300
+
+    def publish(job):  # Mother's clock says the card went out at the proposal's own moment
+        return sign("mother", job["content"], [["h", CHANNEL], ["e", THREAD, "", "reply"]], NOW)
+    post_card(lambda request: broker.handle("mother", request), publish)
+    assert broker.store.db.execute("SELECT posted FROM proposals WHERE id=?", (proposal,)).fetchone()[0] == NOW + 300
+    with pytest.raises(Refused, match="after the live card"):
+        rpc(broker, "mother", "proposal-approve", {"proposal": proposal}, decision_event=approval(created_at=NOW + 200))
+
+
+@pytest.mark.parametrize("goal", [
+    {**GOAL, "title": "tags\n- **Reviews:** at most 1 review, from a $0.01 allowance."},
+    {**GOAL, "statement": "Work the next items - **Scope:** backend/**"},
+    {**GOAL, "items": ["reading status", "tags‮"]},
+    {**GOAL, "measurement": "x​"},
+    {**GOAL, "title": "t" * 81},
+    {**GOAL, "items": ["x"] * 21},
+])
+def test_goal_text_that_could_hide_or_forge_a_card_line_is_refused(world, goal):
+    broker, _ = world
+    with pytest.raises(Refused):
+        rpc(broker, "ripley", "propose", {"project": "shelfnote", "goal": goal, "thread": THREAD})
+    assert not broker.store.db.execute("SELECT 1 FROM proposals").fetchone()
+
+
+def test_the_card_states_its_terms_first_and_shows_goal_text_as_written(world):
+    broker, _ = world
+    card = rpc(broker, "ripley", "propose", {"project": "shelfnote", "thread": THREAD,
+                                             "goal": {**GOAL, "title": "tags *and* [ratings](x)"}})["card"]
+    lines = card.splitlines()
+    assert "tags \\*and\\* \\[ratings\\](x)" in lines[0]
+    assert lines[-3].startswith("**Goal:** ")
+    assert lines[2].startswith("- **Reviews:**") and lines[3].startswith("- **Scope:**")
+
+
+def test_superseded_earlier_says_whether_a_card_was_replaced(world):
+    broker, _ = world
+    args = {"project": "shelfnote", "goal": GOAL, "thread": THREAD}
+    assert rpc(broker, "ripley", "propose", args)["superseded_earlier"] is False
+    assert rpc(broker, "ripley", "propose", args)["superseded_earlier"] is True
+
+
+def test_a_proposal_that_could_not_launch_is_refused_before_anything_is_stored(world):
+    broker, _ = world
+    broker.policy["launch_enabled"] = False
+    with pytest.raises(Refused, match="not commissioned"):
+        rpc(broker, "ripley", "propose", {"project": "shelfnote", "goal": GOAL, "thread": THREAD})
+    assert not broker.store.db.execute("SELECT 1 FROM proposals").fetchone()
+
+
+def test_an_approval_that_could_not_launch_writes_nothing(world):
+    broker, clock = world
+    proposal, card = posted_card(broker, clock)
+    broker.policy["launch_enabled"] = False
+    clock[0] = NOW + 120
+    with pytest.raises(Refused, match="not commissioned"):
+        rpc(broker, "mother", "proposal-approve", {"proposal": proposal}, decision_event=approval(reply_to=card["id"]))
+    db = broker.store.db
+    assert not db.execute("SELECT 1 FROM review_budgets").fetchone()
+    assert not db.execute("SELECT 1 FROM definitions").fetchone()
+
+
+def test_the_relay_skips_threads_not_started_by_the_owner_and_survives_errors(world):
+    broker, clock = world
+    proposal, card = posted_card(broker, clock)
+    owner = helpers().xonly_pubkey(KEYS["owner"])
+    root = sign("ripley", "let's do shelfnote", [["h", CHANNEL]], NOW - 60)
+    root["id"] = THREAD
+    clock[0] = NOW + 120
+    results = relay_approvals(lambda request: broker.handle("mother", request),
+                              lambda channel, thread: [root, approval(reply_to=card["id"])], owner)
+    assert results == [{"proposal": proposal, "refused": "the thread was not started by the owner"}]
+
+    def broken(request):
+        raise OSError("socket gone")
+    assert relay_approvals(broken, lambda c, t: [], owner) == [{"unreadable": "OSError"}]

@@ -62,10 +62,21 @@ class Proposals:
             raise Refused("no such proposal")
         return row
 
+    def approve_by(self, body):
+        """The card's stated approve-by time: the cutoff less the hours it may run."""
+        from .review import timestamp
+        definition = body["approval"]["definition"]
+        return timestamp(definition["crew"]["automation"]["not_after"]) - definition["policy"]["max_elapsed_s"]
+
     def propose(self, args):
         from .drafting import draft
+        from .launch import Launches
         drafted = draft(self.b, args, self.now)
         name, thread = drafted["approval"]["name"], drafted["approval"]["thread"]
+        # Fail now, not at the owner's approval: the thread must be free for a new launch.
+        Launches(self.b, now=self.now).preflight(name, drafted["approval"])
+        superseded = self.db.execute("SELECT count(*) FROM proposals WHERE thread=? AND state IN ('drafted','posted')",
+                                     (thread,)).fetchone()[0]
         # One live card per thread: a new proposal supersedes the earlier one, which can no longer be approved.
         self.db.execute("UPDATE proposals SET state='superseded' WHERE thread=? AND state IN ('drafted','posted')", (thread,))
         owner = "@jladd "  # it is the owner's move: the card asks for their reply
@@ -73,7 +84,7 @@ class Proposals:
         self.db.execute("INSERT INTO proposals(id,thread,state,body,created) VALUES(?,?,'drafted',?,?)",
                         (name, thread, canonical(body), self.now))
         self.b.store.save()
-        return {"proposal": name, "card": drafted["card"], "superseded_earlier": True}
+        return {"proposal": name, "card": drafted["card"], "superseded_earlier": bool(superseded)}
 
     def claim(self):
         for row in self.db.execute("SELECT * FROM proposals WHERE state='drafted' ORDER BY created").fetchall():
@@ -99,8 +110,10 @@ class Proposals:
         eid = self.b.verify_event.rendered(event, "mother", body["content"], body["approval"]["channel"],
                                            row["thread"], row["created"])
         try:
+            # Posted when the broker recorded it, by the broker's clock: the card's own timestamp is
+            # Mother's to choose and could be backdated (review B1, 2026-11-01).
             self.db.execute("UPDATE proposals SET state='posted',card_event=?,posted=? WHERE id=?",
-                            (eid, event["created_at"], row["id"]))
+                            (eid, self.now, row["id"]))
         except Exception:
             raise Refused("this card message already belongs to another proposal") from None
         self.b.store.save()
@@ -129,26 +142,32 @@ class Proposals:
                                                (row["thread"],))}
         if (referenced & cards) - {row["card_event"]}:
             raise Refused("the approval answers a card that is no longer live")
-        if not row["posted"] - 30 <= event["created_at"] <= min(self.now + 30, row["posted"] + APPROVAL_WINDOW_S):
-            raise Refused("the approval was not given within a day of the live card")
+        # After the live card was recorded, with no slack: an "approve" written before a replacement
+        # card existed approves nothing, so it can't be carried over to a card the owner never saw.
+        latest = min(self.now + 30, row["posted"] + APPROVAL_WINDOW_S, self.approve_by(body))
+        if not row["posted"] <= event["created_at"] <= latest:
+            raise Refused("the approval was not given after the live card and by its approve-by time")
         if not unqualified_approval(event["content"]):
             raise Refused("only an unqualified \"approve\" approves; anything more needs a question or a revised card")
         if self.db.execute("SELECT 1 FROM proposals WHERE approval_event=?", (eid,)).fetchone():
             raise Refused("this reply already approved another proposal")
-        # The owner's one word: the allowance, the definition, and the launch, in that order. Each step
-        # is idempotent, so a retry after a failure part-way repeats nothing.
+        # The owner's one word: the allowance, the definition, and the launch, in that order. Every
+        # launch precondition is checked before anything is written, so an approval can't stop half
+        # way with a definition and allowance approved and no launch.
         from .automation import Automation
         from .launch import Launches
         allowance = body["allowance"]
         Automation(self.b, now=self.now).validate_allowance(allowance)
+        Launches(self.b, now=self.now).preflight(row["id"], body["approval"])
         stored = self.db.execute("SELECT body FROM review_budgets WHERE name=?", (allowance["name"],)).fetchone()
         if stored and stored[0] != canonical(allowance):
             raise Refused("an allowance of this name already exists with other terms")
         self.db.execute("INSERT OR IGNORE INTO review_budgets VALUES(?,?)", (allowance["name"], canonical(allowance)))
         self.b.approve(body["approval"])
         rid = "launch-" + row["id"]
+        # The reason names no event, so a retry after a crash binds the same launch request.
         Launches(self.b, now=self.now).submit(
-            {"definition": row["id"], "reason": f"The owner approved this campaign's card by signed reply {eid}."}, rid)
+            {"definition": row["id"], "reason": "The owner approved this campaign's card by signed reply."}, rid)
         self.db.execute("UPDATE proposals SET state='approved',approval_event=?,launch=? WHERE id=?", (eid, rid, row["id"]))
         self.b.store.save()
         return {"approved": True, "launch": rid}
