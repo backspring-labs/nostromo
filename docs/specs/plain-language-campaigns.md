@@ -150,9 +150,12 @@ Owner, 2026-11-01: Buzz is a human-readable collaboration and control plane, not
 Beyond the English-only thread, that means:
 
 **Who is doing what**
-- **A separate identity for automatic posts.** The watcher and launch worker post today as Mother,
-  so "Mother" sometimes means her judgement and sometimes a script. A non-model identity, for
-  example "Campaign Desk", posts notices; Mother's name then means only Mother.
+- **Automatic posts stay Mother's.** Owner, 2026-11-01: the watcher, the launch worker and review
+  summaries keep posting with Mother's identity, as a deterministic ability of hers. No separate
+  identity, account or key.
+  - **They're recognizable by form:** they open with the campaign and what happened ("ShelfNote
+    campaign 2: reading status approved for building") and close with "Next: …".
+  - **Her model replies read as conversation.**
 - **The squad as one actor.** "The squad is working on search", "The squad is revising the search
   proposal", with no breakdown by squad agent for now.
 - **Whose move it is.** Every notice ends with who acts next: the squad, Ripley, Dallas, or the
@@ -224,7 +227,7 @@ Beyond the English-only thread, that means:
 ## Order of work
 
 0. **Readable threads.** The watcher writes English. The review records move out of the message
-   body (render and verify). Also in this phase: the Campaign Desk identity, whose-move-it-is
+   body (render and verify). Also in this phase: the fixed form for automatic posts, whose-move-it-is
    lines, owner mentions on the owner's move, no IDs, plain states, ET times, and fewer posts. This comes first because it's the most visible, and it
    doesn't depend on the rest.
 1. **Registry and draft step.** ShelfNote becomes the first registry entry, and Mother can post cards.
