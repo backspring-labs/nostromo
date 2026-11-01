@@ -94,7 +94,7 @@ def test_an_approval_from_elsewhere_or_elsewhen_or_someone_else_is_refused(world
     event = {
         "other_channel": lambda: approval(channel="other", reply_to=card["id"]),
         "other_thread": lambda: sign("owner", "approve", [["h", CHANNEL], ["e", "b" * 64, "", "root"]], NOW + 60),
-        "before_card": lambda: approval(created_at=NOW - 600),
+        "before_card": lambda: approval(created_at=NOW - 600, reply_to=card["id"]),
         "after_a_day": lambda: approval(created_at=NOW + 25 * 3600, reply_to=card["id"]),
         "not_owner": lambda: approval(role="ripley", reply_to=card["id"]),
     }[change]()
@@ -156,18 +156,34 @@ def test_the_controller_relays_only_the_owners_approvals(world):
     assert results == [{"approved": True, "launch": "launch-" + proposal}]
 
 
-def test_an_approval_signed_before_a_replacement_card_was_posted_is_not_carried_over_to_it(world):
-    # Review B1: the owner's root-only "approve" was meant for the first card. Ripley re-proposes
-    # in the meantime, and the relay offers the same reply for the second card. It approves nothing.
+def test_an_approval_tagged_only_to_the_thread_approves_nothing(world):
+    # Review of phase 2: Mother can post card-like text herself and report a different card as
+    # posted without publishing it. A thread-only "approve" can't say which card the owner read.
     broker, clock = world
-    first, _ = posted_card(broker, clock)
-    meant_for_first = approval(created_at=NOW + 100)
+    _, shown_card = posted_card(broker, clock)
     clock[0] = NOW + 120
-    second, _ = posted_card(broker, clock, {**GOAL, "items": ["reading status", "tags"]})
+    unseen, _ = posted_card(broker, clock, {**GOAL, "items": ["reading status", "tags"]})
     clock[0] = NOW + 180
-    with pytest.raises(Refused, match="after the live card"):
-        rpc(broker, "mother", "proposal-approve", {"proposal": second}, decision_event=meant_for_first)
+    for event in (approval(created_at=NOW + 150), approval(created_at=NOW + 150, reply_to=shown_card["id"])):
+        with pytest.raises(Refused, match="reply to the card itself|no longer live"):
+            rpc(broker, "mother", "proposal-approve", {"proposal": unseen}, decision_event=event)
     assert not broker.store.db.execute("SELECT 1 FROM review_budgets").fetchone()
+
+
+def test_a_failure_inside_the_launch_leaves_no_allowance_or_definition(world, monkeypatch):
+    from runtime.campaigns import launch
+    broker, clock = world
+    proposal, card = posted_card(broker, clock)
+    clock[0] = NOW + 120
+
+    def fail(*args, **kwargs):
+        raise Refused("derived launch operation IDs are already in use")
+    monkeypatch.setattr(launch.Launches, "submit", fail)
+    with pytest.raises(Refused, match="derived"):
+        rpc(broker, "mother", "proposal-approve", {"proposal": proposal}, decision_event=approval(reply_to=card["id"]))
+    db = broker.store.db
+    assert not db.execute("SELECT 1 FROM review_budgets").fetchone()
+    assert not db.execute("SELECT 1 FROM definitions").fetchone()
 
 
 def test_a_backdated_card_counts_as_posted_when_the_broker_recorded_it(world):
@@ -177,17 +193,19 @@ def test_a_backdated_card_counts_as_posted_when_the_broker_recorded_it(world):
 
     def publish(job):  # Mother's clock says the card went out at the proposal's own moment
         return sign("mother", job["content"], [["h", CHANNEL], ["e", THREAD, "", "reply"]], NOW)
-    post_card(lambda request: broker.handle("mother", request), publish)
+    card = post_card(lambda request: broker.handle("mother", request), publish)
+    card = {"id": card["card_event"]}
     assert broker.store.db.execute("SELECT posted FROM proposals WHERE id=?", (proposal,)).fetchone()[0] == NOW + 300
     with pytest.raises(Refused, match="after the live card"):
-        rpc(broker, "mother", "proposal-approve", {"proposal": proposal}, decision_event=approval(created_at=NOW + 200))
+        rpc(broker, "mother", "proposal-approve", {"proposal": proposal}, decision_event=approval(created_at=NOW + 200, reply_to=card["id"]))
 
 
 @pytest.mark.parametrize("goal", [
     {**GOAL, "title": "tags\n- **Reviews:** at most 1 review, from a $0.01 allowance."},
-    {**GOAL, "statement": "Work the next items - **Scope:** backend/**"},
-    {**GOAL, "items": ["reading status", "tags‮"]},
-    {**GOAL, "measurement": "x​"},
+    {**GOAL, "statement": "Work the next items\u2028- **Scope:** backend/**"},
+    {**GOAL, "items": ["reading status", "tags\u202e"]},
+    {**GOAL, "measurement": "x\u200b"},
+    {**GOAL, "title": "tags and ra\u0336tings"},
     {**GOAL, "title": "t" * 81},
     {**GOAL, "items": ["x"] * 21},
 ])

@@ -50,7 +50,7 @@ def test_the_card_reads_as_a_proposal_without_ids(broker):
     goal = {**GOAL, "items": ["a", "b", "c", "d"]}
     card = draft(broker, {"project": "shelfnote", "goal": goal, "thread": THREAD, "size": "small"}, NOW)["card"]
     assert card.startswith("**ShelfNote campaign 1: reading status, tags and ratings**")
-    assert "Reply **approve** to launch" in card and "Left for a later campaign:** d." in card
+    assert "Reply **approve** to this card to launch" in card and "Left for a later campaign:** d." in card
     assert "crew-shelfnote" not in card and THREAD not in card and "{" not in card
     assert "Approve it by 11:00 am ET, Mon Nov 2" in card
     assert "- **Accepted when:** its own tests pass on the product's runner" in card

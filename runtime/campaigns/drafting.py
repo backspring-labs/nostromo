@@ -41,7 +41,9 @@ def plain(value, what, limit):
         raise Refused(f"{what} is required text")
     if len(value) > limit:
         raise Refused(f"{what} is at most {limit} characters")
-    if any(unicodedata.category(ch) in {"Cc", "Cf", "Zl", "Zp"} for ch in value):
+    # Combining marks could strike through or hide words; precomposed accents (NFC) are fine.
+    if unicodedata.normalize("NFC", value) != value or any(
+            unicodedata.category(ch) in {"Cc", "Cf", "Zl", "Zp", "Mn", "Me"} for ch in value):
         raise Refused(f"{what} must be one line of plain visible text")
 
 
@@ -177,5 +179,5 @@ def render_card(registered, approval, allowance, number, title, hours, left_out)
              f"**Goal:** {shown(objective['statement'])}."]
     if left_out:
         lines.append(f"- **Left for a later campaign:** {shown('; '.join(left_out))}.")
-    lines += ["", "Reply **approve** to launch, or tell me what to change."]
+    lines += ["", "Reply **approve** to this card to launch, or tell me what to change."]
     return "\n".join(lines)

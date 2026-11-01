@@ -5,7 +5,11 @@ deterministic controller posts the card in the request's thread, mentioning the 
 verifies the posted card is exactly the stored one. The controller then watches the thread, and
 relays any owner reply. The broker approves only an owner-signed reply that:
 - says only "approve";
-- is in the proposal's thread, after its live card, and within a day.
+- replies to its live card's own event, after the card was recorded, by its approve-by time.
+
+A reply tagged only to the thread is not enough. Mother holds her own Buzz key, so she could post a
+card-like message herself and report a different card as posted without publishing it. Only the
+event the owner actually replied to binds the approval to what they read (review, 2026-11-01).
 
 The approval creates the card's allowance, approves its definition and queues the launch. One
 signed word does all of it, and the owner never handles an ID or a definition.
@@ -142,6 +146,8 @@ class Proposals:
                                                (row["thread"],))}
         if (referenced & cards) - {row["card_event"]}:
             raise Refused("the approval answers a card that is no longer live")
+        if row["card_event"] not in referenced:
+            raise Refused("the approval must reply to the card itself, not only to the thread")
         # After the live card was recorded, with no slack: an "approve" written before a replacement
         # card existed approves nothing, so it can't be carried over to a card the owner never saw.
         latest = min(self.now + 30, row["posted"] + APPROVAL_WINDOW_S, self.approve_by(body))
@@ -159,15 +165,17 @@ class Proposals:
         allowance = body["allowance"]
         Automation(self.b, now=self.now).validate_allowance(allowance)
         Launches(self.b, now=self.now).preflight(row["id"], body["approval"])
-        stored = self.db.execute("SELECT body FROM review_budgets WHERE name=?", (allowance["name"],)).fetchone()
-        if stored and stored[0] != canonical(allowance):
-            raise Refused("an allowance of this name already exists with other terms")
-        self.db.execute("INSERT OR IGNORE INTO review_budgets VALUES(?,?)", (allowance["name"], canonical(allowance)))
-        self.b.approve(body["approval"])
         rid = "launch-" + row["id"]
-        # The reason names no event, so a retry after a crash binds the same launch request.
-        Launches(self.b, now=self.now).submit(
-            {"definition": row["id"], "reason": "The owner approved this campaign's card by signed reply."}, rid)
-        self.db.execute("UPDATE proposals SET state='approved',approval_event=?,launch=? WHERE id=?", (eid, rid, row["id"]))
-        self.b.store.save()
+        # One transaction: the allowance, the definition and the launch are all written, or none is.
+        with self.b.store.one_transaction():
+            stored = self.db.execute("SELECT body FROM review_budgets WHERE name=?", (allowance["name"],)).fetchone()
+            if stored and stored[0] != canonical(allowance):
+                raise Refused("an allowance of this name already exists with other terms")
+            self.db.execute("INSERT OR IGNORE INTO review_budgets VALUES(?,?)", (allowance["name"], canonical(allowance)))
+            self.b.approve(body["approval"])
+            # The reason names no event, so a retry after a crash binds the same launch request.
+            Launches(self.b, now=self.now).submit(
+                {"definition": row["id"], "reason": "The owner approved this campaign's card by signed reply."}, rid)
+            self.db.execute("UPDATE proposals SET state='approved',approval_event=?,launch=? WHERE id=?",
+                            (eid, rid, row["id"]))
         return {"approved": True, "launch": rid}

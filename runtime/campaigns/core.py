@@ -1,6 +1,7 @@
 """Caller-bounded campaign operations. Runtime records remain authoritative in SquadOps."""
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import re
@@ -115,7 +116,22 @@ class Store:
         return dict(row)
 
     def save(self):
-        self.db.commit()
+        if not getattr(self, "deferred", False):
+            self.db.commit()
+
+    @contextlib.contextmanager
+    def one_transaction(self):
+        """Several steps that each save, committed together or rolled back together."""
+        self.deferred = True
+        try:
+            yield
+        except BaseException:
+            self.db.rollback()
+            raise
+        else:
+            self.db.commit()
+        finally:
+            self.deferred = False
 
     def inference_mode(self, name):
         self.definition(name)

@@ -61,9 +61,9 @@ the ShelfNote campaign").
    > **ShelfNote: work the goals.md backlog**, search first
    > Up to 10 increments · stops after 8 hours, or Nov 4 9:02 am ET · reviews about $16 of a $25 allowance
    > Ripley rules each gate; Dallas checks each ruling · Dallas on the draft: not blocking (two notes)
-   > *Reply **approve** to launch, or tell me what to change.*
+   > *Reply **approve** to this card to launch, or tell me what to change.*
 
-6. **The owner replies "approve".** The broker launches, and the launch worker takes over.
+6. **The owner replies "approve" to the card.** The broker launches, and the launch worker takes over.
 
 ## Approval by reply
 
