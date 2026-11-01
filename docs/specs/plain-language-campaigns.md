@@ -1,6 +1,6 @@
 # Plain-language campaigns
 
-**Status:** proposed, 2026-11-01. Owner-directed exception to the harness freeze. Not built.
+**Status:** proposed, 2026-11-01, with the owner's choices recorded below. Owner-directed exception to the harness freeze. Not built.
 
 ## The problem
 
@@ -235,6 +235,19 @@ Beyond the English-only thread, that means:
 2. **Approval by reply,** including the allowance and approve-and-launch. This retires owner-UID
    approvals.
 3. **Plain reads and decision cards,** plus status in words, and the live campaigns canvas.
+
+## Decided with the owner, 2026-11-01
+
+- **Drafting is visible.** Ripley's draft, Dallas's check and any revision appear in the campaign's
+  thread before the card.
+- **The size follows the goal.** When a change shrinks or grows the work, as when "skip sorting" moved
+  a card from medium to small, the crew resizes to fit and the card says so.
+- **Progress is one post per decision and per accepted increment.** Nothing in between, and a quiet
+  campaign posts nothing.
+- **Platform gaps are drafted, not filed.** When a closing analysis names one, Ripley drafts the
+  squad-ops issue (naming nothing from Nostromo) for the owner to approve. Ripley files it only on
+  the owner's say-so.
+- **Automatic posts are Mother's deterministic campaign controller.** See "A readable control plane".
 
 ## Open questions
 
