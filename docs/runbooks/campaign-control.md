@@ -268,7 +268,13 @@ before enabling an unattended definition.
 
 For remote owner approval, `campaignctl approve-definition --args approval.json --explain`
 prints the `campaign-definition: {...}` line. The owner publishes that exact line in an
-allowed campaign channel; Mother imports it with `--decision EVENT_ID`. The broker verifies
+allowed campaign channel; Mother imports it with `--decision EVENT_ID`.
+- **Mother gives the line alone, in a fenced code block.** Outside a code block, Buzz Desktop turns
+  a name like `goals.md` into a Markdown link (`.md` is a real web domain), and the approval then no
+  longer matches. This happened on 2026-11-01.
+- **The line must start the line,** with nothing before it, such as "Approved:". Words of
+  introduction go on a line of their own.
+- **The approval is valid for 30 minutes.** The broker verifies
 the owner's manifest public key, event signature, channel, payload, and freshness.
 
 Mother uses:

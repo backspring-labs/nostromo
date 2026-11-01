@@ -171,8 +171,28 @@ def decision_request(cid, payload, result):
             "request_id": "review-" + digest({"campaign": cid, "gate": gate})[:32]}
 
 
+GATE_LABELS = {"progress_plan_review": "plan review", "progress_increment_ruling": "increment ruling"}
+
+
+def summary(job, result):
+    """One readable line ahead of the signed records, for people reading the thread. It binds
+    nothing: the broker verifies only the prefixed lines below it. No mentions, so no paid turn."""
+    gate = ((job.get("payload") or {}).get("gate") or {}).get("gate")
+    where = GATE_LABELS.get(gate, "closing analysis" if job["kind"] == "analysis" else "review")
+    if job["kind"] == "decision":
+        verdict = result["decision"].replace("_", " ")
+    elif job["kind"] == "review":
+        verdict = "blocking" if result["blocking"] else "not blocking"
+    else:
+        verdict = "posted"
+    text = str(result.get("notes") or "").replace("@", "").split("\n")[0].strip()
+    first = text.split(". ")[0].rstrip(".")
+    first = first if len(first) <= 200 else first[:197].rstrip() + "..."
+    return f"{job['role'].title()}, {where}: {verdict}." + (f" {first}." if first else "")
+
+
 def attestations(job, result):
-    lines = ["campaign-job-result: " + canonical({"job": job["id"], "result": result})]
+    lines = [summary(job, result), "campaign-job-result: " + canonical({"job": job["id"], "result": result})]
     if job["kind"] == "decision" and result["decision"] != "needs_owner":
         lines.append("campaign-decision: " + canonical(decision_request(job["campaign"], job["payload"], result)))
     if job["kind"] == "review":

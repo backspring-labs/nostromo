@@ -838,3 +838,25 @@ def test_the_allowance_ceiling_is_twenty_five_dollars_and_sixty_calls(world, fie
     else:
         with pytest.raises(Refused, match="at most"):
             rpc(broker, "owner", "approve-budget", args)
+
+
+# The readable line ahead of each review's signed records.
+
+def test_each_review_post_opens_with_a_readable_line_that_binds_nothing():
+    from runtime.campaigns.review import summary
+    gate = {"gate": "progress_increment_ruling"}
+    decision = summary({"role": "ripley", "kind": "decision", "payload": {"gate": gate}},
+                       {**RETURNED, "notes": "Revise the acceptance source first. Then plan."})
+    assert decision == "Ripley, increment ruling: returned for revision. Revise the acceptance source first."
+    review = summary({"role": "dallas", "kind": "review", "payload": {"gate": gate}},
+                     {"blocking": False, "notes": "Review of @someone's ruling holds.\nMore."})
+    assert review == "Dallas, increment ruling: not blocking. Review of someone's ruling holds."
+    for line in (decision, review):
+        assert "\n" not in line and "@" not in line
+        assert not line.startswith(("campaign-job-result:", "campaign-decision:", "campaign-review:"))
+
+
+def test_a_long_note_is_trimmed_in_the_summary():
+    from runtime.campaigns.review import summary
+    line = summary({"role": "ripley", "kind": "analysis", "payload": {"gate": None}}, {"notes": "x" * 500})
+    assert line.startswith("Ripley, closing analysis: posted. ") and len(line) < 260

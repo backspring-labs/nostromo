@@ -54,7 +54,9 @@ agents:
     respond_to: allowlist
     workdir: ~/workspace
     requires_clone: false
-    max_rounds: 12
+    # 24 since 2026-11-01. At 12, a ShelfNote launch spent every round retrying a refused import,
+    # and the turn ended before she could say so. Local inference, so rounds cost nothing.
+    max_rounds: 24
     buzz_pubkey: 0fe13d87cb0051685da767d8de393a2d8fff155fbcf1feeb0b1ca4f877a5b063
     buzz_auth_tag: '["auth","508cd1c7dbcddcc93b8168923cac49ef28bb02f0e60de549e44b01000d2bce5f","","8703238bd390f3c28e674f5afce86ab0f00de705c6cbd3c3bf207aa8182a9b26d444d72bb3bbed8ed58beef6f42f3fb6af362a33a979611b45cb1e8757992688"]'
     buzz_private_key: spark:~mother/.config/nostromo/secrets/buzz.key
