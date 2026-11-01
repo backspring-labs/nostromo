@@ -213,8 +213,9 @@ immutable definition or budget change.
 
 When triage reports `stage=buzz_publication`, the role worker has already validated and persisted
 the provider response in its private recovery directory. Do not rerun the provider call. First
-search the campaign's Buzz thread for the exact job ID and `campaign-job-result` marker. The owner
-can authorize adoption of an existing signed result by event ID, without publishing again:
+search the campaign's Buzz thread for the role's English message about that ruling, posted after the
+job was claimed. Since render and verify, messages carry no job ID or record marker. The owner can
+authorize adoption of an existing signed result by event ID, without publishing again:
 
 ```bash
 campaignctl review-recovery-authorize --args - <<'JSON'
@@ -326,8 +327,9 @@ Ripley prepares a JSON file with `campaign`, `cycle`, `run`, `decision`, and sub
 campaignctl increment --args ruling.json --request-id ruling-001 --explain
 ```
 
-The output gives two exact single lines: `campaign-decision: {...}` and
-`campaign-review: {...}`. Ripley publishes the first under her own Buzz identity. Dallas
+This is the **manual path**, for an attended ruling outside the automated reviews; the automated
+reviews post English only (render and verify, below). The output gives two exact single lines:
+`campaign-decision: {...}` and `campaign-review: {...}`. Ripley publishes the first under her own Buzz identity. Dallas
 independently examines the packet and publishes the second only if that exact decision has
 no blocking finding. A signature on a different decision, campaign, cycle, or run is refused.
 If Dallas has a blocking finding, report it in the thread and hold for owner inspection. Any

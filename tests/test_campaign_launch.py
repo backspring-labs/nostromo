@@ -269,7 +269,8 @@ def test_wrong_thread_signed_notice_cannot_unlock_start(world):
     queue(broker)
     rpc(broker, "mother", "launch-advance")
     job = rpc(broker, "mother", "launch-notice-claim")
-    with pytest.raises(Refused, match="approved campaign thread"):
+    # Refused by render and verify (the message isn't in the campaign's thread) or the thread check.
+    with pytest.raises(Refused, match="mismatched or invalid mother message|approved campaign thread"):
         rpc(broker, "mother", "launch-notice-result", {"launch": job["id"], "phase": job["phase"]},
             decision_event=proof(job, thread="b" * 64))
     rpc(broker, "mother", "launch-advance")
@@ -426,3 +427,21 @@ def test_http_publication_binds_auth_to_exact_event_and_requires_exact_receipt(m
     acknowledgment["event_id"] = "wrong"
     with pytest.raises(Refused, match="exact launch event"):
         submit_event(event, KEY, ["auth", "fixture"])
+
+
+def test_an_announcement_can_serve_only_its_own_launch(world):
+    """Review N3: notice texts carry no launch identity, so the event itself is bound to one launch."""
+    broker, api, _, _ = world
+    queue(broker)
+    rpc(broker, "mother", "launch-advance")
+    job = rpc(broker, "mother", "launch-notice-claim")
+    event = proof(job)
+    # Another launch has already recorded this exact event as its own announcement.
+    row = dict(broker.store.db.execute("SELECT * FROM launch_workflows").fetchone())
+    other = {**row, "id": "other-launch", "definition": "other", "campaign": "cmp_other",
+             "create_request": "c2", "start_request": "s2", "announcement_event": event["id"]}
+    columns = ",".join(other)
+    broker.store.db.execute(f"INSERT INTO launch_workflows({columns}) VALUES({','.join('?' * len(other))})", tuple(other.values()))
+    broker.store.save()
+    with pytest.raises(Refused, match="already belongs to another launch"):
+        rpc(broker, "mother", "launch-notice-result", {"launch": job["id"], "phase": job["phase"]}, decision_event=event)

@@ -175,8 +175,8 @@ GATE_LABELS = {"progress_plan_review": "plan review", "progress_increment_ruling
 
 
 def summary(job, result):
-    """One readable line ahead of the signed records, for people reading the thread. It binds
-    nothing: the broker verifies only the prefixed lines below it. No mentions, so no paid turn."""
+    """The message's opening line: who, at which gate, what verdict, and the notes' first sentence.
+    Part of the rendering the broker verifies. No mentions, so no paid turn."""
     gate = ((job.get("payload") or {}).get("gate") or {}).get("gate")
     where = GATE_LABELS.get(gate, "closing analysis" if job["kind"] == "analysis" else "review")
     if job["kind"] == "decision":
@@ -188,23 +188,46 @@ def summary(job, result):
     # The broker splits a message with str.splitlines(), which breaks on \r, \x0b, \x0c, \x1c-\x1e,
     # \x85, \u2028 and \u2029 as well as \n. Keep only the notes' first such line, so the summary can
     # never contribute a second record line.
-    text = (str(result.get("notes") or "").replace("@", "").splitlines() or [""])[0].strip()
+    text = (_clean(result.get("notes")).splitlines() or [""])[0].strip()
     first = text.split(". ")[0].rstrip(".")
     first = first if len(first) <= 200 else first[:197].rstrip() + "..."
     return f"{job['role'].title()}, {where}: {verdict}." + (f" {first}." if first else "")
 
 
-def attestations(job, result):
-    lines = [summary(job, result), record_line("campaign-job-result", {"job": job["id"], "result": result})]
-    if job["kind"] == "decision" and result["decision"] != "needs_owner":
-        lines.append(record_line("campaign-decision", decision_request(job["campaign"], job["payload"], result)))
-    if job["kind"] == "review":
-        from .core import digest
-        req = job["payload"]["packet"]["decision_request"]
-        a = req["args"]
-        lines.append(record_line("campaign-review", {"campaign": job["campaign"], "cycle": a["cycle"], "run": a["run"],
-                     "decision_sha256": digest({"command": req["command"], "args": a}), "blocking": result["blocking"]}))
-    return "\n".join(lines)
+def _clean(text):
+    """Model text, made safe to post. No mentions, which start paid turns: `@` becomes a full-width
+    at sign, and a NIP-27 `nostr:` reference loses its colon. No control characters, and canonical
+    Unicode (NFC), so the text survives the Buzz CLI byte for byte. The same function runs at
+    publication and at verification, so the signed message and the broker's rendering agree."""
+    import unicodedata
+    text = unicodedata.normalize("NFC", str(text or ""))
+    text = text.replace("@", "\uff20").replace("nostr:", "nostr\uff1a")
+    text = "".join(ch for ch in text if ch in "\n\t" or unicodedata.category(ch) != "Cc")
+    return "\n".join(line.rstrip() for line in text.splitlines()).strip()
+
+
+def _no_record_lines(message):
+    """The last pass over the whole message, after every join and strip: no line may start with a
+    manual-path record prefix. On 2026-11-01 review found that indenting inside _clean was undone by
+    its own strip(), which let model text forge a `campaign-decision:` line."""
+    return "\n".join("\u2023 " + line if line.lstrip().startswith("campaign-") else line
+                     for line in message.split("\n"))
+
+
+def render(job, result):
+    """The whole message Ripley or Dallas posts in the campaign thread: English, no record lines.
+
+    The broker re-renders it from the job and result it holds, and accepts the signed message only if
+    it says exactly this (render and verify, docs/specs/plain-language-campaigns.md). So this may
+    depend on nothing but the job and the result."""
+    parts = [summary(job, result)]
+    notes = _clean(result.get("notes"))
+    if notes:
+        parts.append(notes)
+    rationale = _clean(result.get("classification_rationale"))
+    if job["kind"] == "decision" and rationale:
+        parts.append("Why: " + rationale)
+    return _no_record_lines("\n\n".join(parts))
 
 
 def decode(role, response):

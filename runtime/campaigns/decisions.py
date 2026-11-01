@@ -49,4 +49,31 @@ def verifier(policy, now=time.time):
             return eid
         except (KeyError, TypeError, ValueError, IndexError, OverflowError):
             raise Refused(f"missing, stale, mismatched or invalid {signer} {prefix} event") from None
+    def rendered(event, signer, content, channel, thread, not_before):
+        """A signed English message: exactly `content`, signed by `signer`, in `channel` as a reply in
+        `thread`, created no earlier than `not_before`. Returns its event ID. Whether the event was
+        already used for another job is the caller's check: it alone holds the bindings."""
+        try:
+            if not isinstance(event, dict) or event["kind"] != 9 or event["content"] != content:
+                raise ValueError()
+            if event["pubkey"] != policy["public_keys"][signer]:
+                raise ValueError()
+            if not (not_before - 30 <= event["created_at"] <= now() + 30):
+                raise ValueError()
+            tags = event["tags"]
+            if [tag[1] for tag in tags if len(tag) >= 2 and tag[0] == "h"] != [channel] or channel not in policy["decision_channels"]:
+                raise ValueError()
+            replies = [tag[1] for tag in tags if len(tag) >= 4 and tag[0] == "e" and tag[3] in {"reply", "root"}]
+            if thread not in replies:
+                raise ValueError()
+            raw = json.dumps([0, event["pubkey"], event["created_at"], event["kind"],
+                              event["tags"], event["content"]], separators=(",", ":"), ensure_ascii=False)
+            eid = hashlib.sha256(raw.encode()).hexdigest()
+            if event["id"] != eid or not crypto.schnorr_verify(bytes.fromhex(eid), event["pubkey"], event["sig"]):
+                raise ValueError()
+            return eid
+        except (KeyError, TypeError, ValueError, IndexError, OverflowError):
+            raise Refused(f"missing, stale, mismatched or invalid {signer} message") from None
+
+    verify.rendered = rendered
     return verify

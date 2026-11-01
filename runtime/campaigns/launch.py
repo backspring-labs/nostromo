@@ -4,7 +4,7 @@ import json
 import re
 import time
 
-from .core import Refused, canonical, digest, exact, identifier, record_line
+from .core import Refused, canonical, digest, exact, identifier
 from .review import timestamp
 
 COMMANDS = {"launch", "launches", "launch-status", "launch-advance", "launch-notice-claim",
@@ -202,8 +202,8 @@ class Launches:
         return [self.status(row["id"]) for row in rows]
 
     def notice(self, row):
-        # Written for people: the thread already says which campaign, so no IDs. The one record line
-        # below is what the broker verifies; it moves out of the text with render-and-verify.
+        # Written for people: the thread already says which campaign, so no IDs and no record lines.
+        # The broker verifies the signed announcement by rendering this same text (render and verify).
         if row["state"] in {"created", "announcing"}:
             phase = "announcement"
             text = "The campaign you approved is created and starting now. Next: SquadOps accepting the start."
@@ -226,7 +226,7 @@ class Launches:
             payload["diagnostic"] = json.loads(row["diagnostic"])
         return {"id": row["id"], "phase": phase, "channel": row["channel"], "thread": row["thread"],
                 "mention_owner": phase == "failure",
-                "payload": payload, "content": text + "\n" + record_line("campaign-launch", payload)}
+                "payload": payload, "content": text}
 
     def claim_notice(self):
         for row in self.db.execute("SELECT * FROM launch_workflows ORDER BY created").fetchall():
@@ -254,7 +254,15 @@ class Launches:
         job = self.notice(row)
         if not job or args["phase"] != job["phase"] or row["notice_phase"] != job["phase"] or row["notice_claimed"] is None:
             raise Refused("launch notice is not claimed for this phase")
-        self.b.verify_event(event, "mother", "campaign-launch", job["payload"])
+        # Not before the launch was accepted. Not the notice's claim time: after a crash the worker
+        # re-submits the exact event it saved earlier, which predates the re-claim. The outbox keeps
+        # it to one event per phase.
+        eid = self.b.verify_event.rendered(event, "mother", job["content"], row["channel"], row["thread"], row["created"])
+        # Notice texts carry no launch identity, so bind the event: it may serve only this launch.
+        other = self.db.execute("SELECT 1 FROM launch_workflows WHERE id!=? AND ? IN "
+                                "(notice_event, announcement_event, completion_event)", (row["id"], eid)).fetchone()
+        if other:
+            raise Refused("this announcement already belongs to another launch")
         tags = event["tags"]
         roots = [t[1] for t in tags if len(t) >= 4 and t[0] == "e" and t[3] == "root"]
         replies = [t[1] for t in tags if len(t) >= 4 and t[0] == "e" and t[3] == "reply"]

@@ -14,7 +14,7 @@ from pathlib import Path
 from .auth import NoRedirect
 from .cli import call, read_event
 from .core import Refused, canonical
-from .review import MAX_REQUEST_BYTES, MODELS, attestations, decode, refusal_code, validate
+from .review import MAX_REQUEST_BYTES, MODELS, decode, refusal_code, render, validate
 
 ENDPOINTS = {"ripley": "https://api.openai.com/v1/responses", "dallas": "https://api.anthropic.com/v1/messages"}
 
@@ -104,7 +104,7 @@ def send_message(job, result):
     destination = job["payload"]["destination"]
     command = ["/opt/nostromo/runtime/bin/buzz", "messages", "send", "--channel", destination["channel"],
                "--reply-to", destination["thread"], "--content", "-"]
-    response = subprocess.run(command, input=attestations(job, result), text=True, capture_output=True, env=env, timeout=120)
+    response = subprocess.run(command, input=render(job, result), text=True, capture_output=True, env=env, timeout=120)
     if response.returncode:
         # The CLI's message may contain URLs or other sensitive data. Retain only
         # a fixed category so triage can distinguish transport, auth and input.
