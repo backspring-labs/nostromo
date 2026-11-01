@@ -86,6 +86,35 @@ Proposed instead: **a signed owner reply to the card, whose first line is `appro
 - **Nothing else changes:** only the owner approves, definitions stay immutable by name, and
   allowances stay within the $25 / 60-call ceiling.
 
+## Buzz is for people, not a system log
+
+Owner, 2026-11-01: Ripley and Dallas write to the thread in normal English, without campaign JSON.
+
+**Today:** the JSON is in the message bodies because Buzz carries the signatures. The broker verifies
+`campaign-job-result:`, `campaign-decision:`, `campaign-review:`, `campaign-launch:` and
+`campaign-definition:` lines in the content of signed Buzz events. The watcher also pastes its
+"Review control: {…}" state into its notices.
+
+**Proposed:** the body of every crew or worker message in a campaign thread is plain English. The
+machine record moves out of sight but stays signed. Two ways, in order of preference:
+1. **The record as a separate event of a non-chat kind,** in the same channel and thread
+   (`buzz messages send --kind`). Signed records stay on the relay as they are today. This needs a
+   measurement first: that our relay accepts the kind with the channel's `h` tag, and that Desktop
+   doesn't display it. Test it in a scratch channel, never a live one.
+2. **Otherwise, the record signed locally and kept by the broker.** The worker signs the record with
+   the role's key (`nostr_keys.sign_event`), without publishing it, and submits it to the broker. The
+   broker verifies it as today and stores it, and `campaignctl` shows it. Buzz gets only the English
+   message.
+
+**What the English says:**
+- **Ripley:** the ruling and why, in a few sentences, with what the squad should do next.
+- **Dallas:** blocking or not, the reasons, and any suggested change.
+- **The watcher:** what changed, and what it means. For example: "The search increment was returned
+  for revision; 2 of 34 reviews used; the squad is revising."
+
+Fields such as event IDs, digests and request IDs stay in the record and out of the thread. An ID
+appears only when a person needs one, which this design aims to make never.
+
 ## Pieces to build
 
 | Piece | What | Where |
@@ -114,6 +143,9 @@ Each preset's review count and allowance follow the runbook's per-increment esti
 
 ## Order of work
 
+0. **Readable threads.** The watcher writes English. The review records move out of the message
+   body, after the `--kind` measurement. This comes first because it's the most visible, and it
+   doesn't depend on the rest.
 1. **Registry and draft step.** ShelfNote becomes the first registry entry, and Mother can post cards.
    Approval still uses today's line, copied from the card's code block.
 2. **Approval by reply,** including the allowance and approve-and-launch. This retires owner-UID
