@@ -17,6 +17,20 @@ def canonical(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
 
+# The broker reads a signed message with str.splitlines(). JSON already escapes every separator below
+# U+0020; these three it leaves raw. Escaped, they parse back to the same value, so a record line
+# can never break in two. canonical() itself must not change: it feeds digests and fingerprints.
+_LINE_BREAKS = {"\u0085": "\\u0085", "\u2028": "\\u2028", "\u2029": "\\u2029"}
+
+
+def record_line(prefix, value):
+    """One signed record line, `prefix: {json}`, guaranteed to stay one line."""
+    text = canonical(value)
+    for raw, escaped in _LINE_BREAKS.items():
+        text = text.replace(raw, escaped)
+    return prefix + ": " + text
+
+
 def digest(value):
     return hashlib.sha256(canonical(value).encode()).hexdigest()
 

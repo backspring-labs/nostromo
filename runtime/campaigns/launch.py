@@ -4,7 +4,7 @@ import json
 import re
 import time
 
-from .core import Refused, canonical, digest, exact, identifier
+from .core import Refused, canonical, digest, exact, identifier, record_line
 from .review import timestamp
 
 COMMANDS = {"launch", "launches", "launch-status", "launch-advance", "launch-notice-claim",
@@ -223,7 +223,7 @@ class Launches:
         return {"id": row["id"], "phase": phase, "channel": row["channel"], "thread": row["thread"],
                 "payload": payload, "content": text + "\nDefinition: " + row["definition"] +
                 "\nCreate request: " + row["create_request"] + "\nStart request: " + row["start_request"] +
-                "\ncampaign-launch: " + canonical(payload)}
+                "\n" + record_line("campaign-launch", payload)}
 
     def claim_notice(self):
         for row in self.db.execute("SELECT * FROM launch_workflows ORDER BY created").fetchall():
