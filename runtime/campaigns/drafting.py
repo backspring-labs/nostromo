@@ -62,8 +62,8 @@ def free_name(store, project, now):
     day = datetime.fromtimestamp(now, ET).strftime("%Y%m%d")
     for number in range(1, 100):
         name = f"crew-{project}-{day}-{number}"
-        taken = (store.db.execute("SELECT 1 FROM definitions WHERE name=?", (name,)).fetchone() or
-                 store.db.execute("SELECT 1 FROM review_budgets WHERE name=?", (name,)).fetchone())
+        taken = any(store.db.execute(f"SELECT 1 FROM {table} WHERE {column}=?", (name,)).fetchone()
+                    for table, column in (("definitions", "name"), ("review_budgets", "name"), ("proposals", "id")))
         if not taken:
             return name
     raise Refused("no free campaign name today")

@@ -68,6 +68,9 @@ class Store:
                 role TEXT NOT NULL, kind TEXT NOT NULL, state TEXT NOT NULL, payload TEXT NOT NULL,
                 reserved INTEGER NOT NULL DEFAULT 0, claimed REAL, result TEXT, proof TEXT, usage TEXT,
                 failure_diagnostic TEXT);
+            CREATE TABLE IF NOT EXISTS proposals(id TEXT PRIMARY KEY, thread TEXT NOT NULL, state TEXT NOT NULL,
+                body TEXT NOT NULL, created REAL NOT NULL, claimed REAL, attempts INTEGER NOT NULL DEFAULT 0,
+                card_event TEXT UNIQUE, posted REAL, approval_event TEXT UNIQUE, launch TEXT);
             CREATE TABLE IF NOT EXISTS review_recoveries(job TEXT PRIMARY KEY, state TEXT NOT NULL,
                 authorized REAL NOT NULL, claimed REAL, failure TEXT, event_id TEXT);
             CREATE TABLE IF NOT EXISTS launch_workflows(
@@ -138,6 +141,9 @@ class Broker:
         command, args = request["command"], request["args"]
         if not isinstance(args, dict):
             raise Refused("args must be an object")
+        from .proposals import COMMANDS as PROPOSAL_COMMANDS, Proposals
+        if command in PROPOSAL_COMMANDS:
+            return Proposals(self).handle(caller, command, args, request)
         from .launch import COMMANDS as LAUNCH_COMMANDS, Launches
         if command in LAUNCH_COMMANDS:
             return Launches(self).handle(caller, command, args, request)
