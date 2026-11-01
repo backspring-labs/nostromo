@@ -188,20 +188,30 @@ def summary(job, result):
     # The broker splits a message with str.splitlines(), which breaks on \r, \x0b, \x0c, \x1c-\x1e,
     # \x85, \u2028 and \u2029 as well as \n. Keep only the notes' first such line, so the summary can
     # never contribute a second record line.
-    text = (str(result.get("notes") or "").replace("@", "").splitlines() or [""])[0].strip()
+    text = (_clean(result.get("notes")).splitlines() or [""])[0].strip()
     first = text.split(". ")[0].rstrip(".")
     first = first if len(first) <= 200 else first[:197].rstrip() + "..."
     return f"{job['role'].title()}, {where}: {verdict}." + (f" {first}." if first else "")
 
 
 def _clean(text):
-    """Model text, made safe to post: no mentions (they start paid turns) and no line that could read
-    as a manual-path record line. The same function runs at publication and at verification, so the
-    signed message and the broker's rendering always agree."""
-    lines = []
-    for line in str(text or "").replace("@", "\uff20").splitlines():
-        lines.append(" " + line if line.lstrip().startswith("campaign-") else line)
-    return "\n".join(lines).strip()
+    """Model text, made safe to post. No mentions, which start paid turns: `@` becomes a full-width
+    at sign, and a NIP-27 `nostr:` reference loses its colon. No control characters, and canonical
+    Unicode (NFC), so the text survives the Buzz CLI byte for byte. The same function runs at
+    publication and at verification, so the signed message and the broker's rendering agree."""
+    import unicodedata
+    text = unicodedata.normalize("NFC", str(text or ""))
+    text = text.replace("@", "\uff20").replace("nostr:", "nostr\uff1a")
+    text = "".join(ch for ch in text if ch in "\n\t" or unicodedata.category(ch) != "Cc")
+    return "\n".join(line.rstrip() for line in text.splitlines()).strip()
+
+
+def _no_record_lines(message):
+    """The last pass over the whole message, after every join and strip: no line may start with a
+    manual-path record prefix. On 2026-11-01 review found that indenting inside _clean was undone by
+    its own strip(), which let model text forge a `campaign-decision:` line."""
+    return "\n".join("\u2023 " + line if line.lstrip().startswith("campaign-") else line
+                     for line in message.split("\n"))
 
 
 def render(job, result):
@@ -217,7 +227,7 @@ def render(job, result):
     rationale = _clean(result.get("classification_rationale"))
     if job["kind"] == "decision" and rationale:
         parts.append("Why: " + rationale)
-    return "\n\n".join(parts)
+    return _no_record_lines("\n\n".join(parts))
 
 
 def decode(role, response):

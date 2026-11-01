@@ -257,7 +257,12 @@ class Launches:
         # Not before the launch was accepted. Not the notice's claim time: after a crash the worker
         # re-submits the exact event it saved earlier, which predates the re-claim. The outbox keeps
         # it to one event per phase.
-        self.b.verify_event.rendered(event, "mother", job["content"], row["channel"], row["thread"], row["created"])
+        eid = self.b.verify_event.rendered(event, "mother", job["content"], row["channel"], row["thread"], row["created"])
+        # Notice texts carry no launch identity, so bind the event: it may serve only this launch.
+        other = self.db.execute("SELECT 1 FROM launch_workflows WHERE id!=? AND ? IN "
+                                "(notice_event, announcement_event, completion_event)", (row["id"], eid)).fetchone()
+        if other:
+            raise Refused("this announcement already belongs to another launch")
         tags = event["tags"]
         roots = [t[1] for t in tags if len(t) >= 4 and t[0] == "e" and t[3] == "root"]
         replies = [t[1] for t in tags if len(t) >= 4 and t[0] == "e" and t[3] == "reply"]

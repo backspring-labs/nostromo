@@ -239,7 +239,10 @@ class Broker:
         if command in GATES:
             expected = {"command": command, "args": args, "request_id": rid}
             job = self.proven(request.get("decision_event"), "ripley", "decision")
+            if not job and self.bound(request.get("decision_event")):
+                raise Refused("the decision proof binds a different ruling")
             if job:
+                self.live(job["campaign"])
                 # An automated ruling: Ripley signed its English rendering, and the broker holds the
                 # result and the gate binding. The request must be exactly what they derive.
                 from .review import decision_request
@@ -355,6 +358,19 @@ class Broker:
             return result
         return self.api("read", "GET", base + ("" if command == "status" else f"/{READ_PATHS.get(command, command)}"), None)
 
+    def bound(self, event):
+        """Whether this event is any job's accepted proof. A bound event is judged only as a bound
+        proof: never by the manual record-line path, even with a field added to the event dict."""
+        return (isinstance(event, dict) and isinstance(event.get("id"), str) and
+                self.store.db.execute("SELECT 1 FROM review_jobs WHERE proof_event=?", (event["id"],)).fetchone() is not None)
+
+    def live(self, campaign):
+        """A bound proof counts only while the campaign's review automation is active and in time:
+        never for a parked, expired or closed campaign, so a hold can't be bypassed later."""
+        control = self.store.db.execute("SELECT state,deadline FROM automation WHERE campaign=?", (campaign,)).fetchone()
+        if not control or control["state"] != "active" or time.time() >= control["deadline"]:
+            raise Refused("the campaign's review authorization is not active")
+
     def proven(self, event, role, kind):
         """The review job whose accepted proof is exactly this event, or None. The binding exists only
         in the broker's database, so a caller can't fabricate it: at most it can present a proof the
@@ -454,7 +470,10 @@ class Broker:
             raise Refused("gate already has a decision")
         if approved["definition"].get("crew", {}).get("require_dallas", True):
             review = self.proven(request.get("review_event"), "dallas", "review")
+            if not review and self.bound(request.get("review_event")):
+                raise Refused("the review proof binds a different ruling, or is blocking")
             if review:
+                self.live(review["campaign"])
                 # Dallas's job was bound, when it was queued, to the exact ruling it reviews, and to
                 # the decision job that produced it.
                 payload = json.loads(review["payload"])
