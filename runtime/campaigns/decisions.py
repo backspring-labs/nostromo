@@ -75,5 +75,21 @@ def verifier(policy, now=time.time):
         except (KeyError, TypeError, ValueError, IndexError, OverflowError):
             raise Refused(f"missing, stale, mismatched or invalid {signer} message") from None
 
+    def authentic(event, signer):
+        """A genuine kind-9 event signed by `signer`'s pinned key. Returns its ID. Where, when and what
+        it says are the caller's checks."""
+        try:
+            if not isinstance(event, dict) or event["kind"] != 9 or event["pubkey"] != policy["public_keys"][signer]:
+                raise ValueError()
+            raw = json.dumps([0, event["pubkey"], event["created_at"], event["kind"],
+                              event["tags"], event["content"]], separators=(",", ":"), ensure_ascii=False)
+            eid = hashlib.sha256(raw.encode()).hexdigest()
+            if event["id"] != eid or not crypto.schnorr_verify(bytes.fromhex(eid), event["pubkey"], event["sig"]):
+                raise ValueError()
+            return eid
+        except (KeyError, TypeError, ValueError, IndexError, OverflowError, AttributeError):
+            raise Refused(f"not a genuine {signer}-signed message") from None
+
     verify.rendered = rendered
+    verify.authentic = authentic
     return verify

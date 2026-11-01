@@ -27,6 +27,31 @@ DEFAULT_MEASUREMENT = ("its own tests pass on the product's runner, and everythi
                        "still passes")
 
 
+# What the card shows must be what the owner approves (review B2, 2026-11-01): the goal's fields
+# are single lines of visible text, bounded, and the card escapes Markdown so none can hide or forge
+# a line.
+LIMITS = {"title": 80, "statement": 600, "item": 120, "measurement": 300}
+# Inline markers only: no goal text starts a card line, so block markers (#, -, 1.) can't take effect.
+MARKDOWN = re.compile(r"([\\`*_\[\]<>~|])")
+
+
+def plain(value, what, limit):
+    import unicodedata
+    if not isinstance(value, str) or not value.strip():
+        raise Refused(f"{what} is required text")
+    if len(value) > limit:
+        raise Refused(f"{what} is at most {limit} characters")
+    # Combining marks could strike through or hide words; precomposed accents (NFC) are fine.
+    if unicodedata.normalize("NFC", value) != value or any(
+            unicodedata.category(ch) in {"Cc", "Cf", "Zl", "Zp", "Mn", "Me"} for ch in value):
+        raise Refused(f"{what} must be one line of plain visible text")
+
+
+def shown(text):
+    """Text as the owner reads it on the card: Markdown escaped, so it renders as written."""
+    return MARKDOWN.sub(r"\\\1", text)
+
+
 def entry(project):
     """A product's registry entry, by its short name ('shelfnote')."""
     if not isinstance(project, str) or not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,40}", project):
@@ -62,8 +87,8 @@ def free_name(store, project, now):
     day = datetime.fromtimestamp(now, ET).strftime("%Y%m%d")
     for number in range(1, 100):
         name = f"crew-{project}-{day}-{number}"
-        taken = (store.db.execute("SELECT 1 FROM definitions WHERE name=?", (name,)).fetchone() or
-                 store.db.execute("SELECT 1 FROM review_budgets WHERE name=?", (name,)).fetchone())
+        taken = any(store.db.execute(f"SELECT 1 FROM {table} WHERE {column}=?", (name,)).fetchone()
+                    for table, column in (("definitions", "name"), ("review_budgets", "name"), ("proposals", "id")))
         if not taken:
             return name
     raise Refused("no free campaign name today")
@@ -88,11 +113,14 @@ def draft(broker, args, now=None):
     goal = args["goal"]
     exact(goal, {"title", "statement"}, {"items", "measurement"})
     for field in ("title", "statement"):
-        if not isinstance(goal[field], str) or not goal[field].strip():
-            raise Refused(f"the goal needs a {field}")
+        plain(goal[field], f"the goal's {field}", LIMITS[field])
     items = goal.get("items") or []
-    if not isinstance(items, list) or not all(isinstance(i, str) and i.strip() for i in items):
-        raise Refused("the goal's items are a list of backlog items, in order")
+    if not isinstance(items, list) or len(items) > 20:
+        raise Refused("the goal's items are a list of at most 20 backlog items, in order")
+    for item in items:
+        plain(item, "each backlog item", LIMITS["item"])
+    if goal.get("measurement") is not None:
+        plain(goal["measurement"], "the goal's measurement", LIMITS["measurement"])
     size = args.get("size", "medium")
     if size not in PRESETS:
         raise Refused("size is small, medium or large")
@@ -138,17 +166,18 @@ def render_card(registered, approval, allowance, number, title, hours, left_out)
     cutoff = datetime.strptime(approval["definition"]["crew"]["automation"]["not_after"],
                                "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).timestamp()
     increments = objective["target_accepted_increments"]
-    lines = [f"**{registered.get('display_name', registered['project_id'])} campaign {number}: {title.rstrip('.')}**",
+    # The terms first, before any text the crew wrote, and that text escaped.
+    lines = [f"**{registered.get('display_name', registered['project_id'])} campaign {number}: {shown(title.rstrip('.'))}**",
              "",
-             objective["statement"] + ".",
-             "",
-             f"- **Increments:** up to {increments}.",
-             f"- **Accepted when:** {objective['measurement'].rstrip('.')}.",
+             f"- **Reviews:** at most {allowance['max_dispatches']} reviews, from a "
+             f"${allowance['cap_microusd'] / 1e6:.2f} allowance. Ripley rules each gate and Dallas checks each ruling.",
+             f"- **Scope:** {shown(', '.join(objective['allowed_scope']))}.",
              f"- **Time:** runs for up to {hours:g} hours once started. Approve it by {et(cutoff - hours * 3600)}.",
-             f"- **Reviews:** Ripley rules each gate and Dallas checks each ruling; at most "
-             f"{allowance['max_dispatches']} reviews, from a ${allowance['cap_microusd'] / 1e6:.2f} allowance.",
-             f"- **Scope:** {', '.join(objective['allowed_scope'])}."]
+             f"- **Increments:** up to {increments}.",
+             f"- **Accepted when:** {shown(objective['measurement'].rstrip('.'))}.",
+             "",
+             f"**Goal:** {shown(objective['statement'])}."]
     if left_out:
-        lines.append(f"- **Left for a later campaign:** {'; '.join(left_out)}.")
-    lines += ["", "Reply **approve** to launch, or tell me what to change."]
+        lines.append(f"- **Left for a later campaign:** {shown('; '.join(left_out))}.")
+    lines += ["", "Reply **approve** to this card to launch, or tell me what to change."]
     return "\n".join(lines)

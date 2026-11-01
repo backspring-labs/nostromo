@@ -97,11 +97,61 @@ class Publisher:
             return self.lookup(event["id"])
 
 
-def run(rpc=call, publish=None):
+def relay_approvals(rpc, thread_events, owner):
+    """Pass each owner message that reads "approve" in a live card's thread to the broker. The broker
+    verifies every one, signature included, so this only narrows the search; it decides nothing."""
+    from .proposals import unqualified_approval
+    results = []
+    try:
+        posted = rpc({"command": "proposals", "args": {"state": "posted"}})
+    except Exception as error:
+        return [{"unreadable": type(error).__name__}]
+    for proposal in posted:
+        try:
+            events = thread_events(proposal["channel"], proposal["thread"])
+        except Exception as error:
+            results.append({"proposal": proposal["id"], "unreadable": type(error).__name__})
+            continue
+        # Campaigns start from the owner's own request. A thread someone else started gets no relay.
+        # The listing may leave out the root, so only a root that is listed and not the owner's counts.
+        root = next((e for e in events if e.get("id") == proposal["thread"]), None)
+        if root is not None and root.get("pubkey") != owner:
+            results.append({"proposal": proposal["id"], "refused": "the thread was not started by the owner"})
+            continue
+        for event in sorted(events, key=lambda e: e.get("created_at", 0)):
+            if event.get("pubkey") != owner or not unqualified_approval(event.get("content")):
+                continue
+            try:
+                results.append(rpc({"command": "proposal-approve", "args": {"proposal": proposal["id"]},
+                                    "decision_event": event}))
+                break
+            except Exception as error:  # one refusal or failure never stops the run's launch steps
+                results.append({"proposal": proposal["id"], "refused": str(error) if isinstance(error, Refused) else type(error).__name__})
+    return results
+
+
+def post_card(rpc, publish):
+    """Post the next drafted proposal's card through the signed outbox, then let the broker verify it."""
+    job = rpc({"command": "proposal-card-claim", "args": {}})
+    if job is None:
+        return None
+    event = publish(job)
+    return rpc({"command": "proposal-card-posted", "args": {"proposal": job["id"]}, "decision_event": event})
+
+
+def run(rpc=call, publish=None, thread_events=None, owner=None):
+    controller = {}
+    if thread_events and owner:
+        controller["approvals"] = relay_approvals(rpc, thread_events, owner)
+    if publish:
+        try:
+            controller["card"] = post_card(rpc, publish)
+        except Exception as error:
+            controller["card"] = {"failed": type(error).__name__}
     states = rpc({"command": "launch-advance", "args": {}})
     job = rpc({"command": "launch-notice-claim", "args": {}})
     if job is None:
-        return {"launches": states, "notice": "idle"}
+        return {"launches": states, "notice": "idle", **controller}
     try:
         event = publish(job)
         return rpc({"command": "launch-notice-result", "args": {"launch": job["id"], "phase": job["phase"]},
@@ -116,6 +166,33 @@ def run(rpc=call, publish=None):
         raise Refused("launch notice failed; inspect launch-status; error=" + type(error).__name__) from None
 
 
+def thread_reader():
+    """Every signed event in a thread, as the relay serves it, signature included."""
+    import subprocess
+    env = {**os.environ, "BUZZ_RELAY_URL": "wss://nostromo.backspring.xyz", "BUZZ_PRIVATE_KEY": secret("buzz.key"),
+           "TOKIO_WORKER_THREADS": "2"}
+
+    def read(channel, thread):
+        result = subprocess.run(["/opt/nostromo/runtime/bin/buzz", "messages", "thread", "--channel", channel,
+                                 "--event", thread, "--limit", "1000"], capture_output=True, text=True, env=env, timeout=60)
+        if result.returncode:
+            raise Refused("thread unreadable")
+        found = []
+
+        def walk(value):
+            if isinstance(value, dict):
+                if {"id", "pubkey", "sig", "tags", "content", "kind", "created_at"} <= value.keys():
+                    found.append({k: value[k] for k in ("id", "pubkey", "created_at", "kind", "tags", "content", "sig")})
+                for item in value.values():
+                    walk(item)
+            elif isinstance(value, list):
+                for item in value:
+                    walk(item)
+        walk(json.loads(result.stdout))
+        return found
+    return read
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--state", default="/var/lib/nostromo-campaign-launch")
@@ -125,9 +202,9 @@ def main():
     os.umask(0o077)
     try:
         config = json.loads(Path("/etc/nostromo/campaign-broker.json").read_text())
-        publisher = Publisher(args.state, secret("buzz.key"), json.loads(config["watcher_auth_tag"]),
-                              owner=config["public_keys"]["owner"])
-        print(canonical(run(publish=publisher)), flush=True)
+        owner = config["public_keys"]["owner"]
+        publisher = Publisher(args.state, secret("buzz.key"), json.loads(config["watcher_auth_tag"]), owner=owner)
+        print(canonical(run(publish=publisher, thread_events=thread_reader(), owner=owner)), flush=True)
     except Refused as error:
         print(canonical({"error": str(error)}), flush=True)
         raise SystemExit(1) from None

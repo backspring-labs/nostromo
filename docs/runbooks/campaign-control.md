@@ -267,6 +267,18 @@ their prior behavior. Passing unit tests is not live commissioning: exercise one
 feature increment, its independent review, actual implementation acceptance and closing analysis
 before enabling an unattended definition.
 
+**Plain-language campaigns (the normal path).** The owner asks Mother in words. Ripley drafts a goal
+from the product's registry entry (`campaigns/projects/<product>.yaml`) and checks it with
+`campaignctl draft`. Dallas challenges it, and Ripley runs `campaignctl propose`. Mother's
+controller (the launch timer) posts the card and watches the thread. The owner replies **approve**
+to the card itself: an owner-signed bare "approve" that replies to the card's own message, after it
+was posted and by its approve-by time. A reply tagged only to the thread approves nothing, because
+Mother holds her own Buzz key and the broker can't otherwise tell which card the owner read. That
+approval creates the allowance, approves the definition and queues the launch, in one transaction.
+A revised card supersedes the earlier one, which can then no longer be approved. See `docs/specs/plain-language-campaigns.md`.
+
+The manual path below remains for attended or unusual definitions.
+
 For remote owner approval, `campaignctl approve-definition --args approval.json --explain`
 prints the `campaign-definition: {...}` line. The owner publishes that exact line in an
 allowed campaign channel; Mother imports it with `--decision EVENT_ID`.
