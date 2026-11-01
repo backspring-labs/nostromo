@@ -35,8 +35,11 @@ def test_a_pause_for_the_owner_is_marked_as_the_owners_move():
 
 
 def test_a_closed_campaign_waits_for_ripleys_analysis_then_for_nobody():
-    text, _ = notice(packet("completed", "aborted"), "ShelfNote campaign 1")
+    analysing = packet("completed", "aborted", jobs=[{"role": "ripley", "kind": "analysis", "state": "queued"}])
+    text, _ = notice(analysing, "ShelfNote campaign 1")
     assert "closed. It was aborted." in text and text.endswith("Next: Ripley, for the closing analysis.")
+    text, _ = notice(packet("completed", "aborted"), "ShelfNote campaign 1")
+    assert text.endswith("Next: nobody; it has closed, with no closing analysis to come.")
     text, _ = notice(packet("completed", "aborted", analysis={"analysis": "Done."}), "ShelfNote campaign 1")
     assert text.endswith("Next: nobody; it has closed.")
 
@@ -90,3 +93,24 @@ def test_the_closing_record_says_why_a_campaign_was_stopped():
 def test_a_registered_product_keeps_its_own_spelling():
     from runtime.campaigns.watch import product
     assert product("prj-shelfnote") == "ShelfNote" and product("group_run") == "Group Run"
+
+
+def test_a_new_fingerprint_format_is_adopted_silently_not_announced():
+    db = sqlite3.connect(":memory:")
+    db.execute("CREATE TABLE watched(id TEXT PRIMARY KEY, fingerprint TEXT, failures INTEGER, report TEXT)")
+    db.execute("INSERT INTO watched VALUES('cmp_a','old-format-fingerprint',0,'30023:x:closing-cmp_a')")
+    db.commit()
+    posts, notes = [], []
+    rpc = lambda r: [{"id": "cmp_a", "channel": "c", "thread": "t"}] if r["command"] == "tracked" else packet("completed", "aborted")
+    Watcher(db, rpc, lambda item, text, yours: posts.append(text), lambda *a: notes.append(a)).poll()
+    assert posts == [] and notes == []
+    Watcher(db, rpc, lambda item, text, yours: posts.append(text), lambda *a: notes.append(a)).poll()
+    assert posts == [] and notes == [], "nothing changed since adoption, so still nothing to say"
+
+
+def test_a_fresh_watcher_still_announces():
+    db = sqlite3.connect(":memory:")
+    posts = []
+    rpc = lambda r: [{"id": "cmp_a", "channel": "c", "thread": "t"}] if r["command"] == "tracked" else packet("at_proposal")
+    Watcher(db, rpc, lambda item, text, yours: posts.append(text), lambda *a: None).poll()
+    assert len(posts) == 1

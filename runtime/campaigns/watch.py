@@ -44,6 +44,10 @@ OUTCOMES = {"aborted": "it was aborted", "exhausted": "it reached one of its lim
             "succeeded": "it reached its target", "success": "it reached its target", "failure": "it failed"}
 YOURS = {"escalated", "paused", "launch_blocked"}
 FINISHED_JOBS = {"done", "submitted", "cancelled", "failed", "uncertain"}
+# Bump whenever fingerprint() changes. On the first poll under a new format the watcher adopts the new
+# fingerprints silently instead of announcing every campaign: on 2026-11-01, changing the format
+# without this re-posted eleven closed campaigns into their threads.
+FINGERPRINT_FORMAT = 2
 
 
 def product(project_id):
@@ -95,7 +99,11 @@ def next_actor(packet):
     campaign, automation = packet["campaign"], packet.get("automation") or {}
     control = automation.get("control") or {}
     if campaign["state"] == "completed":
-        return "Ripley, for the closing analysis" if automation and not packet.get("analysis") else "nobody; it has closed"
+        if packet.get("analysis"):
+            return "nobody; it has closed"
+        pending = [job for job in automation.get("jobs") or []
+                   if job.get("kind") == "analysis" and job.get("state") not in FINISHED_JOBS]
+        return "Ripley, for the closing analysis" if pending else "nobody; it has closed, with no closing analysis to come"
     if control.get("state") == "parked" or campaign["state"] in YOURS:
         return "you"
     if campaign["state"] == "awaiting_ruling":
@@ -173,6 +181,11 @@ class Watcher:
     def __init__(self, db, rpc, publish, publish_report):
         self.db, self.rpc, self.publish, self.publish_report = db, rpc, publish, publish_report
         db.execute("CREATE TABLE IF NOT EXISTS watched(id TEXT PRIMARY KEY, fingerprint TEXT, failures INTEGER, report TEXT)")
+        db.execute("CREATE TABLE IF NOT EXISTS watcher_meta(key TEXT PRIMARY KEY, value TEXT)")
+        row = db.execute("SELECT value FROM watcher_meta WHERE key='fingerprint_format'").fetchone()
+        has_history = db.execute("SELECT count(*) FROM watched").fetchone()[0] > 0
+        # Old history under another format: adopt silently. A fresh watcher announces as before.
+        self.adopting = has_history and (row is None or row[0] != str(FINGERPRINT_FORMAT))
         db.commit()
 
     def poll(self):
@@ -196,6 +209,10 @@ class Watcher:
                 if campaign["state"] == "awaiting_ruling":
                     self.rpc({"command": "open-window", "args": {"campaign": cid}})
                 current = fingerprint(packet)
+                if self.adopting:
+                    self.db.execute("INSERT OR REPLACE INTO watched VALUES(?,?,?,?)", (cid, current, 0, posted))
+                    self.db.commit()
+                    continue
                 if campaign["state"] == "completed" and (not posted or current != previous):
                     package = self.rpc({"command": "package", "args": {"campaign": cid}})
                     # Stable NIP-23 name makes a retry update the same post after a crash.
@@ -215,6 +232,10 @@ class Watcher:
                                        "assumed about whether it is still working. Next: you.", True)
                 self.db.execute("INSERT OR REPLACE INTO watched VALUES(?,?,?,?)", (cid, previous, failures, posted))
             self.db.commit()
+        if self.adopting:
+            self.db.execute("INSERT OR REPLACE INTO watcher_meta VALUES('fingerprint_format',?)", (str(FINGERPRINT_FORMAT),))
+            self.db.commit()
+            self.adopting = False
 
 
 def main():
