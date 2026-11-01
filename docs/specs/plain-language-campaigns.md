@@ -68,13 +68,23 @@ the ShelfNote campaign").
 ## Approval by reply
 
 Today an approval is a signed owner message containing an exact `campaign-definition:` line.
-Proposed instead: **a signed owner reply to the card, whose first line is `approve`.**
+Proposed instead: **a signed owner reply to the card that says only `approve`.**
 
+- **Only an unqualified approval approves.** After trimming case, whitespace and closing
+  punctuation, the reply must be exactly `approve`. Anything more, such as "approve, but skip export"
+  or "approve if it's cheaper", is not an approval: Mother asks what is meant, or the crew drafts a
+  revised card. A qualified reply never launches the unchanged proposal.
 - **What the broker verifies:**
   - the reply is signed by the owner's pinned key;
   - it is in an admitted campaign channel;
   - its reply tag names the card's event;
-  - the card is a Mother-signed event whose record carries exactly one definition and one allowance.
+  - the card is a Mother-signed event whose record carries exactly one definition and one allowance;
+  - **the card's readable text matches its record.** The broker renders the card from the exact
+    definition and allowance and compares it with the signed text. Authenticating the card is not
+    enough: what the owner read must be what the owner approves;
+  - **the card is the proposal's live version.** The broker keeps one active card per proposal. A
+    revised card supersedes the earlier one, and a cancelled proposal has none. An approval of a
+    superseded or cancelled card is refused, and Mother says which card is current.
 - **What binds it:** the reply binds the exact definition and allowance through the card and its
   record, with nothing copied. The record is either a tagged companion event the card points to, or a
   digest of the record in the card's signed content. Desktop can no longer alter the approval.
@@ -105,7 +115,18 @@ Within the broker, the kernel's caller identity (`SO_PEERCRED`) already authenti
 - **The broker renders the same English from the result** and checks that the signed event says
   exactly that, and is signed by the role in the campaign's thread. Different words fail.
 - **The binding** (campaign, gate, run, and for Dallas the ruling's digest) lives in the broker's
-  record, matched by event ID. `campaignctl` shows it.
+  record, matched by event ID. `campaignctl` shows it. The association is immutable:
+  - **One event, one job.** An event ID can be accepted for exactly one job, recorded when first
+    accepted, and never reused. A second attempt with the same event, or the same event for a
+    different job, is refused.
+  - **After the claim.** The event must be created after its job was claimed, with the existing clock
+    allowance, and within the job's deadline. An older message can't serve, even with identical
+    words.
+  - **The ruling's digest is fixed on storage.** Ripley's result fixes the digest Dallas reviews when
+    the broker stores it. Dallas's job, and the event accepted for it, are bound to that digest, so a
+    review can't be attached to another ruling.
+  - **Identical English is not identity.** Matching text is required, never sufficient: the event,
+    its signer, its thread, its time and its job binding must all hold.
 
 So the thread is all English, every message is signed, and there is no hidden tag, no second event
 kind, and no relay change. A companion event of a non-chat kind (`buzz messages send --kind`) stays
@@ -173,12 +194,24 @@ Beyond the English-only thread, that means:
 | **Decision cards** | Escalations and limit pauses post a card saying what happened, the options, and "reply continue or stop". A signed reply decides. | watcher and broker |
 | **Crew prompts** | Mother: recognize campaign requests and status questions; route drafting to Ripley and the challenge to Dallas. Ripley: the goal's structure. Dallas: the draft challenge. | personas and base prompts |
 
-**Size presets** are stated on every card and changeable in words:
-- small: 3 increments, 3 hours;
-- medium: 6 increments, 6 hours;
-- large: 10 increments, 8 hours.
+**Size presets** are stated on every card and changeable in words. Each one fits inside the $25 /
+60-call allowance ceiling.
+- **Reviews** = 5 per increment + 1 for the closing analysis. Five is two reviewers at each of two
+  gates, plus one revision.
+- **Allowance** = reviews × the largest possible reservation ($0.5632 at current prices), rounded
+  up.
 
-Each preset's review count and allowance follow the runbook's per-increment estimate.
+| Preset | Increments | Hours | Reviews | Allowance |
+|---|---|---|---|---|
+| small | 3 | 3 | 16 | $9.02 |
+| medium | 6 | 6 | 31 | $17.46 |
+| large | 8 | 8 | 41 | $23.10 |
+
+- **Ten increments don't fit:** 51 reviews, $28.72. A request for more than the largest preset gets a
+  card that says so, and offers eight increments now and a follow-up campaign, or a ceiling change
+  that only the owner can make.
+- **If prices go stale,** the doubled reservation (from #20) shrinks what fits. The draft step
+  computes the card from current reservations, never from this table.
 
 ## Cost and time per proposal
 
