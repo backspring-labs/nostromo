@@ -64,9 +64,23 @@ class Automation:
             raise Refused("review budget is not owner-approved")
         return json.loads(row[0])
 
-    def validate_spec(self, spec, crew):
+    def validate_allowance(self, args):
+        """An allowance's own bounds, as approve-budget and the draft step both apply them."""
+        exact(args, {"name", "cap_microusd", "max_dispatches", "expires_at"})
+        identifier(args["name"])
+        # A guard against a mistyped approval, not the spending boundary: that is each provider
+        # console's hard limit. Raised from the first pilots' $10 / 20 calls on 2026-10-30.
+        if type(args["cap_microusd"]) is not int or not 0 < args["cap_microusd"] <= 25000000:
+            raise Refused("a review allowance must be at most twenty-five dollars")
+        if type(args["max_dispatches"]) is not int or not 1 <= args["max_dispatches"] <= 60:
+            raise Refused("a review allowance needs at most sixty calls")
+        if not self.now < timestamp(args["expires_at"]):
+            raise Refused("review allowance must expire in the future")
+
+    def validate_spec(self, spec, crew, budget=None):
+        """budget: a proposed allowance not yet approved (the draft step); otherwise the stored one."""
         exact(spec, {"budget", "not_after"})
-        budget = self.budget(spec["budget"])
+        budget = budget if budget is not None else self.budget(spec["budget"])
         if not self.now < timestamp(spec["not_after"]) <= timestamp(budget["expires_at"]):
             raise Refused("automation needs a future cutoff within the approved budget")
         if type(crew.get("paid_dispatches")) is not int or not 1 <= crew["paid_dispatches"] <= budget["max_dispatches"]:
@@ -577,16 +591,7 @@ class Automation:
         if command == "approve-budget":
             if caller != "owner":
                 raise Refused("review allowances belong to the owner")
-            exact(args, {"name", "cap_microusd", "max_dispatches", "expires_at"})
-            identifier(args["name"])
-            # A guard against a mistyped approval, not the spending boundary: that is each provider
-            # console's hard limit. Raised from the first pilots' $10 / 20 calls on 2026-10-30.
-            if type(args["cap_microusd"]) is not int or not 0 < args["cap_microusd"] <= 25000000:
-                raise Refused("a review allowance must be at most twenty-five dollars")
-            if type(args["max_dispatches"]) is not int or not 1 <= args["max_dispatches"] <= 60:
-                raise Refused("a review allowance needs at most sixty calls")
-            if not self.now < timestamp(args["expires_at"]):
-                raise Refused("review allowance must expire in the future")
+            self.validate_allowance(args)
             old = self.db.execute("SELECT body FROM review_budgets WHERE name=?", (args["name"],)).fetchone()
             if old and old[0] != canonical(args):
                 raise Refused("review allowances are immutable")
