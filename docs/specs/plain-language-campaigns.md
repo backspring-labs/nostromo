@@ -40,14 +40,15 @@ the ShelfNote campaign").
 1. **Mother recognizes a campaign request** and hands it to Ripley in a new thread in
    `#squadops-campaigns`. That thread becomes the campaign's thread.
 2. **Ripley drafts the goal** from the product's own documents: what it is for, which backlog items,
-   in what order, and how success is measured. The result is readable text plus one structured
-   `campaign-goal:` line.
+   in what order, and how success is measured. The thread shows it as readable text. The
+   structured goal travels in the message's record (see **Buzz is for people**).
 3. **The draft step** (`campaignctl draft`, deterministic, no model) builds the full definition.
    - **Its inputs:** the goal, the product's entry in the project registry, and the request's size.
      It fills in the IDs, profiles, scope, policy limits, a generated name, the channel and the
      thread, the review count and the allowance.
    - **Its checks:** the broker validates the definition exactly as an approval would.
-   - **Its output:** a readable card, with the definition as a record underneath.
+   - **Its output:** a readable card. The definition and allowance travel in the card's record, not
+     in its text.
 4. **Dallas challenges the draft** before the owner sees it. Is every goal testable? Is the scope
    right, and does it fit the product? Would the squad know what to build first? Dallas may attach
    suggested changes, as the persona allows.
@@ -73,10 +74,10 @@ Proposed instead: **a signed owner reply to the card, whose first line is `appro
   - the reply is signed by the owner's pinned key;
   - it is in an admitted campaign channel;
   - its reply tag names the card's event;
-  - the card is a Mother-signed event carrying exactly one `campaign-definition:` line and one
-    `campaign-allowance:` line.
-- **What binds it:** the card's event ID is the hash of its full content, so the reply binds the exact
-  definition and allowance with nothing copied. Desktop can no longer alter the approval.
+  - the card is a Mother-signed event whose record carries exactly one definition and one allowance.
+- **What binds it:** the reply binds the exact definition and allowance through the card and its
+  record, with nothing copied. The record is either a tagged companion event the card points to, or a
+  digest of the record in the card's signed content. Desktop can no longer alter the approval.
 - **Freshness** goes from 30 minutes to 24 hours. A reply can only approve the card it points to, so a
   stale or replayed reply can approve nothing else.
 - **The allowance:** the same reply creates the card's allowance. That retires the owner's CLI
@@ -124,7 +125,7 @@ appears only when a person needs one, which this design aims to make never.
 | **Approval by reply** | Card format, reply verification, allowance creation, approve-and-launch | broker and launch worker |
 | **Plain reads** | A campaign overview by product name: state, increments accepted, latest ruling, next step, reviews used | broker read, used by Mother |
 | **Decision cards** | Escalations and limit pauses post a card saying what happened, the options, and "reply continue or stop". A signed reply decides. | watcher and broker |
-| **Crew prompts** | Mother: recognize campaign requests and status questions; route drafting to Ripley and the challenge to Dallas. Ripley: the `campaign-goal:` format. Dallas: the draft challenge. | personas and base prompts |
+| **Crew prompts** | Mother: recognize campaign requests and status questions; route drafting to Ripley and the challenge to Dallas. Ripley: the goal's structure. Dallas: the draft challenge. | personas and base prompts |
 
 **Size presets** are stated on every card and changeable in words:
 - small: 3 increments, 3 hours;
