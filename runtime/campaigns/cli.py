@@ -11,7 +11,7 @@ import urllib.request
 import uuid
 from pathlib import Path
 
-from .core import Refused, canonical
+from .core import Refused, canonical, record_line
 from .decisions import helpers
 
 
@@ -69,16 +69,16 @@ def main():
         if args.explain:
             from .core import digest
             if args.command == "approve-definition":
-                print("campaign-definition: " + canonical(body))
+                print(record_line("campaign-definition", body))
             elif args.command == "analysis":
-                print("campaign-analysis: " + canonical(body))
+                print(record_line("campaign-analysis", body))
             else:
                 if not args.request_id:
                     raise Refused("gate decisions need a stable --request-id")
-                print("campaign-decision: " + canonical(request))
+                print(record_line("campaign-decision", request))
                 review = {"campaign": body["campaign"], "cycle": body["cycle"], "run": body["run"],
                           "decision_sha256": digest({"command": args.command, "args": body}), "blocking": False}
-                print("campaign-review: " + canonical(review))
+                print(record_line("campaign-review", review))
             return 0
         if args.decision:
             request["decision_event"] = read_event(args.decision)

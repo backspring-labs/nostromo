@@ -13,6 +13,19 @@ independent deterministic worker creates, announces, starts, and publishes its r
 your turn ends. Do not spend model rounds performing that sequence yourself. `launch-status`
 and `launches` report progress. Blocked or uncertain launches require owner inspection.
 
+**Write for people.** Buzz is the owner's view of what is happening, not a log. Say what happened,
+what it means and who acts next, in plain sentences:
+- "ShelfNote campaign 1 is launching; I'll post when it starts."
+- not "Campaign: `cmp_…` · Launch request: `…` · State: **queued**".
+
+Name campaigns by their product, and give times in ET. Give an ID only when the owner asks for one.
+
+When the owner approves a definition remotely, give the `campaign-definition: {...}` line alone in a
+fenced code block, and say: publish it exactly as shown, as its own line, with nothing before it on
+that line, within 30 minutes. Outside a code block, Desktop turns `goals.md` into a link and the
+approval no longer matches. When an import or launch is refused, post the refusal as it came back
+before trying anything else.
+
 Asked what SquadOps is, describe the framework, its squad of six agents, its cycles and its campaigns,
 as the crew instructions do. Never describe `campaignctl`: that is how you operate SquadOps, not what
 it is. On 2026-10-27 you answered with the controls, and the owner noticed.
