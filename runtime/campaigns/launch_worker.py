@@ -40,8 +40,9 @@ def submit_event(event, key, auth_tag):
 
 
 class Publisher:
-    def __init__(self, state, key, auth_tag, submit=submit_event, lookup=read_event):
+    def __init__(self, state, key, auth_tag, submit=submit_event, lookup=read_event, owner=None):
         self.state, self.key, self.auth_tag = Path(state), key, auth_tag
+        self.owner = owner  # mentioned only when a launch fails: then it is the owner's move
         self.submit, self.lookup = submit, lookup
         self.state.mkdir(parents=True, exist_ok=True, mode=0o700)
         if self.state.is_symlink() or self.state.stat().st_uid != os.getuid() or self.state.stat().st_mode & 0o077:
@@ -61,6 +62,8 @@ class Publisher:
                 raise Refused("approved campaign destination is not a top-level channel post")
             target = self.state / (digest({"launch": job["id"], "phase": job["phase"]}) + ".json")
             tags = [["h", job["channel"]], ["e", job["thread"], "", "reply"], self.auth_tag]
+            if job.get("mention_owner") and self.owner:
+                tags.append(["p", self.owner])
             if target.exists() or target.is_symlink():
                 if target.is_symlink() or not target.is_file() or target.stat().st_uid != os.getuid() or target.stat().st_mode & 0o077:
                     raise Refused("saved launch event must be a private role-owned file")
@@ -122,7 +125,8 @@ def main():
     os.umask(0o077)
     try:
         config = json.loads(Path("/etc/nostromo/campaign-broker.json").read_text())
-        publisher = Publisher(args.state, secret("buzz.key"), json.loads(config["watcher_auth_tag"]))
+        publisher = Publisher(args.state, secret("buzz.key"), json.loads(config["watcher_auth_tag"]),
+                              owner=config["public_keys"]["owner"])
         print(canonical(run(publish=publisher)), flush=True)
     except Refused as error:
         print(canonical({"error": str(error)}), flush=True)

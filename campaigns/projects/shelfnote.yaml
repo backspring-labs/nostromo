@@ -1,0 +1,5 @@
+# ShelfNote, a product campaigns improve. The plain-language campaigns design
+# (docs/specs/plain-language-campaigns.md) fills in the rest of this entry. For now it only gives the
+# product's name as people write it.
+display_name: ShelfNote
+project_id: prj-shelfnote

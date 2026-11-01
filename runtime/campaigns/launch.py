@@ -202,15 +202,19 @@ class Launches:
         return [self.status(row["id"]) for row in rows]
 
     def notice(self, row):
+        # Written for people: the thread already says which campaign, so no IDs. The one record line
+        # below is what the broker verifies; it moves out of the text with render-and-verify.
         if row["state"] in {"created", "announcing"}:
             phase = "announcement"
-            text = f"{row['campaign']}: created; starting the owner-approved campaign."
+            text = "The campaign you approved is created and starting now. Next: SquadOps accepting the start."
         elif row["state"] == "started" and not row["completion_event"]:
             phase = "result"
-            text = f"{row['campaign']}: start accepted. The campaign watcher will report runtime progress here."
+            text = "The campaign has started. I'll post here whenever something changes. Next: the squad."
         elif row["state"] == "blocked" and not row["completion_event"]:
             phase = "failure"
-            text = f"{row['campaign']}: launch incomplete; owner inspection required. " + row["diagnostic"]
+            reason = json.loads(row["diagnostic"]).get("reason") or "no reason was recorded"
+            text = (f"@jladd The campaign didn't start: {str(reason).rstrip('.')}. Nothing was retried. "
+                    "Next: you. Ask me what your options are.")
         else:
             return None
         body = json.loads(row["body"])
@@ -221,9 +225,8 @@ class Launches:
         if phase == "failure":
             payload["diagnostic"] = json.loads(row["diagnostic"])
         return {"id": row["id"], "phase": phase, "channel": row["channel"], "thread": row["thread"],
-                "payload": payload, "content": text + "\nDefinition: " + row["definition"] +
-                "\nCreate request: " + row["create_request"] + "\nStart request: " + row["start_request"] +
-                "\n" + record_line("campaign-launch", payload)}
+                "mention_owner": phase == "failure",
+                "payload": payload, "content": text + "\n" + record_line("campaign-launch", payload)}
 
     def claim_notice(self):
         for row in self.db.execute("SELECT * FROM launch_workflows ORDER BY created").fetchall():

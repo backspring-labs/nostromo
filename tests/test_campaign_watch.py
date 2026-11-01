@@ -1,0 +1,92 @@
+"""The campaign controller's posts: plain English, whose move it is, the owner mentioned only on theirs."""
+import sqlite3
+
+from runtime.campaigns.watch import Watcher, fingerprint, labels, notice, report
+
+BASE = {"campaign_id": "cmp_a", "project_id": "prj-shelfnote", "created_at": "2026-11-01T15:45:32Z",
+        "updated_at": "2026-11-01T16:52:51Z", "objective": {"target_accepted_increments": 3,
+        "statement": "work the goals.md backlog"}}
+
+
+def packet(state, outcome=None, control=None, jobs=(), ledger=(), analysis=None):
+    return {"campaign": {**BASE, "state": state, "outcome": outcome}, "ledger": list(ledger), "escalations": [],
+            "crew_policy": {"paid_dispatches": 16}, "analysis": analysis,
+            "automation": {"control": control or {"state": "active"}, "jobs": list(jobs)}}
+
+
+def test_a_working_campaign_says_what_the_squad_is_doing_and_whose_move_it_is():
+    text, yours = notice(packet("at_proposal"), "ShelfNote campaign 1")
+    assert text == ("ShelfNote campaign 1: the squad is proposing the next increment. "
+                    "0 of 3 increments accepted; 0 of 16 reviews used. Next: the squad.")
+    assert yours is False and "cmp_" not in text and "{" not in text
+
+
+def test_a_ruling_in_progress_names_the_reviewer_whose_turn_it_is():
+    jobs = [{"role": "ripley", "state": "done", "reserved": 1}, {"role": "dallas", "state": "queued", "reserved": 0}]
+    text, _ = notice(packet("awaiting_ruling", jobs=jobs), "ShelfNote campaign 1")
+    assert text.endswith("1 of 16 reviews used. Next: Dallas.")
+
+
+def test_a_pause_for_the_owner_is_marked_as_the_owners_move():
+    text, yours = notice(packet("paused", control={"state": "parked", "reason": "Ripley requires an owner decision"}),
+                         "ShelfNote campaign 1")
+    assert text.startswith("ShelfNote campaign 1: paused for you. Ripley requires an owner decision.")
+    assert text.endswith("Next: you.") and yours is True
+
+
+def test_a_closed_campaign_waits_for_ripleys_analysis_then_for_nobody():
+    text, _ = notice(packet("completed", "aborted"), "ShelfNote campaign 1")
+    assert "closed. It was aborted." in text and text.endswith("Next: Ripley, for the closing analysis.")
+    text, _ = notice(packet("completed", "aborted", analysis={"analysis": "Done."}), "ShelfNote campaign 1")
+    assert text.endswith("Next: nobody; it has closed.")
+
+
+def test_review_jobs_changing_state_is_not_news():
+    queued = packet("awaiting_ruling", jobs=[{"role": "ripley", "state": "queued"}])
+    claimed = packet("awaiting_ruling", jobs=[{"role": "ripley", "state": "claimed"}])
+    assert fingerprint(queued) == fingerprint(claimed)
+    assert fingerprint(queued) != fingerprint(packet("paused", control={"state": "parked", "reason": "x"}))
+
+
+def test_campaigns_are_numbered_per_product_in_start_order():
+    a = packet("completed"); b = packet("at_proposal")
+    b["campaign"] = {**b["campaign"], "campaign_id": "cmp_b", "created_at": "2026-11-02T10:00:00Z"}
+    other = packet("at_proposal"); other["campaign"] = {**other["campaign"], "project_id": "group_run"}
+    names = labels({"cmp_a": a, "cmp_b": b, "cmp_c": other})
+    assert names == {"cmp_a": "ShelfNote campaign 1", "cmp_b": "ShelfNote campaign 2", "cmp_c": "Group Run campaign 1"}
+
+
+def test_the_closing_record_reads_as_a_summary_not_a_dump():
+    ledger = [{"ruling": {"decision": "returned_for_revision", "reason": "Revise the acceptance source first. More."}}]
+    text = report(packet("completed", "aborted", ledger=ledger), {"identity": "pkg"}, "ShelfNote campaign 1")
+    assert text.startswith("# ShelfNote campaign 1: closed")
+    assert "**Ran:** 10:45 am ET, Nov 1 to 11:52 am ET, Nov 1." in text
+    assert "1. Returned for revision. Revise the acceptance source first." in text
+    assert "```json" not in text and "{" not in text
+
+
+def test_the_owner_is_mentioned_only_on_their_move():
+    db = sqlite3.connect(":memory:")
+    posts = []
+    states = iter([packet("at_proposal"), packet("paused", control={"state": "parked", "reason": "Ripley requires an owner decision"})])
+    current = {}
+    def rpc(request):
+        if request["command"] == "tracked":
+            current["p"] = next(states)
+            return [{"id": "cmp_a", "channel": "c", "thread": "t"}]
+        return current["p"]
+    watcher = Watcher(db, rpc, lambda item, text, yours: posts.append((text, yours)), lambda *_: None)
+    watcher.poll(); watcher.poll()
+    assert [yours for _, yours in posts] == [False, True]
+    assert not posts[0][0].startswith("@") and posts[1][0].startswith("@jladd ")
+
+
+def test_the_closing_record_says_why_a_campaign_was_stopped():
+    p = packet("completed", "aborted")
+    p["log"] = [{"operation": "abort", "reason": "Owner decision: the scope excluded the criterion files."}]
+    assert "**Why it was stopped:** Owner decision: the scope excluded the criterion files." in report(p, {}, "ShelfNote campaign 1")
+
+
+def test_a_registered_product_keeps_its_own_spelling():
+    from runtime.campaigns.watch import product
+    assert product("prj-shelfnote") == "ShelfNote" and product("group_run") == "Group Run"
