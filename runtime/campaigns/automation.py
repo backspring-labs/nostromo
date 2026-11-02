@@ -48,6 +48,54 @@ def evidence_key(meta):
     return kind
 
 
+LOG_FULL_RECENT = 4
+LOG_REASON_CHARS = 200
+
+
+def bounded_log(log, gate):
+    """The control log, complete but bounded. Every entry stays, so every entry ID stays citable. The
+    gate's own cycle and the latest few entries are kept whole; older entries keep their identity,
+    time, operation and states, with the reason cut to an excerpt. On 2026-11-01 the full log (25
+    entries, 23 KB, every earlier ruling's notes repeated) pushed the third gate's request past the
+    single-call limit and parked campaign 4."""
+    cycle = (gate or {}).get("cycle")
+    entries = [e for e in log if isinstance(e, dict)]
+    recent = {id(e) for e in entries[-LOG_FULL_RECENT:]}
+
+    def whole(entry):
+        return id(entry) in recent or (cycle and cycle in canonical(entry))
+    out = []
+    for entry in entries:
+        if whole(entry):
+            out.append(entry)
+            continue
+        reason = str(entry.get("reason") or "")
+        out.append({**{k: entry.get(k) for k in ("entry_id", "committed_at", "operation", "prior_state", "next_state",
+                                                   "outcome")},
+                    "reason": reason if len(reason) <= LOG_REASON_CHARS else reason[:LOG_REASON_CHARS - 3] + "...",
+                    "abridged": True})
+    return out
+
+
+def bounded_ledger(ledger, gate):
+    """The proposal ledger, every row kept. The gate's own cycle stays whole (its unruled row is the
+    binding the ruling needs); earlier rows keep their binding, decision and outcome, with the
+    ruling's reason cut to an excerpt. Each earlier ruling repeated its full notes, about 1.5 KB per
+    increment."""
+    cycle = (gate or {}).get("cycle")
+    out = []
+    for row in ledger:
+        ruling = row.get("ruling") if isinstance(row, dict) else None
+        if not isinstance(ruling, dict) or row.get("cycle_id") == cycle:
+            out.append(row)
+            continue
+        reason = str(ruling.get("reason") or "")
+        out.append({**row, "ruling": {**{k: ruling.get(k) for k in ("decision", "actor_role", "at")},
+                                      "reason": reason if len(reason) <= LOG_REASON_CHARS
+                                      else reason[:LOG_REASON_CHARS - 3] + "...", "abridged": True}})
+    return out
+
+
 # The park reason a decision card answers; only this hold is lifted by the owner's approve.
 CARD_HOLD = "Ripley needs your decision; answer her decision card in this thread"
 
@@ -198,7 +246,8 @@ class Automation:
         p = self.b.read("packet", {"campaign": cid})
         # The control log and ledger are authoritative. Artifact excerpts are never passed
         # off as full records: selected authoritative documents are included in full.
-        packet = {k: p[k] for k in ("campaign", "ledger", "log", "escalations")}
+        packet = {k: p[k] for k in ("campaign", "escalations")}
+        packet["ledger"], packet["log"] = bounded_ledger(p["ledger"], gate), bounded_log(p["log"], gate)
         approved, _ = self.b.store.definition(self.b.store.campaign(cid)["definition"])
         packet["approved_policy"] = approved["definition"]["policy"]
         packet["budget"] = self.status(cid)

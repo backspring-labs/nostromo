@@ -1073,3 +1073,25 @@ def test_a_refused_launch_waits_instead_of_parking(world):
     assert control["state"] == "active"
     assert not any(post[1].endswith("/pause") for post in api.posts)
     assert store.db.execute("SELECT state FROM review_jobs").fetchone()[0] == "queued"
+
+
+def test_the_gate_packet_keeps_every_log_entry_citable_but_bounds_old_ones():
+    # 2026-11-01: campaign 4's full log (25 entries, 23 KB) pushed the Tags gate past the single-call limit.
+    from runtime.campaigns.automation import bounded_ledger, bounded_log
+    from runtime.campaigns.core import canonical
+    gate = {"gate": "progress_increment_ruling", "cycle": "cyc_now", "run": "run_now"}
+    log = [{"entry_id": f"ctl_{i:03d}", "committed_at": "t", "operation": "rule", "prior_state": "a", "next_state": "b",
+            "outcome": "applied", "actor": "6e712313-dd17", "idempotency_key": "k" * 40, "binding": {"cycle_id": "cyc_old"},
+            "reason": "R" * 900} for i in range(40)]
+    log[10]["binding"] = {"cycle_id": "cyc_now"}
+    bounded = bounded_log(log, gate)
+    assert [e["entry_id"] for e in bounded] == [e["entry_id"] for e in log], "every entry stays citable"
+    assert bounded[10] == log[10] and bounded[-1] == log[-1], "the gate's cycle and the latest entries stay whole"
+    assert bounded[0]["abridged"] and len(bounded[0]["reason"]) == 200
+    assert len(canonical(bounded)) < len(canonical(log)) / 2
+    ledger = [{"cycle_id": "cyc_old", "run_id": "r", "proposal_id": "p", "version": "1",
+               "ruling": {"decision": "approved", "actor_role": "campaign-supervisor", "at": "t", "reason": "N" * 1400}},
+              {"cycle_id": "cyc_now", "run_id": "run_now", "proposal_id": "q", "version": "1", "ruling": None}]
+    rows = bounded_ledger(ledger, gate)
+    assert rows[0]["ruling"]["decision"] == "approved" and len(rows[0]["ruling"]["reason"]) == 200
+    assert rows[1] == ledger[1], "the gate's unruled row, the ruling's binding, is untouched"
