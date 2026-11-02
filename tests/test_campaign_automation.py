@@ -1040,6 +1040,23 @@ def test_bound_proofs_count_only_while_the_campaigns_reviews_are_active(world):
     assert api.posts == []
 
 
+def test_the_increment_gate_returns_only_out_of_scope_untestable_or_contradicting_proposals():
+    # 2026-11-01: Ripley spent both revisions on a seam table and escalated cmp_7c4c28bb4118's v3.
+    from runtime.campaigns.review import body
+    instructions = body("ripley", "decision", {"gate": {"gate": "progress_increment_ruling"}}, "persona")["instructions"]
+    assert "reaches outside the goal item or the allowed scope, cannot be tested" in instructions
+    assert "seam tables" in instructions and "approve and put those in notes" in instructions
+
+
+def test_ripleys_design_standard_is_scoped_to_her_own_work():
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    persona = (root / "crew/personas/ripley.md").read_text()
+    assert "not the bar for a squad's campaign proposal" in persona
+    assert "never a\nreason to return it" in persona
+    assert "For your own design and code work." in (root / "crew/prompts/base-ripley.md").read_text()
+
+
 def test_a_refused_launch_waits_instead_of_parking(world):
     # 2026-11-01: parking on launch_blocked paused a campaign seconds after SquadOps unblocked it.
     broker, api, store = world
