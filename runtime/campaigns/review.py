@@ -231,6 +231,11 @@ def render(job, result):
     depend on nothing but the job and the result."""
     parts = [summary(job, result)]
     notes = _clean(result.get("notes"))
+    # The summary line already carries the notes' first sentence; don't say it twice (campaign 4's
+    # posts read "Approval authorizes ... Approval authorizes ...").
+    lead = (notes.splitlines() or [""])[0].strip().split(". ")[0].rstrip(".")
+    if lead and len(lead) <= 200 and notes.startswith(lead):
+        notes = notes[len(lead):].lstrip(".").strip()
     if notes:
         parts.append(notes)
     rationale = _clean(result.get("classification_rationale"))

@@ -112,6 +112,11 @@ def step(packet):
 
 def doing(packet):
     """What the squad is doing now, naming the increment when the objective lists them."""
+    if packet["campaign"]["state"] == "repairing":
+        # Campaign 4's repair post read word for word like the build before it.
+        names, n = items(packet), accepted(packet)
+        subject = names[n] if n < len(names) else "the increment"
+        return f"the first build of {subject} didn't pass its checks; the squad is repairing it"
     current = step(packet)
     if not current or current[0] not in STEPS:
         return None
@@ -170,7 +175,25 @@ def notice(packet, label):
         what = (doing(packet) if campaign["state"] not in {"awaiting_ruling", "escalated", "paused", "launch_blocked"}
                 else None) or DOING.get(campaign["state"], str(campaign["state"]).replace("_", " "))
     who = next_actor(packet)
+    if campaign["state"] != "completed" and running_out(packet):
+        from .drafting import et
+        deadline = packet["automation"]["control"]["deadline"]
+        what += f". It stops at its cutoff, {et(deadline)}, in under half an hour, if it isn't answered"
     return f"{label}: {what}. {progress(packet)} Next: {who}.", who == "you"
+
+
+WARN_BEFORE_CUTOFF_S = 1800
+
+
+def running_out(packet, now=None):
+    """A held campaign within half an hour of its cutoff: the owner's last chance to answer. On
+    2026-11-01 campaign 4 sat held for 1h44m and was stopped by its cutoff with no warning."""
+    import time
+    control = (packet.get("automation") or {}).get("control") or {}
+    deadline = control.get("deadline")
+    held = control.get("state") == "parked" or packet["campaign"]["state"] in YOURS
+    now = time.time() if now is None else now
+    return bool(held and isinstance(deadline, (int, float)) and 0 < deadline - now <= WARN_BEFORE_CUTOFF_S)
 
 
 def fingerprint(packet):
@@ -181,7 +204,7 @@ def fingerprint(packet):
                    "control": [control.get("state"), control.get("reason")], "accepted": accepted(packet),
                    "rulings": sum(1 for row in rows(packet) if row.get("ruling")),
                    "escalations": len(packet.get("escalations") or []), "analysis": bool(packet.get("analysis")),
-                   "step": step(packet)})
+                   "step": step(packet), "running_out": running_out(packet)})
 
 
 def report(packet, package, label):

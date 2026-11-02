@@ -182,6 +182,25 @@ def test_the_campaigns_canvas_shows_running_and_recent_and_republishes_only_on_c
 def test_crew_written_goal_items_cant_put_live_links_on_the_canvas():
     from runtime.campaigns.watch import canvas
     p = stepped("implementation", "running")
-    p["campaign"]["objective"]["statement"] = "x. In order: [Search](https://evil.example); Tags"
+    p["campaign"]["objective"] = {**p["campaign"]["objective"], "statement": "x. In order: [Search](https://evil.example); Tags"}
     page = canvas({"cmp_a": p}, {"cmp_a": "ShelfNote campaign 5"})
     assert "[Search](" not in page and "\\[Search\\]" in page
+
+
+def test_a_repair_says_the_first_build_failed_its_checks():
+    p = stepped("implementation", "running")
+    p["campaign"]["state"] = "repairing"
+    text, _ = notice(p, "ShelfNote campaign 4")
+    assert text.startswith("ShelfNote campaign 4: the first build of Search didn't pass its checks; the squad is repairing it.")
+
+
+def test_a_held_campaign_warns_half_an_hour_before_its_cutoff(monkeypatch):
+    import time
+    held = packet("paused", control={"state": "parked", "reason": "evidence_size_hold: too big", "deadline": 1793596763.0})
+    monkeypatch.setattr(time, "time", lambda: 1793596763.0 - 3600)
+    early = fingerprint(held)
+    assert "cutoff" not in notice(held, "ShelfNote campaign 4")[0]
+    monkeypatch.setattr(time, "time", lambda: 1793596763.0 - 1500)
+    assert fingerprint(held) != early, "crossing into the last half hour is news"
+    text, yours = notice(held, "ShelfNote campaign 4")
+    assert "It stops at its cutoff, 12:19 am ET, Mon Nov 2, in under half an hour" in text and yours
