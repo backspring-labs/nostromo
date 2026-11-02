@@ -519,6 +519,11 @@ def test_zero_revision_packet_and_provider_schema_offer_an_owner_hold(world):
     finish(broker, job, result)
     control = rpc(broker, "mother", "automation", {"campaign": "cmp_test"})
     assert control["control"]["state"] == "parked" and len(control["jobs"]) == 1
+    # The escalation becomes a decision card for the owner, bound to the proposal at the gate.
+    cards = rpc(broker, "mother", "decision-cards")
+    assert [c["state"] for c in cards] == ["drafted"]
+    card = rpc(broker, "mother", "decision-card-claim")
+    assert "Ripley needs your decision" in card["content"] and "Reply **approve** to this card" in card["content"]
 
 
 def test_retained_zero_revision_failure_stops_before_dallas_or_gate_write(world):

@@ -392,7 +392,9 @@ class Automation:
             self.b.store.save()
         elif job["kind"] == "decision":
             if result["decision"] == "needs_owner":
-                self.park(cid, "Ripley requires an owner decision")
+                from .decision_cards import DecisionCards
+                DecisionCards(self.b, now=self.now).create(cid, payload, result)
+                self.park(cid, "Ripley needs your decision; answer her decision card in this thread")
             else:
                 if result["decision"] == "returned_for_revision":
                     try:

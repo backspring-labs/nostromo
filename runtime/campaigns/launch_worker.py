@@ -139,15 +139,56 @@ def post_card(rpc, publish):
     return rpc({"command": "proposal-card-posted", "args": {"proposal": job["id"]}, "decision_event": event})
 
 
+def relay_answers(rpc, thread_events, owner):
+    """Pass each owner reply to a live decision card that reads "approve" or "abort" to the broker,
+    which verifies it, signature and reply-to-card included."""
+    from .decision_cards import answer_of
+    results = []
+    try:
+        live = rpc({"command": "decision-cards", "args": {"state": "posted"}}) + \
+            rpc({"command": "decision-cards", "args": {"state": "answered"}})
+    except Exception as error:
+        return [{"unreadable": type(error).__name__}]
+    for card in live:
+        try:
+            events = thread_events(card["channel"], card["thread"])
+        except Exception as error:
+            results.append({"card": card["id"], "unreadable": type(error).__name__})
+            continue
+        for event in sorted(events, key=lambda e: e.get("created_at", 0)):
+            replies = {t[1] for t in event.get("tags", []) if len(t) >= 2 and t[0] == "e"}
+            if event.get("pubkey") != owner or card["card_event"] not in replies or answer_of(event.get("content")) is None:
+                continue
+            try:
+                results.append(rpc({"command": "decision-answer", "args": {"card": card["id"]}, "decision_event": event}))
+                break
+            except Exception as error:
+                results.append({"card": card["id"], "refused": str(error) if isinstance(error, Refused) else type(error).__name__})
+    return results
+
+
+def post_decision_card(rpc, publish):
+    job = rpc({"command": "decision-card-claim", "args": {}})
+    if job is None:
+        return None
+    event = publish(job)
+    return rpc({"command": "decision-card-posted", "args": {"card": job["id"]}, "decision_event": event})
+
+
 def run(rpc=call, publish=None, thread_events=None, owner=None):
     controller = {}
     if thread_events and owner:
         controller["approvals"] = relay_approvals(rpc, thread_events, owner)
+        controller["answers"] = relay_answers(rpc, thread_events, owner)
     if publish:
         try:
             controller["card"] = post_card(rpc, publish)
         except Exception as error:
             controller["card"] = {"failed": type(error).__name__}
+        try:
+            controller["decision_card"] = post_decision_card(rpc, publish)
+        except Exception as error:
+            controller["decision_card"] = {"failed": type(error).__name__}
     states = rpc({"command": "launch-advance", "args": {}})
     job = rpc({"command": "launch-notice-claim", "args": {}})
     if job is None:

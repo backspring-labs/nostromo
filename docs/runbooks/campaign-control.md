@@ -280,6 +280,15 @@ Mother holds her own Buzz key and the broker can't otherwise tell which card the
 approval creates the allowance, approves the definition and queues the launch, in one transaction.
 A revised card supersedes the earlier one, which can then no longer be approved. See `docs/specs/plain-language-campaigns.md`.
 
+**Decision cards.** When Ripley's ruling at an increment gate is `needs_owner`, the automation parks
+the campaign and Mother's controller posts a decision card in its thread, mentioning the owner. The
+owner replies **approve** or **abort** to the card itself (a thread-only reply decides nothing). On
+approve the broker resumes the supervisor's pause, rules the proposal approved as the owner's
+decision (`decided_by_kind: human`, Ripley's notes first as build guidance, the Buzz event as their
+last line), and re-activates the automation, in that order. On abort it aborts. A card without a gate
+binding offers only abort. If the ruling bound has passed when the owner answers, SquadOps escalates;
+that's a new decision, not a failure.
+
 The manual path below remains for attended or unusual definitions.
 
 For remote owner approval, `campaignctl approve-definition --args approval.json --explain`
