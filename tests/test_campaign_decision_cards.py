@@ -29,6 +29,10 @@ class SquadOps:
         if method == "GET":
             if path.endswith("/ledger"):
                 return [dict(r) for r in self.ledger]
+            if path.endswith("/control-log"):
+                return [dict(e) for e in getattr(self, "log", [])]
+            if "/runs/" in path:
+                return {"run_id": GATE["run"], "gate_decisions": list(getattr(self, "decisions", []))}
             return {"campaign_id": CID, "project_id": "prj-shelfnote", "state": self.state}
         self.posts.append((principal, path, body))
         if path.endswith("/resume"):
@@ -38,6 +42,8 @@ class SquadOps:
             assert self.state == "awaiting_ruling", "resume first, then rule"
             self.state = "executing"
             self.ledger[0]["ruling"] = "approved"
+            self.decisions = [{"gate_name": "progress_increment_ruling", "decision": body["decision"],
+                               "decided_by": f"{body['decided_by_kind']}:{principal}"}]
         elif path.endswith("/pause"):
             self.state = "paused"
         elif path.endswith("/abort"):
@@ -331,3 +337,50 @@ def test_a_ruling_on_another_version_counts_as_no_ruling(world, gate_open):
     api.ledger[0]["version"] = 4  # the gate now holds a version Ripley never saw
     job = hold_card(broker, api, "Dallas has blocking findings; owner inspection required")
     assert "Ripley's ruling:" not in job["content"] and "No one in the crew has reviewed" in job["content"]
+
+
+def test_a_lost_response_to_the_owners_ruling_completes_as_approved(world, monkeypatch):
+    # #49: the ruling landed but its response was lost; the retry must not call the card stale.
+    broker, api, clock = world
+    card = posted(broker, clock)
+    clock[0] = NOW + 120
+    event = reply("approve", card["id"])
+    real = api.__call__
+
+    def lose_rule(principal, method, path, body, **kwargs):
+        result = real(principal, method, path, body)
+        if path.endswith("progress_increment_ruling"):
+            raise OSError("response lost after commit")
+        return result
+    monkeypatch.setattr(broker, "api", lose_rule)
+    with pytest.raises(OSError):
+        answer(broker, event)
+    monkeypatch.setattr(broker, "api", api)
+    assert answer(broker, event) == {"decided": "approved"}
+    assert broker.store.db.execute("SELECT state FROM automation WHERE campaign=?", (CID,)).fetchone()[0] == "active"
+    assert [p[1].rsplit("/", 1)[1] for p in api.posts] == ["resume", "progress_increment_ruling"], "nothing repeated"
+
+
+def test_a_dallas_blocking_card_shows_his_view_and_when_it_was_submitted(world, gate_open):
+    import json as _json
+    broker, api, _ = world
+    api.ledger[0]["submitted_at"] = "2026-11-02T03:34:08Z"
+    crew_ruled(broker, "approved", "Approve Tags.")
+    broker.store.db.execute("INSERT INTO review_jobs(id,campaign,role,kind,state,payload,result) VALUES(?,?,?,?,?,?,?)",
+                            ("job_d", CID, "dallas", "review", "done", _json.dumps({"parent": "job_r"}),
+                             _json.dumps({"blocking": True, "notes": "The tag filter isn't testable as written."})))
+    broker.store.db.commit()
+    job = hold_card(broker, api, "Dallas has blocking findings; owner inspection required")
+    assert "Dallas's view: The tag filter isn't testable as written." in job["content"]
+    assert "The squad submitted it 10:34 pm ET" in job["content"]
+
+
+def test_a_borrowed_log_key_doesnt_pass_for_the_owners_ruling(world, monkeypatch):
+    # Review of #50: a compromised Mother could send another operation with the card's "-rule" key.
+    broker, api, clock = world
+    card = posted(broker, clock)
+    clock[0] = NOW + 120
+    api.decisions = [{"gate_name": "progress_increment_ruling", "decision": "approved", "decided_by": "agent:review"}]
+    assert answer(broker, reply("approve", card["id"])) == {"decided": "approved"}
+    assert [p[1].rsplit("/", 1)[1] for p in api.posts] == ["resume", "progress_increment_ruling"], \
+        "an agent's ruling isn't the owner's: the owner's ruling is still sent"
