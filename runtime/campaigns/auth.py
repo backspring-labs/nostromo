@@ -44,6 +44,18 @@ class API:
         self.opener = urllib.request.build_opener(NoRedirect)
         self.tokens = {}
 
+    def agents(self):
+        """Fixed, read-only public health route: each squad agent's built and deployed revision."""
+        request = urllib.request.Request(self.config["api_url"].rstrip("/") + "/health/agents")
+        try:
+            with self.opener.open(request, timeout=15) as response:
+                raw = response.read(65537)
+            if len(raw) > 65536:
+                raise ValueError()
+            return json.loads(raw)
+        except (OSError, ValueError):
+            raise Refused("SquadOps agent health unreadable") from None
+
     def host(self):
         """Fixed, read-only public health route; never a caller-supplied URL or API pass-through."""
         request = urllib.request.Request(self.config["api_url"].rstrip("/") + "/health/host")

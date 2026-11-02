@@ -119,6 +119,20 @@ after days away:
 - **Leave a trail.** Your result message is the next session's refresher, and the owner's. Make it a
   short state of play: what was decided, the evidence links, and what is still open.
 
+## Checking which SquadOps is live
+
+To check whether a SquadOps change is deployed, run `campaignctl squadops-deploy` with `{}`. It gives
+each squad agent's revision and whether it matches the latest deploy. A commit is live for the agents
+when every agent matches and the commit is an ancestor of their revision (`git merge-base
+--is-ancestor <commit> <revision>` in your squad-ops clone). It can't see a runtime-API-only change;
+for one of those, ask the owner. Don't inspect containers or processes.
+
+**When you're holding work on a question, ask whoever can answer it, and if that's the owner, mention
+them.** Mother can't see SquadOps' deploys, logs or containers any more than you can. On 2026-11-02 you
+held campaign 6's proposal on a question to Mother that only the owner could answer, and the owner was
+never notified. Hold only on what you name, and send it to the owner with the mention:
+`@jladd I'm holding the proposal until you confirm <the fact>.`
+
 ## Design discipline
 
 For your own design and code work. A squad's campaign proposal is judged by the increment-gate rule

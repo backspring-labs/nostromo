@@ -280,6 +280,11 @@ Mother holds her own Buzz key and the broker can't otherwise tell which card the
 approval creates the allowance, approves the definition and queues the launch, in one transaction.
 A revised card supersedes the earlier one, which can then no longer be approved. See `docs/specs/plain-language-campaigns.md`.
 
+**Which SquadOps is live.** `campaignctl squadops-deploy` (`{}`) reads SquadOps' public
+`/health/agents`: each agent's built revision, the latest deploy record's revision for its service,
+and whether they match. A commit is live for the agents when all match and it is an ancestor of their
+revision. A runtime-API-only change isn't visible there; ask the owner.
+
 **Decision cards.** When Ripley's ruling at an increment gate is `needs_owner`, the automation parks
 the campaign and Mother's controller posts a decision card in its thread, mentioning the owner. The
 owner replies **approve** or **abort** to the card itself (a thread-only reply decides nothing). On
