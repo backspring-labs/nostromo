@@ -1073,3 +1073,10 @@ def test_a_refused_launch_waits_instead_of_parking(world):
     assert control["state"] == "active"
     assert not any(post[1].endswith("/pause") for post in api.posts)
     assert store.db.execute("SELECT state FROM review_jobs").fetchone()[0] == "queued"
+
+
+def test_a_ruling_post_says_its_first_sentence_once():
+    from runtime.campaigns.review import render
+    job = {"id": "j", "role": "ripley", "kind": "decision", "campaign": "c", "payload": {"gate": {"gate": "progress_increment_ruling"}}}
+    text = render(job, {"decision": "approved", "notes": "Approval authorizes framing. Cover q omitted.", "evidence": []})
+    assert text.count("Approval authorizes framing") == 1 and "Cover q omitted." in text

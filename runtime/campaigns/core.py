@@ -43,8 +43,15 @@ def identifier(value):
 
 
 def exact(data, required, optional=()):
-    if not isinstance(data, dict) or set(data) - set(required) - set(optional) or set(required) - set(data):
+    if not isinstance(data, dict):
         raise Refused("missing or unexpected request fields")
+    # Name the fields (never their values), so an attended caller can correct the request. On
+    # 2026-11-01 Ripley's binding carried cycle_id and the bare refusal didn't say so.
+    extra, missing = sorted(set(data) - set(required) - set(optional)), sorted(set(required) - set(data))
+    if extra or missing:
+        said = "; ".join(part for part in (extra and "unexpected: " + ", ".join(map(str, extra))[:200],
+                                           missing and "missing: " + ", ".join(missing)) if part)
+        raise Refused(f"missing or unexpected request fields ({said})")
 
 
 class Store:

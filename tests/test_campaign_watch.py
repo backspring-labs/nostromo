@@ -151,3 +151,10 @@ def test_the_squads_step_is_named_with_its_increment():
 
 def test_a_new_step_is_news():
     assert fingerprint(stepped("framing", "running")) != fingerprint(stepped("implementation", "running"))
+
+
+def test_a_repair_says_the_first_build_failed_its_checks():
+    p = stepped("implementation", "running")
+    p["campaign"]["state"] = "repairing"
+    text, _ = notice(p, "ShelfNote campaign 4")
+    assert text.startswith("ShelfNote campaign 4: the first build of Search didn't pass its checks; the squad is repairing it.")
