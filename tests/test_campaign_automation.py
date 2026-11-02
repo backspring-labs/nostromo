@@ -1075,6 +1075,13 @@ def test_a_refused_launch_waits_instead_of_parking(world):
     assert store.db.execute("SELECT state FROM review_jobs").fetchone()[0] == "queued"
 
 
+def test_a_ruling_post_says_its_first_sentence_once():
+    from runtime.campaigns.review import render
+    job = {"id": "j", "role": "ripley", "kind": "decision", "campaign": "c", "payload": {"gate": {"gate": "progress_increment_ruling"}}}
+    text = render(job, {"decision": "approved", "notes": "Approval authorizes framing. Cover q omitted.", "evidence": []})
+    assert text.count("Approval authorizes framing") == 1 and "Cover q omitted." in text
+
+
 def test_the_gate_packet_keeps_every_log_entry_citable_but_bounds_old_ones():
     # 2026-11-01: campaign 4's full log (25 entries, 23 KB) pushed the Tags gate past the single-call limit.
     from runtime.campaigns.automation import bounded_ledger, bounded_log

@@ -345,7 +345,10 @@ Otherwise valid decisions continue to require Dallas's independent review of the
 
 Ripley prepares a JSON file with `campaign`, `cycle`, `run`, `decision`, and substantive
 `notes`; increment rulings also carry the SquadOps `binding` and, when required,
-`classification` and `classification_rationale`. Use the exact current runtime gate binding.
+`classification` and `classification_rationale`. Use the exact current runtime gate binding, with
+exactly these four keys: `{"proposal_id", "version", "content_hash", "baseline_tree"}`, copied from
+the gate's unruled ledger row. Never add `cycle_id` (it is the request's `cycle`), and pass `version`
+as the ledger gives it.
 
 ```bash
 campaignctl increment --args ruling.json --request-id ruling-001 --explain

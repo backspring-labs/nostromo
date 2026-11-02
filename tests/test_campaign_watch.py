@@ -153,6 +153,13 @@ def test_a_new_step_is_news():
     assert fingerprint(stepped("framing", "running")) != fingerprint(stepped("implementation", "running"))
 
 
+def test_a_repair_says_the_first_build_failed_its_checks():
+    p = stepped("implementation", "running")
+    p["campaign"]["state"] = "repairing"
+    text, _ = notice(p, "ShelfNote campaign 4")
+    assert text.startswith("ShelfNote campaign 4: the first build of Search didn't pass its checks; the squad is repairing it.")
+
+
 def test_a_held_campaign_warns_half_an_hour_before_its_cutoff(monkeypatch):
     import time
     held = packet("paused", control={"state": "parked", "reason": "evidence_size_hold: too big", "deadline": 1793596763.0})

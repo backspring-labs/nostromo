@@ -112,6 +112,11 @@ def step(packet):
 
 def doing(packet):
     """What the squad is doing now, naming the increment when the objective lists them."""
+    if packet["campaign"]["state"] == "repairing":
+        # Campaign 4's repair post read word for word like the build before it.
+        names, n = items(packet), accepted(packet)
+        subject = names[n] if n < len(names) else "the increment"
+        return f"the first build of {subject} didn't pass its checks; the squad is repairing it"
     current = step(packet)
     if not current or current[0] not in STEPS:
         return None
