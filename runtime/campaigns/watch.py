@@ -48,7 +48,7 @@ FINISHED_JOBS = {"done", "submitted", "cancelled", "failed", "uncertain"}
 # Bump whenever fingerprint() changes. On the first poll under a new format the watcher adopts the new
 # fingerprints silently instead of announcing every campaign: on 2026-11-01, changing the format
 # without this re-posted eleven closed campaigns into their threads.
-FINGERPRINT_FORMAT = 2
+FINGERPRINT_FORMAT = 3
 
 
 def product(project_id):
@@ -81,7 +81,52 @@ def rows(packet):
 
 
 def accepted(packet):
-    return sum(1 for row in rows(packet) if str(row.get("outcome") or "").startswith("accept"))
+    # SquadOps' outcome is a record ({"verdict": "accepted", ...}); a bare string is the older shape.
+    # On 2026-11-01 reading only the string counted an accepted increment as none.
+    def verdict(outcome):
+        return outcome.get("verdict") if isinstance(outcome, dict) else outcome
+    return sum(1 for row in rows(packet) if str(verdict(row.get("outcome")) or "").startswith("accept"))
+
+
+# The squad's steps inside a cycle, as a person would say them.
+STEPS = {"proposal": "proposing", "framing": "planning how to build", "implementation": "building",
+         "verification": "verifying", "qa": "testing", "repair": "repairing", "retry": "retrying"}
+
+
+def items(packet):
+    """The objective's increments in order, from the draft's "In order: a; b; c"."""
+    statement = str((packet["campaign"].get("objective") or {}).get("statement") or "")
+    _, found, tail = statement.rpartition("In order: ")
+    return [i.strip().rstrip(".") for i in tail.split(";") if i.strip()] if found else []
+
+
+def step(packet):
+    """The squad's current step: the campaign's most recently started run, as (type, status)."""
+    cycles = [c for c in ((packet.get("progress") or {}).get("cycles") or []) if isinstance(c, dict)]
+    runs = [r for c in cycles for r in (c.get("runs") or []) if isinstance(r, dict)]
+    if not runs:
+        return None
+    run = max(runs, key=lambda r: (r.get("started_at") or "", r.get("run_number") or 0))
+    return run.get("workload_type"), run.get("status")
+
+
+def doing(packet):
+    """What the squad is doing now, naming the increment when the objective lists them."""
+    current = step(packet)
+    if not current or current[0] not in STEPS:
+        return None
+    kind, status = current
+    names = items(packet)
+    n = accepted(packet)
+    if kind == "proposal":
+        subject = f"the next increment ({names[n]})" if n < len(names) else "the next increment"
+    else:
+        subject = names[n] if n < len(names) else "the approved increment"
+    if status in {"completed", "succeeded"}:
+        return f"the squad finished {STEPS[kind]} {subject}"
+    if status in {"failed", "cancelled"}:
+        return f"the squad's {kind} run for {subject} {status}"
+    return f"the squad is {STEPS[kind]} {subject}"
 
 
 def progress(packet):
@@ -122,7 +167,8 @@ def notice(packet, label):
     elif control.get("state") == "parked":
         what = "paused for you. " + str(control.get("reason") or "It needs a decision").rstrip(".")
     else:
-        what = DOING.get(campaign["state"], str(campaign["state"]).replace("_", " "))
+        what = (doing(packet) if campaign["state"] not in {"awaiting_ruling", "escalated", "paused", "launch_blocked"}
+                else None) or DOING.get(campaign["state"], str(campaign["state"]).replace("_", " "))
     who = next_actor(packet)
     return f"{label}: {what}. {progress(packet)} Next: {who}.", who == "you"
 
@@ -134,7 +180,8 @@ def fingerprint(packet):
     return digest({"state": campaign["state"], "outcome": campaign.get("outcome"),
                    "control": [control.get("state"), control.get("reason")], "accepted": accepted(packet),
                    "rulings": sum(1 for row in rows(packet) if row.get("ruling")),
-                   "escalations": len(packet.get("escalations") or []), "analysis": bool(packet.get("analysis"))})
+                   "escalations": len(packet.get("escalations") or []), "analysis": bool(packet.get("analysis")),
+                   "step": step(packet)})
 
 
 def report(packet, package, label):
@@ -195,6 +242,13 @@ class Watcher:
         for item in tracked:
             try:
                 packets[item["id"]] = self.rpc({"command": "packet", "args": {"campaign": item["id"]}})
+                if packets[item["id"]]["campaign"]["state"] != "completed":
+                    # The squad's step inside a cycle (framing, building, ...). Optional: a failed read
+                    # only means a coarser post.
+                    try:
+                        packets[item["id"]]["progress"] = self.rpc({"command": "progress", "args": {"campaign": item["id"]}})
+                    except Exception:
+                        pass
             except Exception as error:
                 unread[item["id"]] = error
         names = labels(packets)
@@ -242,7 +296,8 @@ class Watcher:
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--state", default="/var/lib/nostromo-campaign-watch/watch.sqlite3")
-    p.add_argument("--interval", type=int, default=300)
+    # Every minute: the owner watches the thread, and a poll is cheap and calls no model.
+    p.add_argument("--interval", type=int, default=60)
     p.add_argument("--once", action="store_true")
     args = p.parse_args()
     if args.interval < 30:
