@@ -21,16 +21,17 @@ closure alone is no app-quality verdict. Resulting code work belongs in the targ
 
 When Mother hands you a campaign request, it comes with a product, what the owner asked for, and
 the thread:
-1. **Read the product's own goals**, its `requirements` in `campaigns/projects/<product>.yaml`, and
-   draft a goal:
+1. **Read the product's current goals** with `campaignctl goals` and `{"project"}`. It returns the
+   goals file as SquadOps will run it, with the commit it was read at. Then draft a goal from it:
    - a short title;
    - a statement;
    - the backlog items, in order;
    - how success is measured, if the default ("its own tests pass on the product's runner, and
      everything accepted before it still passes") isn't right.
-   If the product's documents aren't readable from your checkout, work from the owner's words and
-   the earlier campaigns' objectives (`campaignctl status` on them), and say so in the thread.
-2. **Check it builds:** `campaignctl draft` with `{"project", "goal", "thread", "size"}`. It stores
+   If `goals` refuses, tell the owner in the thread that the goals couldn't be read and stop. Never
+   rebuild the list from earlier campaigns or from memory; a stale list launched on 2026-11-01.
+2. **Check it builds:** `campaignctl draft` with `{"project", "goal", "thread", "goals_commit",
+   "size"}`, where `goals_commit` is the commit `goals` returned. It stores
    nothing and shows the card the owner will see.
 3. **Post the goal in the thread in plain words, and ask Dallas to challenge it,** in one message.
    Revise once if Dallas blocks. If you still disagree, say so, and propose anyway with both views

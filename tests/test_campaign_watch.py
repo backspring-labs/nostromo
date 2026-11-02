@@ -114,3 +114,9 @@ def test_a_fresh_watcher_still_announces():
     rpc = lambda r: [{"id": "cmp_a", "channel": "c", "thread": "t"}] if r["command"] == "tracked" else packet("at_proposal")
     Watcher(db, rpc, lambda item, text, yours: posts.append(text), lambda *a: None).poll()
     assert len(posts) == 1
+
+
+def test_a_refused_launch_is_the_squads_wait_not_the_owners_move():
+    # SquadOps retries launch_blocked on its own and escalates if it never launches.
+    text, yours = notice(packet("launch_blocked"), "ShelfNote campaign 1")
+    assert "retries on its own" in text and text.endswith("Next: the squad.") and yours is False

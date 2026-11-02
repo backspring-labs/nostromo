@@ -1055,3 +1055,16 @@ def test_ripleys_design_standard_is_scoped_to_her_own_work():
     assert "not the bar for a squad's campaign proposal" in persona
     assert "never a\nreason to return it" in persona
     assert "For your own design and code work." in (root / "crew/prompts/base-ripley.md").read_text()
+
+
+def test_a_refused_launch_waits_instead_of_parking(world):
+    # 2026-11-01: parking on launch_blocked paused a campaign seconds after SquadOps unblocked it.
+    broker, api, store = world
+    rpc(broker, "mother", "advance", {"campaign": "cmp_test"})
+    api.campaign["state"] = "launch_blocked"
+    assert rpc(broker, "ripley", "review-claim") is None
+    Automation(broker).advance("cmp_test")
+    control = store.db.execute("SELECT state FROM automation WHERE campaign='cmp_test'").fetchone()
+    assert control["state"] == "active"
+    assert not any(post[1].endswith("/pause") for post in api.posts)
+    assert store.db.execute("SELECT state FROM review_jobs").fetchone()[0] == "queued"

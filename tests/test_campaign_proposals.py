@@ -16,13 +16,25 @@ GOAL = {"title": "reading status, tags and ratings", "statement": "Work the next
         "items": ["reading status", "tags", "ratings"]}
 
 
+GOALS_COMMIT = "ae9ad47" + "0" * 33
+GOALS_FILE = {"path": "docs/goals.md", "commit": GOALS_COMMIT, "content": "# Goals\n\n1. Readers can find a book.\n"}
+
+
+def squadops(principal, method, path, body):
+    """SquadOps' read of the product's managed clone, at its integrated commit."""
+    assert (principal, method, body) == ("read", "GET", None)
+    if path == "/api/v1/projects/prj-shelfnote/source-file?path=docs/goals.md":
+        return dict(GOALS_FILE)
+    raise RuntimeError("404")
+
+
 @pytest.fixture
 def world(tmp_path, monkeypatch):
     clock = [NOW]
     monkeypatch.setattr(time, "time", lambda: clock[0])
     policy = {"automation_enabled": True, "launch_enabled": True, "decision_channels": [CHANNEL],
               "public_keys": {role: helpers().xonly_pubkey(key) for role, key in KEYS.items()}}
-    broker = Broker(Store(tmp_path / "broker.sqlite3"), None, policy, verifier(policy, now=lambda: clock[0]))
+    broker = Broker(Store(tmp_path / "broker.sqlite3"), squadops, policy, verifier(policy, now=lambda: clock[0]))
     return broker, clock
 
 
@@ -36,7 +48,7 @@ def sign(role, content, tags, created_at):
 
 def posted_card(broker, clock, goal=GOAL):
     """Ripley proposes; the controller posts the card; the broker verifies it. Returns the proposal and card event."""
-    proposal = rpc(broker, "ripley", "propose", {"project": "shelfnote", "goal": goal, "thread": THREAD})["proposal"]
+    proposal = rpc(broker, "ripley", "propose", {"project": "shelfnote", "goal": goal, "thread": THREAD, "goals_commit": GOALS_COMMIT})["proposal"]
     events = {}
 
     def publish(job):
@@ -139,7 +151,7 @@ def test_only_mothers_controller_posts_cards_or_relays_approvals(world):
 
 def test_a_card_that_differs_from_the_stored_one_is_refused(world):
     broker, clock = world
-    proposal = rpc(broker, "ripley", "propose", {"project": "shelfnote", "goal": GOAL, "thread": THREAD})["proposal"]
+    proposal = rpc(broker, "ripley", "propose", {"project": "shelfnote", "goal": GOAL, "thread": THREAD, "goals_commit": GOALS_COMMIT})["proposal"]
     with pytest.raises(Refused, match="mismatched or invalid mother message"):
         post_card(lambda request: broker.handle("mother", request),
                   lambda job: sign("mother", job["content"] + " (and more)", [["h", CHANNEL], ["e", THREAD, "", "reply"]], NOW))
@@ -188,7 +200,7 @@ def test_a_failure_inside_the_launch_leaves_no_allowance_or_definition(world, mo
 
 def test_a_backdated_card_counts_as_posted_when_the_broker_recorded_it(world):
     broker, clock = world
-    proposal = rpc(broker, "ripley", "propose", {"project": "shelfnote", "goal": GOAL, "thread": THREAD})["proposal"]
+    proposal = rpc(broker, "ripley", "propose", {"project": "shelfnote", "goal": GOAL, "thread": THREAD, "goals_commit": GOALS_COMMIT})["proposal"]
     clock[0] = NOW + 300
 
     def publish(job):  # Mother's clock says the card went out at the proposal's own moment
@@ -212,13 +224,13 @@ def test_a_backdated_card_counts_as_posted_when_the_broker_recorded_it(world):
 def test_goal_text_that_could_hide_or_forge_a_card_line_is_refused(world, goal):
     broker, _ = world
     with pytest.raises(Refused):
-        rpc(broker, "ripley", "propose", {"project": "shelfnote", "goal": goal, "thread": THREAD})
+        rpc(broker, "ripley", "propose", {"project": "shelfnote", "goal": goal, "thread": THREAD, "goals_commit": GOALS_COMMIT})
     assert not broker.store.db.execute("SELECT 1 FROM proposals").fetchone()
 
 
 def test_the_card_states_its_terms_first_and_shows_goal_text_as_written(world):
     broker, _ = world
-    card = rpc(broker, "ripley", "propose", {"project": "shelfnote", "thread": THREAD,
+    card = rpc(broker, "ripley", "propose", {"project": "shelfnote", "thread": THREAD, "goals_commit": GOALS_COMMIT,
                                              "goal": {**GOAL, "title": "tags *and* [ratings](x)"}})["card"]
     lines = card.splitlines()
     assert "tags \\*and\\* \\[ratings\\](x)" in lines[0]
@@ -228,7 +240,7 @@ def test_the_card_states_its_terms_first_and_shows_goal_text_as_written(world):
 
 def test_superseded_earlier_says_whether_a_card_was_replaced(world):
     broker, _ = world
-    args = {"project": "shelfnote", "goal": GOAL, "thread": THREAD}
+    args = {"project": "shelfnote", "goal": GOAL, "thread": THREAD, "goals_commit": GOALS_COMMIT}
     assert rpc(broker, "ripley", "propose", args)["superseded_earlier"] is False
     assert rpc(broker, "ripley", "propose", args)["superseded_earlier"] is True
 
@@ -237,7 +249,7 @@ def test_a_proposal_that_could_not_launch_is_refused_before_anything_is_stored(w
     broker, _ = world
     broker.policy["launch_enabled"] = False
     with pytest.raises(Refused, match="not commissioned"):
-        rpc(broker, "ripley", "propose", {"project": "shelfnote", "goal": GOAL, "thread": THREAD})
+        rpc(broker, "ripley", "propose", {"project": "shelfnote", "goal": GOAL, "thread": THREAD, "goals_commit": GOALS_COMMIT})
     assert not broker.store.db.execute("SELECT 1 FROM proposals").fetchone()
 
 

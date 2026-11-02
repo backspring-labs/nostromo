@@ -290,7 +290,12 @@ class Automation:
                     self.b.store.save()
                 else:
                     self.queue(cid, "ripley", "analysis", self.packet(cid))
-            elif state in {"paused", "escalated", "launch_blocked"}:
+            elif state == "launch_blocked":
+                # Transient: SquadOps retries a refused launch on its own (launch_blocked_interval_s,
+                # up to launch_blocked_attempts) and escalates if it never launches. Wait; on
+                # 2026-11-01 parking here paused a campaign that had already unblocked.
+                pass
+            elif state in {"paused", "escalated"}:
                 self.park(cid, "runtime requires an owner decision")
             else:
                 gates = Evidence(self.b).handle("progress", {"campaign": cid})["gates"]
@@ -319,7 +324,9 @@ class Automation:
             self.park(cid, "insufficient time for a bounded review")
             return None
         current = self.b.read("status", {"campaign": cid})
-        if current["state"] in {"paused", "escalated", "launch_blocked", "draft"}:
+        if current["state"] == "launch_blocked":
+            return None  # transient; the job waits for the launch
+        if current["state"] in {"paused", "escalated", "draft"}:
             self.park(cid, "runtime is held; no new review authorized")
             return None
         if (row["kind"] == "analysis") != (current["state"] == "completed"):
@@ -537,7 +544,9 @@ class Automation:
             if control["state"] != "active" or self.now >= control["deadline"]:
                 continue
             current = self.b.read("status", {"campaign": cid})
-            if current["state"] in {"paused", "escalated", "launch_blocked", "completed", "draft"}:
+            if current["state"] == "launch_blocked":
+                continue  # transient; submit once the launch goes through
+            if current["state"] in {"paused", "escalated", "completed", "draft"}:
                 self.park(cid, "runtime moved out of the gate's active authorization")
                 continue
             req = payload["packet"]["decision_request"]

@@ -38,11 +38,12 @@ DOING = {
     "awaiting_ruling": "a proposal is waiting for a ruling",
     "escalated": "it has escalated and is waiting for you",
     "paused": "it is paused",
-    "launch_blocked": "it could not launch its next cycle",
+    "launch_blocked": "it is waiting to launch its next cycle; SquadOps retries on its own",
 }
 OUTCOMES = {"aborted": "it was aborted", "exhausted": "it reached one of its limits",
             "succeeded": "it reached its target", "success": "it reached its target", "failure": "it failed"}
-YOURS = {"escalated", "paused", "launch_blocked"}
+# launch_blocked is not the owner's move: SquadOps retries it, and escalates if it never launches.
+YOURS = {"escalated", "paused"}
 FINISHED_JOBS = {"done", "submitted", "cancelled", "failed", "uncertain"}
 # Bump whenever fingerprint() changes. On the first poll under a new format the watcher adopts the new
 # fingerprints silently instead of announcing every campaign: on 2026-11-01, changing the format

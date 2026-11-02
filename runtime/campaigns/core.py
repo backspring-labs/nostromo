@@ -172,6 +172,13 @@ class Broker:
         if command == "tracked":
             exact(args, set())
             return [dict(row) for row in self.store.db.execute("SELECT * FROM campaigns ORDER BY id")]
+        if command == "goals":
+            # Read-only: the product's current goals from SquadOps, with the commit they were read at.
+            if caller not in {"mother", "ripley", "dallas", "owner"}:
+                raise Refused("reading a product's goals belongs to the crew's drafting roles or the owner")
+            exact(args, {"project"})
+            from .drafting import goals
+            return goals(self, args["project"])
         if command == "draft":
             # Read-only: builds and validates a campaign from a plain-language goal; stores nothing.
             if caller not in {"mother", "ripley", "owner"}:
