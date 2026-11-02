@@ -158,3 +158,15 @@ def test_a_repair_says_the_first_build_failed_its_checks():
     p["campaign"]["state"] = "repairing"
     text, _ = notice(p, "ShelfNote campaign 4")
     assert text.startswith("ShelfNote campaign 4: the first build of Search didn't pass its checks; the squad is repairing it.")
+
+
+def test_a_held_campaign_warns_half_an_hour_before_its_cutoff(monkeypatch):
+    import time
+    held = packet("paused", control={"state": "parked", "reason": "evidence_size_hold: too big", "deadline": 1793596763.0})
+    monkeypatch.setattr(time, "time", lambda: 1793596763.0 - 3600)
+    early = fingerprint(held)
+    assert "cutoff" not in notice(held, "ShelfNote campaign 4")[0]
+    monkeypatch.setattr(time, "time", lambda: 1793596763.0 - 1500)
+    assert fingerprint(held) != early, "crossing into the last half hour is news"
+    text, yours = notice(held, "ShelfNote campaign 4")
+    assert "It stops at its cutoff, 12:19 am ET, Mon Nov 2, in under half an hour" in text and yours
