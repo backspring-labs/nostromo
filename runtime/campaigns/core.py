@@ -186,6 +186,17 @@ class Broker:
         if command == "tracked":
             exact(args, set())
             return [dict(row) for row in self.store.db.execute("SELECT * FROM campaigns ORDER BY id")]
+        if command == "squadops-deploy":
+            # Read-only: which SquadOps revision the squad's agents run (#54). On 2026-11-02 Ripley
+            # held a card until the owner confirmed squad-ops #2859 was live; no crew role could see it.
+            exact(args, set())
+            agents = [a for a in (self.api.agents() or []) if isinstance(a, dict)]
+            revisions = sorted({str(a.get("revision")) for a in agents if a.get("revision")})
+            return {"agents": [{k: a.get(k) for k in ("agent_id", "revision", "deployed_revision",
+                                                      "revision_matches_deploy")} for a in agents],
+                    "revision": revisions[0] if len(revisions) == 1 else None,
+                    "all_match_deploy": bool(agents) and all(a.get("revision_matches_deploy") is True for a in agents),
+                    "covers": "the squad agents' images; a runtime-API-only change isn't visible here"}
         if command == "goals":
             # Read-only: the product's current goals from SquadOps, with the commit they were read at.
             if caller not in {"mother", "ripley", "dallas", "owner"}:

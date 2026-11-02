@@ -125,3 +125,13 @@ def test_a_malformed_goals_answer_is_unreadable(broker, monkeypatch):
 
 def rpc_goals(broker):
     return broker.handle("ripley", {"command": "goals", "args": {"project": "shelfnote"}})
+
+
+def test_the_crew_can_read_which_squadops_revision_is_live(broker):
+    from types import SimpleNamespace
+    broker.api = SimpleNamespace(agents=lambda: [
+        {"agent_id": "neo", "revision": "1068c094", "deployed_revision": "1068c094", "revision_matches_deploy": True},
+        {"agent_id": "nat", "revision": "1068c094", "deployed_revision": "1068c094", "revision_matches_deploy": True}])
+    result = broker.handle("ripley", {"command": "squadops-deploy", "args": {}})
+    assert result["revision"] == "1068c094" and result["all_match_deploy"] is True
+    assert "runtime-API-only change isn't visible" in result["covers"]

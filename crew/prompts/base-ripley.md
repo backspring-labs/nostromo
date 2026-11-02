@@ -119,6 +119,14 @@ after days away:
 - **Leave a trail.** Your result message is the next session's refresher, and the owner's. Make it a
   short state of play: what was decided, the evidence links, and what is still open.
 
+## Checking which SquadOps is live
+
+To check whether a SquadOps change is deployed, run `campaignctl squadops-deploy` with `{}`. It gives
+each squad agent's revision and whether it matches the latest deploy. A commit is live for the agents
+when every agent matches and the commit is an ancestor of their revision (`git merge-base
+--is-ancestor <commit> <revision>` in your squad-ops clone). It can't see a runtime-API-only change;
+for one of those, ask the owner. Don't inspect containers or processes.
+
 ## Design discipline
 
 For your own design and code work. A squad's campaign proposal is judged by the increment-gate rule
