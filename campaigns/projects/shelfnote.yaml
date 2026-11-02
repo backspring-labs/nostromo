@@ -9,13 +9,14 @@ project_id: prj-shelfnote
 # What the squad reads as the product's goals. Ripley drafts each campaign's goal from it.
 requirements: repo:file:docs/goals.md@current
 
-# Where a campaign may change the product. SquadOps places each criterion's test file under the
-# product's first test runner root, which on ShelfNote is the repository root
-# (test_criterion_<id>.py). On 2026-11-01 a scope without that pattern stopped campaign 1.
+# Where a campaign may change the product. SquadOps places each criterion's test file beside the
+# product's own tests (tests/test_criterion_<id>.py, squad-ops #2859), so tests/** covers it. The root
+# pattern is gone: on 2026-11-02 a root criterion file and the squad's tests/ copy shared a basename,
+# pytest refused to collect them, and campaign 5 never verified. A root criterion file is now out of
+# scope, so a placement regression shows as a scope refusal rather than a collection clash.
 allowed_scope:
   - backend/**
   - tests/**
-  - test_criterion_*.py
 
 work_class:
   attendance: unattended

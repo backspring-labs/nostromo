@@ -40,7 +40,8 @@ def test_a_goal_becomes_a_valid_definition_from_the_registry(broker):
     result = draft(broker, {"project": "shelfnote", "goal": GOAL, "thread": THREAD, "goals_commit": GOALS_COMMIT}, NOW)
     definition = result["approval"]["definition"]
     assert definition["project_id"] == "prj-shelfnote"
-    assert "test_criterion_*.py" in definition["objective"]["allowed_scope"], "the lesson of campaign 1"
+    # Criterion files sit beside the product's tests (squad-ops #2859); a root one is out of scope.
+    assert definition["objective"]["allowed_scope"] == ["backend/**", "tests/**"]
     assert definition["objective"]["target_accepted_increments"] == 3, "the size follows the goal"
     assert definition["policy"]["calibration_profile"] == "campaign-increment-source"
     assert definition["crew"]["paid_dispatches"] == 16 == result["allowance"]["max_dispatches"]
