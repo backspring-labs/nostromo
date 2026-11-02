@@ -232,7 +232,7 @@ def canvas(packets, names):
     """The campaigns channel's canvas: every running campaign and the last few closed, at a glance.
     Built only from campaign records, never from model text. The thread is still where things are
     discussed and decided; this is the summary view."""
-    from .drafting import et
+    from .drafting import et, shown
     running, closed = [], []
     for cid, packet in packets.items():
         campaign = packet["campaign"]
@@ -246,13 +246,14 @@ def canvas(packets, names):
         label, _, rest = text.partition(": ")
         control = (packet.get("automation") or {}).get("control") or {}
         cutoff = control.get("deadline")
-        lines.append(f"- **{label}**: {rest}" + (f" Cutoff {et(cutoff)}." if isinstance(cutoff, (int, float)) else "")
+        # Escaped: the canvas renders Markdown, and goal items are crew-written (review of #48).
+        lines.append(f"- **{label}**: {shown(rest)}" + (f" Cutoff {et(cutoff)}." if isinstance(cutoff, (int, float)) else "")
                      + (" **Waiting for you:** reply on the decision card in its thread." if yours else ""))
     lines += ["", "## Recently closed", ""]
     for _, cid, packet in sorted(closed, reverse=True)[:RECENT_CLOSED]:
         campaign = packet["campaign"]
         outcome = OUTCOMES.get(campaign.get("outcome"), str(campaign.get("outcome") or "closed"))
-        lines.append(f"- **{names[cid]}**, closed {when(campaign.get('updated_at'))}: {outcome}. {progress(packet)}")
+        lines.append(f"- **{names[cid]}**, closed {when(campaign.get('updated_at'))}: {shown(outcome)}. {progress(packet)}")
     if not closed:
         lines.append("None yet.")
     return "\n".join(lines) + "\n"

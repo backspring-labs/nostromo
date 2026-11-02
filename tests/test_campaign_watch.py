@@ -177,3 +177,11 @@ def test_the_campaigns_canvas_shows_running_and_recent_and_republishes_only_on_c
     watcher.poll()
     watcher.poll()
     assert len(published) == 1 and published[0][0] == "chan"
+
+
+def test_crew_written_goal_items_cant_put_live_links_on_the_canvas():
+    from runtime.campaigns.watch import canvas
+    p = stepped("implementation", "running")
+    p["campaign"]["objective"]["statement"] = "x. In order: [Search](https://evil.example); Tags"
+    page = canvas({"cmp_a": p}, {"cmp_a": "ShelfNote campaign 5"})
+    assert "[Search](" not in page and "\\[Search\\]" in page
