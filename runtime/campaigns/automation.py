@@ -98,6 +98,14 @@ def bounded_ledger(ledger, gate):
     return out
 
 
+CLOSING_GRACE_S = 1800
+
+
+def in_closing_grace(control):
+    """A campaign its cutoff stopped, inside the closing analysis's grace."""
+    return bool(control) and control["state"] == "expired" and control["reason"] == "deadline reached"
+
+
 # The park reason a decision card answers; only this hold is lifted by the owner's approve.
 CARD_HOLD = "Ripley needs your decision; answer her decision card in this thread"
 # Holds that get no card: SquadOps' own pause or escalation (the owner's defaults keep cards to the
@@ -336,10 +344,21 @@ class Automation:
         if control["state"] == "closed":
             return self.status(cid)
         if self.now >= control["deadline"]:
-            self.db.execute("UPDATE review_jobs SET state='cancelled' WHERE campaign=? AND state='queued'", (cid,))
+            self.db.execute("UPDATE review_jobs SET state='cancelled' WHERE campaign=? AND state='queued' AND kind!='analysis'",
+                            (cid,))
             self.db.execute("UPDATE automation SET state='expired',reason='deadline reached' WHERE campaign=?", (cid,))
             self.b.store.save()
             self.stop(cid, "abort", "deadline reached")
+            # A campaign stopped by its cutoff still gets Ripley's closing analysis: one call, within
+            # the closing grace, inside the approved allowance (which runs an hour past the cutoff).
+            # Owner's call by delegation, 2026-11-02 (#40); campaign 4 closed with none.
+            if self.now + 900 <= control["deadline"] + CLOSING_GRACE_S:
+                try:
+                    p = self.b.read("packet", {"campaign": cid})
+                    if p["campaign"]["state"] == "completed" and not p.get("analysis"):
+                        self.queue(cid, "ripley", "analysis", self.packet(cid))
+                except Exception as error:
+                    print(f"campaign automation: no closing analysis for {cid}: {type(error).__name__}", file=sys.stderr)
             return self.status(cid)
         if control["state"] == "parked":
             self.stop(cid, "pause", control["reason"])
@@ -392,7 +411,12 @@ class Automation:
             return None
         cid, spec = row["campaign"], self.spec(row["campaign"])
         control = self.db.execute("SELECT * FROM automation WHERE campaign=?", (cid,)).fetchone()
-        if not control or control["state"] != "active" or self.now + 900 > control["deadline"]:
+        if row["kind"] == "analysis" and in_closing_grace(control):
+            if self.now + 900 > control["deadline"] + CLOSING_GRACE_S:
+                self.db.execute("UPDATE review_jobs SET state='cancelled' WHERE id=?", (row["id"],))
+                self.b.store.save()
+                return None
+        elif not control or control["state"] != "active" or self.now + 900 > control["deadline"]:
             self.park(cid, "insufficient time for a bounded review")
             return None
         current = self.b.read("status", {"campaign": cid})
@@ -448,7 +472,10 @@ class Automation:
             raise Refused("review job is not claimed by this role")
         cid = job["campaign"]
         control = self.db.execute("SELECT * FROM automation WHERE campaign=?", (cid,)).fetchone()
-        if control["state"] != "active" or self.now >= control["deadline"] or self.now - job["claimed"] >= 900:
+        in_window = (control["state"] == "active" and self.now < control["deadline"]
+                     or job["kind"] == "analysis" and in_closing_grace(control)
+                     and self.now < control["deadline"] + CLOSING_GRACE_S)
+        if not in_window or self.now - job["claimed"] >= 900:
             raise Refused("review arrived after its active authorization window")
         payload = json.loads(job["payload"])
         result = validate(job["kind"], args["result"], payload["packet"]["references"], payload["packet"])

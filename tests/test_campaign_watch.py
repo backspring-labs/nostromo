@@ -204,3 +204,9 @@ def test_a_held_campaign_warns_half_an_hour_before_its_cutoff(monkeypatch):
     assert fingerprint(held) != early, "crossing into the last half hour is news"
     text, yours = notice(held, "ShelfNote campaign 4")
     assert "It stops at its cutoff, 12:19 am ET, Mon Nov 2, in under half an hour" in text and yours
+
+
+def test_a_hold_reads_in_plain_words_in_the_thread():
+    held = packet("paused", control={"state": "parked", "reason": "evidence_size_hold: complete evidence exceeds the limit"})
+    text, _ = notice(held, "ShelfNote campaign 4")
+    assert "paused for you. Its evidence was too large for a single review call" in text and "evidence_size_hold" not in text

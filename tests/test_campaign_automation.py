@@ -1102,3 +1102,31 @@ def test_the_gate_packet_keeps_every_log_entry_citable_but_bounds_old_ones():
     rows = bounded_ledger(ledger, gate)
     assert rows[0]["ruling"]["decision"] == "approved" and len(rows[0]["ruling"]["reason"]) == 200
     assert rows[1] == ledger[1], "the gate's unruled row, the ruling's binding, is untouched"
+
+
+def test_a_campaign_stopped_by_its_cutoff_still_gets_one_closing_analysis(world, monkeypatch):
+    # #40: campaign 4 ended at its cutoff with "no closing analysis to come".
+    broker, api, store = world
+    deadline = store.db.execute("SELECT deadline FROM automation").fetchone()[0]
+    monkeypatch.setattr(time, "time", lambda: deadline + 60)
+    rpc(broker, "mother", "advance", {"campaign": "cmp_test"})
+    assert api.posts[-1][1].endswith("/abort") and api.campaign["state"] == "completed"
+    rpc(broker, "mother", "advance", {"campaign": "cmp_test"})  # a later tick keeps it queued
+    job = rpc(broker, "ripley", "review-claim")
+    assert job["kind"] == "analysis"
+    result = {"notes": "Stopped at its cutoff with two of three increments accepted.", "evidence": ["ctl_launched"]}
+    event = helpers().sign_event(KEYS["ripley"], 9, render(job, result), [["h", "channel"], ["e", "thread", "", "reply"]],
+                                 created_at=int(deadline + 90))
+    finish(broker, job, result, event)
+    assert rpc(broker, "mother", "packet", {"campaign": "cmp_test"})["analysis"]
+
+
+def test_the_closing_grace_ends_half_an_hour_after_the_cutoff(world, monkeypatch):
+    broker, api, store = world
+    deadline = store.db.execute("SELECT deadline FROM automation").fetchone()[0]
+    monkeypatch.setattr(time, "time", lambda: deadline + 60)
+    rpc(broker, "mother", "advance", {"campaign": "cmp_test"})
+    monkeypatch.setattr(time, "time", lambda: deadline + 1800 - 600)  # under 15 minutes of grace left
+    assert rpc(broker, "ripley", "review-claim") is None
+    assert store.db.execute("SELECT state FROM review_jobs WHERE kind='analysis'").fetchone()[0] == "cancelled"
+    assert store.db.execute("SELECT state FROM automation").fetchone()[0] == "expired", "never parked"

@@ -55,15 +55,17 @@ def plain_hold(reason):
     return " ".join(str(reason).split())[:300]
 
 
-def card_text(product, version, view, can_approve, cutoff=None, hold=None, ruling=None):
+def card_text(product, version, view, can_approve, cutoff=None, hold=None, ruling=None, submitted=None):
     from .drafting import et, shown
+    from .watch import when
     if hold is None:
         lines = [f"**{shown(product)}: Ripley needs your decision on proposal v{version} for the next increment.**",
                  "", f"Her view: {shown(view)}", ""]
         go = "Reply **approve** to this card to go ahead with it (her notes go to the build plan), "
     else:
         lines = [f"**{shown(product)}: proposal v{version} for the next increment is held at the gate.**", "",
-                 f"Why it's held: {shown(plain_hold(hold))}.", ""]
+                 f"Why it's held: {shown(plain_hold(hold))}." + (f" The squad submitted it {when(submitted)}."
+                                                                  if submitted else ""), ""]
         if ruling:
             # The crew's own ruling, always shown: approving must never silently override it.
             lines += [f"Ripley's ruling: {ruling.replace('_', ' ')}. Her view: {shown(view)}", ""]
@@ -136,14 +138,21 @@ class DecisionCards:
                     result = json.loads(job["result"] or "{}")
                     ruling, view = result.get("decision"), card_view(result.get("notes"))
                 break
+        if str(reason).startswith("Dallas has blocking findings"):
+            for job in self.db.execute("SELECT result FROM review_jobs WHERE campaign=? AND kind='review' AND state='done' "
+                                       "ORDER BY rowid DESC LIMIT 1", (cid,)).fetchall():
+                found = json.loads(job["result"] or "{}")
+                if found.get("blocking"):
+                    view = (view + " " if view else "") + "Dallas's view: " + card_view(found.get("notes"))
+        submitted = rows[0].get("submitted_at")
         # A reviewed ruling that failed to submit needs its retry, not an override.
         if (ruling and ruling != "approved") or str(reason).startswith(("gate submission failed",
                                                                          "gate submission outcome unresolved")):
             request = None
         project = self.b.read("status", {"campaign": cid}).get("project_id")
-        return self.store_card(cid, gate, request, view, project, reason, reason, ruling)
+        return self.store_card(cid, gate, request, view, project, reason, reason, ruling, submitted)
 
-    def store_card(self, cid, gate, request, view, project, park_reason, hold, ruling=None):
+    def store_card(self, cid, gate, request, view, project, park_reason, hold, ruling=None, submitted=None):
         from .watch import product
         item = self.b.store.campaign(cid)
         cid_row = identifier(cid)
@@ -154,7 +163,7 @@ class DecisionCards:
         body = {"campaign": cid_row, "gate": gate, "request": request, "view": view, "channel": item["channel"],
                 "hold": park_reason, "unreviewed": hold is not None and not ruling, "ruling": ruling,
                 "content": card_text(product(project) + " campaign", version, view, request is not None, cutoff, hold,
-                                     ruling)}
+                                     ruling, submitted)}
         # One card per gate: Ripley's own escalation, or the first hold at it, whichever came first.
         self.db.execute("INSERT OR IGNORE INTO decision_cards(id,campaign,thread,state,body,created) VALUES(?,?,?,?,?,?)",
                         (card, cid_row, item["thread"], "drafted", canonical(body), self.now))
@@ -263,6 +272,10 @@ class DecisionCards:
             return self.done(card, "aborted")
         from .automation import CARD_HOLD
         args = body["request"]["args"]
+        # The owner's ruling may have landed with its response lost: SquadOps' log carries our key.
+        if any(e.get("idempotency_key") == key + "-rule" and e.get("outcome") == "applied"
+               for e in self.b.read("log", {"campaign": cid}) or [] if isinstance(e, dict)):
+            return self.ruled(card, body, cid)
         current = self.b.read("status", {"campaign": cid})
         # Before any write: the proposal the card shows must still be the one waiting at the gate.
         # SquadOps would refuse a stale binding, but only after the resume had already happened.
@@ -307,6 +320,11 @@ class DecisionCards:
             self.done(card, "failed")
             Automation(self.b, now=self.now).park(cid, "SquadOps refused the owner's ruling; owner inspection required")
             return {"decided": "failed"}
+        return self.ruled(card, body, cid)
+
+    def ruled(self, card, body, cid):
+        """The owner's ruling is in: settle the crew's side of the gate and lift the card's hold."""
+        from .automation import CARD_HOLD
         # The owner ruled this gate: the crew's unsubmitted reviews for it are moot, and must not be
         # submitted (or park as "outcome unresolved") at the next gate.
         self.db.execute("UPDATE review_jobs SET state='cancelled' WHERE campaign=? AND kind='review' AND state='done'",

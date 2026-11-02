@@ -170,7 +170,10 @@ def notice(packet, label):
     if campaign["state"] == "completed":
         what = "closed. " + OUTCOMES.get(campaign.get("outcome"), f"Its outcome is {campaign.get('outcome')}").capitalize()
     elif control.get("state") == "parked":
-        what = "paused for you. " + str(control.get("reason") or "It needs a decision").rstrip(".")
+        from .decision_cards import plain_hold
+        reason = control.get("reason")
+        what = "paused for you. " + (plain_hold(reason)[:1].upper() + plain_hold(reason)[1:] if reason
+                                     else "It needs a decision").rstrip(".")
     else:
         what = (doing(packet) if campaign["state"] not in {"awaiting_ruling", "escalated", "paused", "launch_blocked"}
                 else None) or DOING.get(campaign["state"], str(campaign["state"]).replace("_", " "))
