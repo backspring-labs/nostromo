@@ -20,10 +20,11 @@ GOALS_COMMIT = "ae9ad47" + "0" * 33
 GOALS_FILE = {"path": "docs/goals.md", "commit": GOALS_COMMIT, "content": "# Goals\n\n1. Readers can find a book.\n"}
 
 
-def squadops(principal, method, path, body):
-    """SquadOps' read of the product's managed clone, at its integrated commit."""
-    assert (principal, method, body) == ("read", "GET", None)
-    if path == "/api/v1/projects/prj-shelfnote/source-file?path=docs/goals.md":
+def squadops(principal, method, path, body, *, query=None):
+    """SquadOps' read of the product's managed clone, at its integrated commit. Like the real client,
+    it refuses a query smuggled into the path."""
+    assert (principal, method, body) == ("read", "GET", None) and "?" not in path
+    if path == "/api/v1/projects/prj-shelfnote/source-file" and query == {"path": "docs/goals.md"}:
         return dict(GOALS_FILE)
     raise RuntimeError("404")
 

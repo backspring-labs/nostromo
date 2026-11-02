@@ -79,16 +79,22 @@ class API:
         except Exception:
             raise Refused("service authentication failed; ask the owner to check provisioning") from None
 
-    def __call__(self, principal, method, path, body):
-        raw = self.request(principal, method, path, body)
+    def __call__(self, principal, method, path, body, *, query=None):
+        raw = self.request(principal, method, path, body, query=query)
         try:
             return json.loads(raw) if raw else None
         except ValueError:
             raise Refused("SquadOps response is not JSON") from None
 
-    def request(self, principal, method, path, body, *, limit=1048576, page=None):
+    def request(self, principal, method, path, body, *, limit=1048576, page=None, query=None):
         if not path.startswith("/api/v1/") or ".." in path or "?" in path:
             raise Refused("invalid internal API path")
+        if query is not None:
+            # A broker-built query (the goals file's path), encoded here, never a caller's raw string.
+            if page is not None or method != "GET" or not isinstance(query, dict) or not all(
+                    isinstance(k, str) and isinstance(v, str) for k, v in query.items()):
+                raise Refused("invalid internal API query")
+            path += "?" + urllib.parse.urlencode(query)
         if page is not None:
             # Only internal evidence readers construct paging, never caller-supplied queries.
             offset, count = page
