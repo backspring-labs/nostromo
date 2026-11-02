@@ -126,10 +126,15 @@ class DecisionCards:
         ruling, view = None, ""
         for job in self.db.execute("SELECT payload,result FROM review_jobs WHERE campaign=? AND kind='decision' "
                                    "AND state='done' ORDER BY rowid DESC", (cid,)).fetchall():
-            if {k: (json.loads(job["payload"]).get("gate") or {}).get(k) for k in ("cycle", "run")} == \
+            payload = json.loads(job["payload"])
+            if {k: (payload.get("gate") or {}).get(k) for k in ("cycle", "run")} == \
                     {"cycle": gate["cycle"], "run": gate["run"]}:
-                result = json.loads(job["result"] or "{}")
-                ruling, view = result.get("decision"), card_view(result.get("notes"))
+                # The ruling counts only for the exact proposal she saw: the binding in her packet.
+                seen = [{k: r.get(k) for k in binding} for r in (payload.get("packet") or {}).get("ledger") or []
+                        if r.get("cycle_id") == gate["cycle"] and r.get("run_id") == gate["run"] and not r.get("ruling")]
+                if seen == [binding]:
+                    result = json.loads(job["result"] or "{}")
+                    ruling, view = result.get("decision"), card_view(result.get("notes"))
                 break
         # A reviewed ruling that failed to submit needs its retry, not an override.
         if (ruling and ruling != "approved") or str(reason).startswith(("gate submission failed",

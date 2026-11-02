@@ -282,7 +282,8 @@ def test_squadops_own_pause_and_ripleys_escalation_make_no_extra_card(world, gat
 def crew_ruled(broker, decision, notes="Ripley's reasons."):
     import json as _json
     broker.store.db.execute("INSERT INTO review_jobs(id,campaign,role,kind,state,payload,result) VALUES(?,?,?,?,?,?,?)",
-                            ("job_r", CID, "ripley", "decision", "done", _json.dumps({"gate": GATE}),
+                            ("job_r", CID, "ripley", "decision", "done", _json.dumps({"gate": GATE, "packet": {"ledger": [
+                                {"cycle_id": GATE["cycle"], "run_id": GATE["run"], "ruling": None, **BINDING}]}}),
                              _json.dumps({"decision": decision, "notes": notes, "evidence": ["art_x"]})))
     broker.store.db.commit()
 
@@ -322,3 +323,11 @@ def test_a_reviewed_ruling_that_failed_to_submit_is_not_overridden(world, gate_o
     crew_ruled(broker, "rejected")
     job = hold_card(broker, api, "gate submission failed; owner inspection required")
     assert "Reply **approve**" not in job["content"] and "Reply **abort**" in job["content"]
+
+
+def test_a_ruling_on_another_version_counts_as_no_ruling(world, gate_open):
+    broker, api, _ = world
+    crew_ruled(broker, "approved")
+    api.ledger[0]["version"] = 4  # the gate now holds a version Ripley never saw
+    job = hold_card(broker, api, "Dallas has blocking findings; owner inspection required")
+    assert "Ripley's ruling" not in job["content"] and "No one in the crew has reviewed" in job["content"]
