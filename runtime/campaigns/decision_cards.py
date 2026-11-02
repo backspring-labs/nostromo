@@ -65,7 +65,7 @@ def card_text(product, version, view, can_approve, cutoff=None, hold=None, rulin
     else:
         lines = [f"**{shown(product)}: proposal v{version} for the next increment is held at the gate.**", "",
                  f"Why it's held: {shown(plain_hold(hold))}." + (f" The squad submitted it {when(submitted)}."
-                                                                  if submitted else ""), ""]
+                                                                  if submitted and when(submitted) else ""), ""]
         if ruling:
             # The crew's own ruling, always shown: approving must never silently override it.
             lines += [f"Ripley's ruling: {ruling.replace('_', ' ')}. Her view: {shown(view)}", ""]
@@ -125,8 +125,8 @@ class DecisionCards:
                                                     "decision": "approved", "binding": binding}}
         # The crew's ruling for this gate, if Ripley has made one (review of #46: a hold card must
         # never let the owner override a ruling they can't see).
-        ruling, view = None, ""
-        for job in self.db.execute("SELECT payload,result FROM review_jobs WHERE campaign=? AND kind='decision' "
+        ruling, view, parent = None, "", None
+        for job in self.db.execute("SELECT id,payload,result FROM review_jobs WHERE campaign=? AND kind='decision' "
                                    "AND state='done' ORDER BY rowid DESC", (cid,)).fetchall():
             payload = json.loads(job["payload"])
             if {k: (payload.get("gate") or {}).get(k) for k in ("cycle", "run")} == \
@@ -136,14 +136,18 @@ class DecisionCards:
                         if r.get("cycle_id") == gate["cycle"] and r.get("run_id") == gate["run"] and not r.get("ruling")]
                 if seen == [binding]:
                     result = json.loads(job["result"] or "{}")
-                    ruling, view = result.get("decision"), card_view(result.get("notes"))
+                    ruling, view, parent = result.get("decision"), card_view(result.get("notes")), job["id"]
                 break
-        if str(reason).startswith("Dallas has blocking findings"):
-            for job in self.db.execute("SELECT result FROM review_jobs WHERE campaign=? AND kind='review' AND state='done' "
-                                       "ORDER BY rowid DESC LIMIT 1", (cid,)).fetchall():
+        if parent and str(reason).startswith("Dallas has blocking findings"):
+            # His review of exactly this ruling: the review job whose parent is her decision job.
+            for job in self.db.execute("SELECT payload,result FROM review_jobs WHERE campaign=? AND kind='review' "
+                                       "AND state='done' ORDER BY rowid DESC", (cid,)).fetchall():
+                if json.loads(job["payload"]).get("parent") != parent:
+                    continue
                 found = json.loads(job["result"] or "{}")
                 if found.get("blocking"):
                     view = (view + " " if view else "") + "Dallas's view: " + card_view(found.get("notes"))
+                break
         submitted = rows[0].get("submitted_at")
         # A reviewed ruling that failed to submit needs its retry, not an override.
         if (ruling and ruling != "approved") or str(reason).startswith(("gate submission failed",
@@ -272,9 +276,10 @@ class DecisionCards:
             return self.done(card, "aborted")
         from .automation import CARD_HOLD
         args = body["request"]["args"]
-        # The owner's ruling may have landed with its response lost: SquadOps' log carries our key.
-        if any(e.get("idempotency_key") == key + "-rule" and e.get("outcome") == "applied"
-               for e in self.b.read("log", {"campaign": cid}) or [] if isinstance(e, dict)):
+        # The owner's ruling may have landed with its response lost. Confirm it from the gate's own run:
+        # an approved increment ruling decided by a human (only the owner's path declares "human"). A
+        # log key alone could be borrowed by another operation's request id (review of #50).
+        if self.owner_ruled(cid, args):
             return self.ruled(card, body, cid)
         current = self.b.read("status", {"campaign": cid})
         # Before any write: the proposal the card shows must still be the one waiting at the gate.
@@ -321,6 +326,17 @@ class DecisionCards:
             Automation(self.b, now=self.now).park(cid, "SquadOps refused the owner's ruling; owner inspection required")
             return {"decided": "failed"}
         return self.ruled(card, body, cid)
+
+    def owner_ruled(self, cid, args):
+        try:
+            project = identifier(self.b.read("status", {"campaign": cid})["project_id"])
+            run = self.b.api("read", "GET", f"/api/v1/projects/{project}/cycles/{identifier(args['cycle'])}"
+                                            f"/runs/{identifier(args['run'])}", None)
+        except Exception:
+            return False
+        return any(isinstance(g, dict) and g.get("gate_name") == "progress_increment_ruling"
+                   and g.get("decision") == "approved" and str(g.get("decided_by") or "").startswith("human:")
+                   for g in (run or {}).get("gate_decisions") or [])
 
     def ruled(self, card, body, cid):
         """The owner's ruling is in: settle the crew's side of the gate and lift the card's hold."""

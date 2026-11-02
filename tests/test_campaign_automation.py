@@ -1130,3 +1130,22 @@ def test_the_closing_grace_ends_half_an_hour_after_the_cutoff(world, monkeypatch
     assert rpc(broker, "ripley", "review-claim") is None
     assert store.db.execute("SELECT state FROM review_jobs WHERE kind='analysis'").fetchone()[0] == "cancelled"
     assert store.db.execute("SELECT state FROM automation").fetchone()[0] == "expired", "never parked"
+
+
+def test_the_closing_analysis_job_carries_a_deadline_the_worker_accepts(world, monkeypatch):
+    # Review of #50: in the grace, the claimed job's deadline was the past cutoff, so the worker refused it.
+    broker, api, store = world
+    deadline = store.db.execute("SELECT deadline FROM automation").fetchone()[0]
+    monkeypatch.setattr(time, "time", lambda: deadline + 60)
+    rpc(broker, "mother", "advance", {"campaign": "cmp_test"})
+    job = rpc(broker, "ripley", "review-claim")
+    assert job["deadline"] - time.time() >= 30, "the worker's preflight needs 30 s"
+
+
+def test_a_failed_closing_analysis_never_pauses_a_stopped_campaign(world, monkeypatch):
+    broker, api, store = world
+    deadline = store.db.execute("SELECT deadline FROM automation").fetchone()[0]
+    monkeypatch.setattr(time, "time", lambda: deadline + 60)
+    rpc(broker, "mother", "advance", {"campaign": "cmp_test"})
+    Automation(broker).park("cmp_test", "provider or worker failure; no automatic retry; reservation retained")
+    assert store.db.execute("SELECT state FROM automation").fetchone()[0] == "expired"

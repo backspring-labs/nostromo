@@ -190,6 +190,13 @@ class Automation:
             self.b.store.save()
 
     def park(self, cid, reason):
+        control = self.db.execute("SELECT state FROM automation WHERE campaign=?", (cid,)).fetchone()
+        if control and control["state"] in {"expired", "closed"}:
+            # A campaign its cutoff (or the owner) stopped is never "paused for you": a failed
+            # closing analysis only marks its job (review of #50).
+            self.db.execute("UPDATE review_jobs SET state='cancelled' WHERE campaign=? AND state='queued'", (cid,))
+            self.b.store.save()
+            return {"state": control["state"]}
         self.db.execute("UPDATE automation SET state='parked',reason=? WHERE campaign=?", (reason, cid))
         self.db.execute("UPDATE review_jobs SET state='cancelled' WHERE campaign=? AND state='queued'", (cid,))
         self.b.store.save()
@@ -462,8 +469,12 @@ class Automation:
         self.db.execute("UPDATE review_jobs SET state='claimed',claimed=?,reserved=? WHERE id=?",
                         (self.now, reserve, row["id"]))
         self.b.store.save()  # Reservation is durable BEFORE any provider access.
+        # In the closing grace the cutoff has passed: the job's own window is the grace's end
+        # (review of #50: the worker refused a deadline already in the past).
+        until = control["deadline"] + CLOSING_GRACE_S if row["kind"] == "analysis" and in_closing_grace(control) \
+            else control["deadline"]
         return {"id": row["id"], "campaign": cid, "role": role, "kind": row["kind"],
-                "payload": payload, "deadline": min(control["deadline"], self.now + 840)}
+                "payload": payload, "deadline": min(until, self.now + 840)}
 
     def result(self, role, args, event):
         exact(args, {"job", "result", "usage"})
