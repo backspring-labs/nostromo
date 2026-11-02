@@ -50,6 +50,10 @@ class Publisher:
         if not isinstance(auth_tag, list) or not auth_tag or auth_tag[0] != "auth":
             raise Refused("Mother's existing Buzz membership tag is required")
 
+    def saved(self, job):
+        """Whether this job's event is already in the outbox (a hint posted on an earlier run)."""
+        return (self.state / (digest({"launch": job["id"], "phase": job["phase"]}) + ".json")).is_file()
+
     def __call__(self, job):
         # Serialize timer/manual invocations so a single outbox key never gets two events.
         descriptor = os.open(self.state / ".publisher.lock", os.O_CREAT | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
@@ -203,6 +207,8 @@ def run(rpc=call, publish=None, thread_events=None, owner=None):
     if publish:
         for result in controller.get("approvals", []) + controller.get("answers", []):
             if "hint" in result:
+                if getattr(publish, "saved", lambda job: False)(result["hint"]):
+                    continue  # posted on an earlier run
                 try:
                     publish(result["hint"])
                 except Exception as error:

@@ -51,7 +51,8 @@ def near_miss(text):
     word = bare(text)
     if not word or len(word) > 60 or word in GO_WORDS or word in STOP_WORDS:
         return False
-    return any(word.startswith(w) for w in GO_WORDS | STOP_WORDS if w != "\U0001f44d")
+    # Whole words only: "got it" or "yesterday it failed" is conversation, not a near miss.
+    return any(re.match(rf"{re.escape(w)}(?![\w'])", word) for w in GO_WORDS | STOP_WORDS if w != "\U0001f44d")
 
 
 class Proposals:

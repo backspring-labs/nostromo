@@ -286,7 +286,9 @@ def test_the_relay_skips_threads_not_started_by_the_owner_and_survives_errors(wo
 
 
 @pytest.mark.parametrize("text,miss", [("approve now", True), ("go please", True), ("approved!", False),
-                                      ("make it two increments instead of three", False), ("thanks", False)])
+                                      ("make it two increments instead of three", False), ("thanks", False),
+                                      ("got it", False), ("yesterday it failed", False), ("stopping by later", False),
+                                      ("cancel that", True)])
 def test_a_near_miss_is_told_what_counts(text, miss):
     from runtime.campaigns.proposals import near_miss
     assert near_miss(text) is miss
