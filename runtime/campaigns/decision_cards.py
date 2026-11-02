@@ -208,8 +208,17 @@ class DecisionCards:
                 "/gates/progress_increment_ruling")
         # Ripley's notes first, and about the build: SquadOps shows approval notes to the framing run.
         notes = body["view"] + f"\n\nApproved by the owner in Buzz, event {eid}."
-        self.b.api("review", "POST", path, {"decision": "approved", "notes": notes, "decided_by_kind": "human",
-                                            "binding": args["binding"], "idempotency_key": key + "-rule"})
+        try:
+            self.b.api("review", "POST", path, {"decision": "approved", "notes": notes, "decided_by_kind": "human",
+                                                "binding": args["binding"], "idempotency_key": key + "-rule"})
+        except Refused as error:
+            if not re.search(r"\(HTTP 4\d\d\)", str(error)):
+                raise  # transport or server trouble: the recorded answer is retried
+            # A definitive refusal: hold the campaign again (a new pause episode) instead of retrying.
+            from .automation import Automation
+            self.done(card, "failed")
+            Automation(self.b, now=self.now).park(cid, "SquadOps refused the owner's ruling; owner inspection required")
+            return {"decided": "failed"}
         from .automation import CARD_HOLD
         # Lift only the hold this card answers.
         self.db.execute("UPDATE automation SET state='active',reason=NULL WHERE campaign=? AND state='parked' AND reason=?",

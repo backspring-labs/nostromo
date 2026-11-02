@@ -224,3 +224,18 @@ def test_a_card_whose_proposal_was_overtaken_writes_nothing(world):
     clock[0] = NOW + 120
     assert answer(broker, reply("approve", card["id"])) == {"decided": "stale"}
     assert api.posts == []
+
+
+def test_a_definitive_refusal_of_the_ruling_holds_the_campaign_again(world, monkeypatch):
+    broker, api, clock = world
+    card = posted(broker, clock)
+    clock[0] = NOW + 120
+    real = api.__call__
+
+    def refuse_rule(principal, method, path, body, **kwargs):
+        if path.endswith("progress_increment_ruling"):
+            raise Refused("SquadOps refused the operation (HTTP 409); inspect its control log")
+        return real(principal, method, path, body)
+    monkeypatch.setattr(broker, "api", refuse_rule)
+    assert answer(broker, reply("approve", card["id"])) == {"decided": "failed"}
+    assert [p[1].rsplit("/", 1)[1] for p in api.posts] == ["resume", "pause"] and api.state == "paused"
