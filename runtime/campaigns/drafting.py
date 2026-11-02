@@ -210,5 +210,5 @@ def render_card(registered, approval, allowance, number, title, hours, left_out,
              f"**Goal:** {shown(objective['statement'])}."]
     if left_out:
         lines.append(f"- **Left for a later campaign:** {shown('; '.join(left_out))}.")
-    lines += ["", "Reply **approve** to this card to launch, or tell me what to change."]
+    lines += ["", "Reply **approve** to this card to launch (go, engage or let's go work too), or tell me what to change."]
     return "\n".join(lines)

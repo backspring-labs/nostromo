@@ -77,8 +77,11 @@ def test_the_owners_approve_creates_the_allowance_definition_and_launch(world):
     assert db.execute("SELECT state FROM launch_workflows WHERE id=?", ("launch-" + proposal,)).fetchone()[0] == "queued"
 
 
-@pytest.mark.parametrize("text,ok", [("approve", True), ("Approve.", True), ("  APPROVE! ", True),
-                                     ("approve, but skip ratings", False), ("approved", False), ("ok", False), ("", False)])
+@pytest.mark.parametrize("text,ok", [("approve", True), ("Approve.", True), ("  APPROVE! ", True), ("approved", True),
+                                     ("go", True), ("Go ahead!", True), ("Engage", True), ("Let\u2019s go!", True),
+                                     ("lets go", True), ("ship it", True), ("yes", True), ("\U0001f44d", True),
+                                     ("approve, but skip ratings", False), ("go, but skip ratings", False),
+                                     ("ok", False), ("", False), ("not yet", False)])
 def test_only_an_unqualified_approve_counts(text, ok):
     assert unqualified_approval(text) is ok
 
@@ -280,3 +283,21 @@ def test_the_relay_skips_threads_not_started_by_the_owner_and_survives_errors(wo
     def broken(request):
         raise OSError("socket gone")
     assert relay_approvals(broken, lambda c, t: [], owner) == [{"unreadable": "OSError"}]
+
+
+@pytest.mark.parametrize("text,miss", [("approve now", True), ("go please", True), ("approved!", False),
+                                      ("make it two increments instead of three", False), ("thanks", False)])
+def test_a_near_miss_is_told_what_counts(text, miss):
+    from runtime.campaigns.proposals import near_miss
+    assert near_miss(text) is miss
+
+
+def test_the_controller_answers_a_near_miss_on_the_card_once(world):
+    broker, clock = world
+    proposal, card = posted_card(broker, clock)
+    clock[0] = NOW + 120
+    owner = helpers().xonly_pubkey(KEYS["owner"])
+    events = [approval("approve now please", reply_to=card["id"])]
+    results = relay_approvals(lambda request: broker.handle("mother", request), lambda c, t: events, owner)
+    assert len(results) == 1 and results[0]["hint"]["id"] == "hint-" + events[0]["id"]
+    assert "reply to the card with just **approve**" in results[0]["hint"]["content"]

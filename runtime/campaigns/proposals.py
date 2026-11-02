@@ -27,10 +27,31 @@ CARD_LEASE_S = 180
 APPROVAL_WINDOW_S = 24 * 3600
 
 
+# The owner's go-words (2026-11-02: "approved" was turned away in silence). Each must be the whole
+# reply; anything more ("go, but skip export") is not an approval.
+GO_WORDS = {"approve", "approved", "go", "go ahead", "engage", "let's go", "lets go", "launch", "ship it",
+            "yes", "\U0001f44d"}
+STOP_WORDS = {"abort", "stop", "cancel"}
+
+
+def bare(text):
+    """A reply as a word: case, surrounding space, closing punctuation and curly apostrophes forgiven."""
+    word = str(text or "").strip().lower().replace("\u2019", "'")
+    return " ".join(re.sub(r"[.!\s]+$", "", word).split())
+
+
 def unqualified_approval(text):
-    """Only a bare "approve" approves. Case, surrounding space and closing punctuation are forgiven;
-    anything more ("approve, but skip export") is not an approval and gets a question instead."""
-    return re.sub(r"[.!\s]+$", "", str(text or "").strip()).lower() == "approve"
+    """Only a bare go-word approves."""
+    return bare(text) in GO_WORDS
+
+
+def near_miss(text):
+    """A short reply that starts like an answer but isn't one ("approve now", "go please"): worth
+    telling the owner what counts, rather than ignoring it in silence."""
+    word = bare(text)
+    if not word or len(word) > 60 or word in GO_WORDS or word in STOP_WORDS:
+        return False
+    return any(word.startswith(w) for w in GO_WORDS | STOP_WORDS if w != "\U0001f44d")
 
 
 class Proposals:

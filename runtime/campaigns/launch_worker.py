@@ -100,7 +100,7 @@ class Publisher:
 def relay_approvals(rpc, thread_events, owner):
     """Pass each owner message that reads "approve" in a live card's thread to the broker. The broker
     verifies every one, signature included, so this only narrows the search; it decides nothing."""
-    from .proposals import unqualified_approval
+    from .proposals import near_miss, unqualified_approval
     results = []
     try:
         posted = rpc({"command": "proposals", "args": {"state": "posted"}})
@@ -119,7 +119,12 @@ def relay_approvals(rpc, thread_events, owner):
             results.append({"proposal": proposal["id"], "refused": "the thread was not started by the owner"})
             continue
         for event in sorted(events, key=lambda e: e.get("created_at", 0)):
-            if event.get("pubkey") != owner or not unqualified_approval(event.get("content")):
+            if event.get("pubkey") != owner:
+                continue
+            if not unqualified_approval(event.get("content")):
+                replies = {t[1] for t in event.get("tags", []) if len(t) >= 2 and t[0] == "e"}
+                if proposal.get("card_event") in replies and near_miss(event.get("content")):
+                    results.append({"hint": hint(proposal, event, "launch")})
                 continue
             try:
                 results.append(rpc({"command": "proposal-approve", "args": {"proposal": proposal["id"]},
@@ -143,6 +148,7 @@ def relay_answers(rpc, thread_events, owner):
     """Pass each owner reply to a live decision card that reads "approve" or "abort" to the broker,
     which verifies it, signature and reply-to-card included."""
     from .decision_cards import answer_of
+    from .proposals import near_miss
     results = []
     try:
         live = rpc({"command": "decision-cards", "args": {"state": "posted"}}) + \
@@ -157,7 +163,11 @@ def relay_answers(rpc, thread_events, owner):
             continue
         for event in sorted(events, key=lambda e: e.get("created_at", 0)):
             replies = {t[1] for t in event.get("tags", []) if len(t) >= 2 and t[0] == "e"}
-            if event.get("pubkey") != owner or card["card_event"] not in replies or answer_of(event.get("content")) is None:
+            if event.get("pubkey") != owner or card["card_event"] not in replies:
+                continue
+            if answer_of(event.get("content")) is None:
+                if near_miss(event.get("content")):
+                    results.append({"hint": hint(card, event, "decision")})
                 continue
             try:
                 results.append(rpc({"command": "decision-answer", "args": {"card": card["id"]}, "decision_event": event}))
@@ -165,6 +175,16 @@ def relay_answers(rpc, thread_events, owner):
             except Exception as error:
                 results.append({"card": card["id"], "refused": str(error) if isinstance(error, Refused) else type(error).__name__})
     return results
+
+
+def hint(item, event, kind):
+    """A plain reply when the owner's answer to a card wasn't understood. Keyed by the reply's own
+    event, so the outbox posts it once however often the controller runs."""
+    what = ("To launch, reply to the card with just **approve** (or go, engage, let's go). To change it, "
+            "say what to change." if kind == "launch" else
+            "Reply to the card with just **approve** (or go) to go ahead, or **abort** (or stop) to stop it.")
+    return {"id": "hint-" + event["id"], "phase": "hint", "channel": item["channel"], "thread": item["thread"],
+            "content": "I didn't take that as an answer to the card. " + what, "mention_owner": False}
 
 
 def post_decision_card(rpc, publish):
@@ -181,6 +201,12 @@ def run(rpc=call, publish=None, thread_events=None, owner=None):
         controller["approvals"] = relay_approvals(rpc, thread_events, owner)
         controller["answers"] = relay_answers(rpc, thread_events, owner)
     if publish:
+        for result in controller.get("approvals", []) + controller.get("answers", []):
+            if "hint" in result:
+                try:
+                    publish(result["hint"])
+                except Exception as error:
+                    result["hint"] = {"failed": type(error).__name__}
         try:
             controller["card"] = post_card(rpc, publish)
         except Exception as error:
