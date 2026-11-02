@@ -70,8 +70,9 @@ def bounded_log(log, gate):
             out.append(entry)
             continue
         reason = str(entry.get("reason") or "")
+        # Who acted and how stay (small); only the reason is cut, and bulky bindings dropped.
         out.append({**{k: entry.get(k) for k in ("entry_id", "committed_at", "operation", "prior_state", "next_state",
-                                                   "outcome")},
+                                                   "outcome", "actor", "actor_role", "target", "refusal")},
                     "reason": reason if len(reason) <= LOG_REASON_CHARS else reason[:LOG_REASON_CHARS - 3] + "...",
                     "abridged": True})
     return out
