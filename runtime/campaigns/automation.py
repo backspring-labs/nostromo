@@ -1,5 +1,6 @@
 """Durable bounded review queue. Mother routes; Ripley judges; Dallas challenges."""
 import json
+import sys
 import sqlite3
 import re
 import time
@@ -141,8 +142,9 @@ class Automation:
             try:
                 from .decision_cards import DecisionCards
                 DecisionCards(self.b, now=self.now).for_hold(cid, reason)
-            except Exception:
-                pass  # the hold stands; the watcher still tells the owner
+            except Exception as error:
+                # The hold stands and the watcher still tells the owner; say why there's no card.
+                print(f"campaign automation: no decision card for {cid}: {type(error).__name__}", file=sys.stderr)
         return result
 
     def stop(self, cid, command, reason):

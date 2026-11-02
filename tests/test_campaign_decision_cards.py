@@ -277,3 +277,48 @@ def test_squadops_own_pause_and_ripleys_escalation_make_no_extra_card(world, gat
     Automation(broker, now=NOW).park(CID, "runtime requires an owner decision")
     cards = broker.handle("mother", {"command": "decision-cards", "args": {}})
     assert len(cards) == 1
+
+
+def crew_ruled(broker, decision, notes="Ripley's reasons."):
+    import json as _json
+    broker.store.db.execute("INSERT INTO review_jobs(id,campaign,role,kind,state,payload,result) VALUES(?,?,?,?,?,?,?)",
+                            ("job_r", CID, "ripley", "decision", "done", _json.dumps({"gate": GATE}),
+                             _json.dumps({"decision": decision, "notes": notes, "evidence": ["art_x"]})))
+    broker.store.db.commit()
+
+
+def hold_card(broker, api, reason):
+    from runtime.campaigns.automation import Automation
+    api.state = "awaiting_ruling"
+    Automation(broker, now=NOW).park(CID, reason)
+    return broker.handle("mother", {"command": "decision-card-claim", "args": {}})
+
+
+@pytest.mark.parametrize("decision", ["rejected", "returned_for_revision"])
+def test_a_hold_card_never_offers_to_override_the_crews_rejection(world, gate_open, decision):
+    # Review of #46: a blocking (or failing) Dallas on Ripley's rejection made an approvable card.
+    broker, api, _ = world
+    crew_ruled(broker, decision, "Out of the goal's scope.")
+    job = hold_card(broker, api, "Dallas has blocking findings; owner inspection required")
+    assert f"Ripley's ruling: {decision.replace('_', ' ')}. Her view: Out of the goal's scope." in job["content"]
+    assert "Approve isn't offered" in job["content"] and "Reply **approve**" not in job["content"]
+
+
+def test_a_hold_over_ripleys_approval_says_approve_overrides_it(world, gate_open):
+    broker, api, clock = world
+    crew_ruled(broker, "approved", "Approve Tags; framing covers unknown tags.")
+    job = hold_card(broker, api, "Dallas has blocking findings; owner inspection required")
+    assert "Ripley's ruling: approved." in job["content"] and "overriding the hold" in job["content"]
+    card = sign("mother", job["content"], [["h", CHANNEL], ["e", THREAD, "", "reply"]], NOW)
+    broker.handle("mother", {"command": "decision-card-posted", "args": {"card": job["id"]}, "decision_event": card})
+    clock[0] = NOW + 120
+    assert answer(broker, reply("approve", card["id"])) == {"decided": "approved"}
+    notes = api.posts[-1][2]["notes"]
+    assert notes.startswith("Approve Tags; framing covers unknown tags.") and "over a crew hold" in notes
+
+
+def test_a_reviewed_ruling_that_failed_to_submit_is_not_overridden(world, gate_open):
+    broker, api, _ = world
+    crew_ruled(broker, "rejected")
+    job = hold_card(broker, api, "gate submission failed; owner inspection required")
+    assert "Reply **approve**" not in job["content"] and "Reply **abort**" in job["content"]
