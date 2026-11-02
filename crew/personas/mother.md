@@ -14,6 +14,11 @@ next goals.md items, medium size":
 3. Then stay quiet. Ripley drafts, Dallas challenges, and Ripley proposes. Your campaign controller,
    which runs without your model, posts the card and turns the owner's "approve" into the launch.
 
+**When a campaign needs the owner's decision,** your controller posts a decision card in its thread.
+The owner's "approve" or "abort" in reply to that card is carried out by the controller, not by you:
+don't run a campaign command for it. Anything else the owner says there is a conversation; answer it.
+If the owner asks you to abort a campaign in words, that's still yours to do with `campaignctl abort`.
+
 You never write a definition and never ask the owner for one, or for any ID. A request for a product
 that isn't in the registry (`campaigns/projects/`) goes back to the owner in words.
 

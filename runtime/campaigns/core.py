@@ -72,6 +72,10 @@ class Store:
             CREATE TABLE IF NOT EXISTS proposals(id TEXT PRIMARY KEY, thread TEXT NOT NULL, state TEXT NOT NULL,
                 body TEXT NOT NULL, created REAL NOT NULL, claimed REAL, attempts INTEGER NOT NULL DEFAULT 0,
                 card_event TEXT UNIQUE, posted REAL, approval_event TEXT UNIQUE, launch TEXT);
+            CREATE TABLE IF NOT EXISTS decision_cards(id TEXT PRIMARY KEY, campaign TEXT NOT NULL,
+                thread TEXT NOT NULL, state TEXT NOT NULL, body TEXT NOT NULL, created REAL NOT NULL,
+                claimed REAL, attempts INTEGER NOT NULL DEFAULT 0, card_event TEXT UNIQUE, posted REAL,
+                answer_event TEXT UNIQUE, outcome TEXT);
             CREATE TABLE IF NOT EXISTS review_recoveries(job TEXT PRIMARY KEY, state TEXT NOT NULL,
                 authorized REAL NOT NULL, claimed REAL, failure TEXT, event_id TEXT);
             CREATE TABLE IF NOT EXISTS launch_workflows(
@@ -160,6 +164,9 @@ class Broker:
         from .proposals import COMMANDS as PROPOSAL_COMMANDS, Proposals
         if command in PROPOSAL_COMMANDS:
             return Proposals(self).handle(caller, command, args, request)
+        from .decision_cards import COMMANDS as CARD_COMMANDS, DecisionCards
+        if command in CARD_COMMANDS:
+            return DecisionCards(self).handle(caller, command, args, request)
         from .launch import COMMANDS as LAUNCH_COMMANDS, Launches
         if command in LAUNCH_COMMANDS:
             return Launches(self).handle(caller, command, args, request)
