@@ -184,7 +184,8 @@ def test_the_controller_relays_only_owner_replies_to_the_card(world):
     assert results == [{"decided": "approved"}]
 
 
-@pytest.mark.parametrize("text,word", [("approve", "approve"), ("Abort!", "abort"), ("approve it", None), ("", None)])
+@pytest.mark.parametrize("text,word", [("approve", "approve"), ("Abort!", "abort"), ("approve it", None), ("", None),
+                                       ("go", "approve"), ("Engage.", "approve"), ("stop", "abort"), ("Cancel", "abort")])
 def test_answers_are_one_bare_word(text, word):
     assert answer_of(text) == word
 
