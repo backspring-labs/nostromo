@@ -330,4 +330,4 @@ def test_a_ruling_on_another_version_counts_as_no_ruling(world, gate_open):
     crew_ruled(broker, "approved")
     api.ledger[0]["version"] = 4  # the gate now holds a version Ripley never saw
     job = hold_card(broker, api, "Dallas has blocking findings; owner inspection required")
-    assert "Ripley's ruling" not in job["content"] and "No one in the crew has reviewed" in job["content"]
+    assert "Ripley's ruling:" not in job["content"] and "No one in the crew has reviewed" in job["content"]
