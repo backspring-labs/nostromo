@@ -248,9 +248,44 @@ def labels(packets):
     return names
 
 
+RECENT_CLOSED = 5
+
+
+def canvas(packets, names):
+    """The campaigns channel's canvas: every running campaign and the last few closed, at a glance.
+    Built only from campaign records, never from model text. The thread is still where things are
+    discussed and decided; this is the summary view."""
+    from .drafting import et, shown
+    running, closed = [], []
+    for cid, packet in packets.items():
+        campaign = packet["campaign"]
+        (closed if campaign["state"] == "completed" else running).append((campaign.get("created_at") or "", cid, packet))
+    lines = ["# Campaigns", "", "_Kept current by Mother's campaign controller from the campaign records._", ""]
+    lines += ["## Running", ""]
+    if not running:
+        lines += ["Nothing is running. Ask Mother for a campaign in a new thread here.", ""]
+    for _, cid, packet in sorted(running):
+        text, yours = notice(packet, names[cid])
+        label, _, rest = text.partition(": ")
+        control = (packet.get("automation") or {}).get("control") or {}
+        cutoff = control.get("deadline")
+        # Escaped: the canvas renders Markdown, and goal items are crew-written (review of #48).
+        lines.append(f"- **{label}**: {shown(rest)}" + (f" Cutoff {et(cutoff)}." if isinstance(cutoff, (int, float)) else "")
+                     + (" **Waiting for you:** reply on the decision card in its thread." if yours else ""))
+    lines += ["", "## Recently closed", ""]
+    for _, cid, packet in sorted(closed, reverse=True)[:RECENT_CLOSED]:
+        campaign = packet["campaign"]
+        outcome = OUTCOMES.get(campaign.get("outcome"), str(campaign.get("outcome") or "closed"))
+        lines.append(f"- **{names[cid]}**, closed {when(campaign.get('updated_at'))}: {shown(outcome)}. {progress(packet)}")
+    if not closed:
+        lines.append("None yet.")
+    return "\n".join(lines) + "\n"
+
+
 class Watcher:
-    def __init__(self, db, rpc, publish, publish_report):
+    def __init__(self, db, rpc, publish, publish_report, publish_canvas=None):
         self.db, self.rpc, self.publish, self.publish_report = db, rpc, publish, publish_report
+        self.publish_canvas = publish_canvas
         db.execute("CREATE TABLE IF NOT EXISTS watched(id TEXT PRIMARY KEY, fingerprint TEXT, failures INTEGER, report TEXT)")
         db.execute("CREATE TABLE IF NOT EXISTS watcher_meta(key TEXT PRIMARY KEY, value TEXT)")
         row = db.execute("SELECT value FROM watcher_meta WHERE key='fingerprint_format'").fetchone()
@@ -314,6 +349,27 @@ class Watcher:
             self.db.execute("INSERT OR REPLACE INTO watcher_meta VALUES('fingerprint_format',?)", (str(FINGERPRINT_FORMAT),))
             self.db.commit()
             self.adopting = False
+        self.refresh_canvas(tracked, packets, names)
+
+    def refresh_canvas(self, tracked, packets, names):
+        """Republish the campaigns canvas only when what it says changed. Best effort: a canvas that
+        can't be published never stops the thread posts."""
+        if not self.publish_canvas or not packets:
+            return
+        channels = {item["channel"] for item in tracked if item["id"] in packets}
+        for channel in sorted(channels):
+            ids = {item["id"] for item in tracked if item["channel"] == channel}
+            page = canvas({cid: p for cid, p in packets.items() if cid in ids}, names)
+            key, sha = "canvas:" + channel, digest(page)
+            old = self.db.execute("SELECT value FROM watcher_meta WHERE key=?", (key,)).fetchone()
+            if old and old[0] == sha:
+                continue
+            try:
+                self.publish_canvas(channel, page)
+            except Exception:
+                continue
+            self.db.execute("INSERT OR REPLACE INTO watcher_meta VALUES(?,?)", (key, sha))
+            self.db.commit()
 
 
 def main():
@@ -357,8 +413,15 @@ def main():
             raise RuntimeError("Buzz note was published under an unexpected coordinate")
         return expected
 
+    def publish_canvas(channel, page):
+        # canvas set prints no publication receipt, so only its exit status is checked.
+        result = subprocess.run([buzz, "canvas", "set", "--channel", channel, "--content", "-"], input=page,
+                                text=True, capture_output=True, env=env, timeout=30)
+        if result.returncode:
+            raise RuntimeError("Buzz canvas publication failed")
+
     db = sqlite3.connect(args.state)
-    watcher = Watcher(db, call, publish, publish_report)
+    watcher = Watcher(db, call, publish, publish_report, publish_canvas)
     while True:
         try:
             watcher.poll()

@@ -153,6 +153,40 @@ def test_a_new_step_is_news():
     assert fingerprint(stepped("framing", "running")) != fingerprint(stepped("implementation", "running"))
 
 
+def test_the_campaigns_canvas_shows_running_and_recent_and_republishes_only_on_change():
+    from runtime.campaigns.watch import canvas
+    held = packet("paused", control={"state": "parked", "reason": "evidence_size_hold: x", "deadline": 1793596763.0})
+    done = packet("completed", outcome="aborted")
+    page = canvas({"cmp_a": held, "cmp_b": done}, {"cmp_a": "ShelfNote campaign 5", "cmp_b": "ShelfNote campaign 4"})
+    assert "## Running" in page and "**ShelfNote campaign 5**: paused for you." in page
+    assert "Cutoff 12:19 am ET, Mon Nov 2." in page and "Waiting for you" in page
+    assert "**ShelfNote campaign 4**, closed" in page and "it was aborted" in page
+    assert "cmp_" not in page
+
+    published = []
+    db = sqlite3.connect(":memory:")
+    rpc_packets = {"cmp_a": held}
+
+    def rpc(request):
+        if request["command"] == "tracked":
+            return [{"id": "cmp_a", "channel": "chan", "thread": "t" * 64}]
+        if request["command"] == "packet":
+            return rpc_packets[request["args"]["campaign"]]
+        return {}
+    watcher = Watcher(db, rpc, lambda *a: None, lambda *a: None, lambda channel, page: published.append((channel, page)))
+    watcher.poll()
+    watcher.poll()
+    assert len(published) == 1 and published[0][0] == "chan"
+
+
+def test_crew_written_goal_items_cant_put_live_links_on_the_canvas():
+    from runtime.campaigns.watch import canvas
+    p = stepped("implementation", "running")
+    p["campaign"]["objective"] = {**p["campaign"]["objective"], "statement": "x. In order: [Search](https://evil.example); Tags"}
+    page = canvas({"cmp_a": p}, {"cmp_a": "ShelfNote campaign 5"})
+    assert "[Search](" not in page and "\\[Search\\]" in page
+
+
 def test_a_repair_says_the_first_build_failed_its_checks():
     p = stepped("implementation", "running")
     p["campaign"]["state"] = "repairing"
