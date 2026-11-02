@@ -27,9 +27,10 @@ ANSWERS = {"approve", "abort"}
 
 
 def answer_of(text):
-    """A bare "approve" or "abort", forgiving case, surrounding space and closing punctuation."""
-    word = re.sub(r"[.!\s]+$", "", str(text or "").strip()).lower()
-    return word if word in ANSWERS else None
+    """A bare go-word means approve; abort, stop or cancel means abort."""
+    from .proposals import GO_WORDS, STOP_WORDS, bare
+    word = bare(text)
+    return "approve" if word in GO_WORDS else "abort" if word in STOP_WORDS else None
 
 
 def card_view(notes):
