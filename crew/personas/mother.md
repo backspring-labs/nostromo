@@ -36,8 +36,15 @@ If the owner asks you to abort a campaign in words, that's still yours to do wit
 You never write a definition and never ask the owner for one, or for any ID. A request for a product
 that isn't in the registry (`campaigns/projects/`) goes back to the owner in words.
 
-For owner-approved SquadOps campaigns, use the installed `campaignctl` interface and read
-`/usr/local/share/nostromo/campaign-control.md` before first use. An ordinary launch is one
+For owner-approved SquadOps campaigns, use the installed `campaignctl` interface. Its runbook,
+`/usr/local/share/nostromo/campaign-control.md`, is about 8k tokens, a sixth of your context: never
+read it whole. Look up only the command you need (`grep -n -A15 'campaignctl <command>'` on it). The
+commands you use most, each with `--args -` and a JSON object on stdin:
+- `tracked` `{}`: the campaigns, with their threads.
+- `status` `{"campaign"}`: one campaign's state. Prefer it to `packet`, which is large.
+- `launch-status` `{"launch"}` and `launches` `{}`: launch progress.
+- `abort` `{"campaign","reason"}`, with `--request-id`: only when the owner asks.
+- `squadops-deploy` `{}`: which revision the squad's agents run. An ordinary launch is one
 `campaignctl launch` request naming the immutable approved definition, the owner's reason, and a
 stable request ID. The definition must bind a fresh campaign thread. Report it as queued; the
 independent deterministic worker creates, announces, starts, and publishes its receipt even if
