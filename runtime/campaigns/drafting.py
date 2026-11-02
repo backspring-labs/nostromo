@@ -66,6 +66,30 @@ def entry(project):
     return value
 
 
+def goals(broker, project):
+    """The product's current goals, as SquadOps will run them: the registry's requirements file, read
+    from the project's managed clone at its integrated commit. There is no fallback. On 2026-11-01
+    every draft rebuilt the list from older campaigns because the file was unreadable, and a stale
+    list launched."""
+    from urllib.parse import quote
+    registered = entry(project)
+    name = registered.get("display_name", registered["project_id"])
+    match = re.fullmatch(r"repo:file:([A-Za-z0-9._/-]+)@current", str(registered.get("requirements") or ""))
+    if not match or ".." in match.group(1).split("/"):
+        raise Refused(f"{name}'s registry entry names no goals file (requirements: repo:file:<path>@current)")
+    path = match.group(1)
+    try:
+        found = broker.api("read", "GET", f"/api/v1/projects/{identifier(registered['project_id'])}/source-file"
+                                          f"?path={quote(path, safe='/')}", None)
+    except Exception:
+        found = None
+    if not (isinstance(found, dict) and found.get("path") == path and isinstance(found.get("content"), str)
+            and re.fullmatch(r"[0-9a-f]{7,64}", str(found.get("commit")))):
+        raise Refused(f"I couldn't read {name}'s goals ({path}) from SquadOps, so there is nothing current to "
+                      "draft from. Tell the owner; never draft from an older list.")
+    return {"path": path, "commit": found["commit"], "content": found["content"]}
+
+
 def campaigns_channel():
     import yaml
     for channel in yaml.safe_load((ROOT / "crew" / "channels.yaml").read_text())["channels"]:
@@ -107,9 +131,13 @@ def campaign_number(store, project_id):
 def draft(broker, args, now=None):
     from .review import reservation_microusd
     now = time.time() if now is None else now
-    exact(args, {"project", "goal", "thread"}, {"size", "hours"})
+    exact(args, {"project", "goal", "thread", "goals_commit"}, {"size", "hours"})
     identifier(args["thread"])
     registered = entry(args["project"])
+    # The goal must come from the goals as they are now: the commit Ripley read must still be current.
+    source = goals(broker, args["project"])
+    if args["goals_commit"] != source["commit"]:
+        raise Refused(f"{source['path']} has changed since it was read (now at {source['commit'][:7]}); read it again")
     goal = args["goal"]
     exact(goal, {"title", "statement"}, {"items", "measurement"})
     for field in ("title", "statement"):
@@ -155,11 +183,11 @@ def draft(broker, args, now=None):
     Automation(broker, now=now).validate_allowance(allowance)
     broker.check_definition(approval, allowance=allowance)
     card = render_card(registered, approval, allowance, campaign_number(broker.store, registered["project_id"]),
-                       goal["title"].strip(), hours, items[increments:])
+                       goal["title"].strip(), hours, items[increments:], source)
     return {"card": card, "approval": approval, "allowance": allowance}
 
 
-def render_card(registered, approval, allowance, number, title, hours, left_out):
+def render_card(registered, approval, allowance, number, title, hours, left_out, source):
     """The proposal the owner reads and approves. A pure function of what it describes, so that
     approval-by-reply can re-render it and check the signed card says exactly this."""
     objective = approval["definition"]["objective"]
@@ -172,6 +200,7 @@ def render_card(registered, approval, allowance, number, title, hours, left_out)
              f"- **Reviews:** at most {allowance['max_dispatches']} reviews, from a "
              f"${allowance['cap_microusd'] / 1e6:.2f} allowance. Ripley rules each gate and Dallas checks each ruling.",
              f"- **Scope:** {shown(', '.join(objective['allowed_scope']))}.",
+             f"- **Goals:** from {shown(source['path'])} at {source['commit'][:7]}.",
              f"- **Time:** runs for up to {hours:g} hours once started. Approve it by {et(cutoff - hours * 3600)}.",
              f"- **Increments:** up to {increments}.",
              f"- **Accepted when:** {shown(objective['measurement'].rstrip('.'))}.",

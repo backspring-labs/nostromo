@@ -267,9 +267,12 @@ their prior behavior. Passing unit tests is not live commissioning: exercise one
 feature increment, its independent review, actual implementation acceptance and closing analysis
 before enabling an unattended definition.
 
-**Plain-language campaigns (the normal path).** The owner asks Mother in words. Ripley drafts a goal
-from the product's registry entry (`campaigns/projects/<product>.yaml`) and checks it with
-`campaignctl draft`. Dallas challenges it, and Ripley runs `campaignctl propose`. Mother's
+**Plain-language campaigns (the normal path).** The owner asks Mother in words. Ripley reads the
+product's current goals with `campaignctl goals` (the registry's `requirements` file, from SquadOps'
+managed clone at the project's integrated commit, the same tree the campaign runs on), drafts a goal
+and checks it with `campaignctl draft`, passing the commit she read. If the goals can't be read, or
+changed since she read them, the draft refuses; there is no fallback to earlier campaigns. The card
+states the file and commit. Dallas challenges it, and Ripley runs `campaignctl propose`. Mother's
 controller (the launch timer) posts the card and watches the thread. The owner replies **approve**
 to the card itself: an owner-signed bare "approve" that replies to the card's own message, after it
 was posted and by its approve-by time. A reply tagged only to the thread approves nothing, because
