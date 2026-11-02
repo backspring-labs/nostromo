@@ -16,10 +16,11 @@ GOALS_COMMIT = "ae9ad47" + "0" * 33
 GOALS_FILE = {"path": "docs/goals.md", "commit": GOALS_COMMIT, "content": "# Goals\n\n1. Readers can find a book.\n"}
 
 
-def squadops(principal, method, path, body):
-    """SquadOps' read of the product's managed clone, at its integrated commit."""
-    assert (principal, method, body) == ("read", "GET", None)
-    if path == "/api/v1/projects/prj-shelfnote/source-file?path=docs/goals.md":
+def squadops(principal, method, path, body, *, query=None):
+    """SquadOps' read of the product's managed clone, at its integrated commit. Like the real client,
+    it refuses a query smuggled into the path."""
+    assert (principal, method, body) == ("read", "GET", None) and "?" not in path
+    if path == "/api/v1/projects/prj-shelfnote/source-file" and query == {"path": "docs/goals.md"}:
         return dict(GOALS_FILE)
     raise RuntimeError("404")
 
@@ -103,7 +104,7 @@ def test_the_goals_are_read_live_and_the_card_says_which_commit(broker):
 
 def test_unreadable_goals_refuse_the_draft_with_no_fallback(broker, monkeypatch):
     # 2026-11-01: every draft rebuilt the list from older campaigns, and a stale list launched.
-    def down(*args):
+    def down(*args, **kwargs):
         raise RuntimeError("404")
     monkeypatch.setattr(broker, "api", down)
     with pytest.raises(Refused, match="couldn't read ShelfNote's goals .* never draft from an older list"):
@@ -116,7 +117,7 @@ def test_goals_that_changed_since_they_were_read_refuse_the_draft(broker):
 
 
 def test_a_malformed_goals_answer_is_unreadable(broker, monkeypatch):
-    monkeypatch.setattr(broker, "api", lambda *a: {"path": "docs/goals.md", "content": "x"})  # no commit
+    monkeypatch.setattr(broker, "api", lambda *a, **k: {"path": "docs/goals.md", "content": "x"})  # no commit
     with pytest.raises(Refused, match="couldn't read"):
         rpc_goals(broker)
 

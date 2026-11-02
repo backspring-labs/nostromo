@@ -163,3 +163,22 @@ def test_return_to_shared_refuses_counted_mode_and_only_starts_enabled_local_rol
     box.restore_shared(mode)
     assert not box.flag.exists()
     assert [c[-1] for c in calls[before:] if c[1] == "start"] == ["nostromo@mother"]
+
+
+def test_a_broker_built_query_is_encoded_and_a_smuggled_one_refused():
+    # 2026-11-01: the goals read put "?path=" into the path, which the client refuses; the fakes didn't.
+    api = API({"api_url": "http://squadops:8001", "clients": {}})
+    api.token = lambda principal: "fixture-only"
+    seen = []
+
+    class Response:
+        def __enter__(self): return self
+        def __exit__(self, *args): pass
+        def read(self, maximum): return b'{"ok": true}'
+    api.opener = SimpleNamespace(open=lambda request, **kwargs: seen.append(request) or Response())
+    assert api("read", "GET", "/api/v1/projects/prj-shelfnote/source-file", None, query={"path": "docs/goals.md"}) == {"ok": True}
+    assert seen[0].full_url == "http://squadops:8001/api/v1/projects/prj-shelfnote/source-file?path=docs%2Fgoals.md"
+    with pytest.raises(Refused, match="invalid internal API path"):
+        api("read", "GET", "/api/v1/projects/p/source-file?path=x", None)
+    with pytest.raises(Refused, match="invalid internal API query"):
+        api("read", "POST", "/api/v1/projects/p/source-file", {}, query={"path": "x"})

@@ -71,22 +71,24 @@ def goals(broker, project):
     from the project's managed clone at its integrated commit. There is no fallback. On 2026-11-01
     every draft rebuilt the list from older campaigns because the file was unreadable, and a stale
     list launched."""
-    from urllib.parse import quote
     registered = entry(project)
     name = registered.get("display_name", registered["project_id"])
     match = re.fullmatch(r"repo:file:([A-Za-z0-9._/-]+)@current", str(registered.get("requirements") or ""))
     if not match or ".." in match.group(1).split("/"):
         raise Refused(f"{name}'s registry entry names no goals file (requirements: repo:file:<path>@current)")
     path = match.group(1)
+    reason = ""
     try:
-        found = broker.api("read", "GET", f"/api/v1/projects/{identifier(registered['project_id'])}/source-file"
-                                          f"?path={quote(path, safe='/')}", None)
+        found = broker.api("read", "GET", f"/api/v1/projects/{identifier(registered['project_id'])}/source-file",
+                           None, query={"path": path})
+    except Refused as error:  # status only; the client never passes error bodies through
+        found, reason = None, f" ({error})"
     except Exception:
         found = None
     if not (isinstance(found, dict) and found.get("path") == path and isinstance(found.get("content"), str)
             and re.fullmatch(r"[0-9a-f]{7,64}", str(found.get("commit")))):
-        raise Refused(f"I couldn't read {name}'s goals ({path}) from SquadOps, so there is nothing current to "
-                      "draft from. Tell the owner; never draft from an older list.")
+        raise Refused(f"I couldn't read {name}'s goals ({path}) from SquadOps{reason}, so there is nothing current "
+                      "to draft from. Tell the owner; never draft from an older list.")
     return {"path": path, "commit": found["commit"], "content": found["content"]}
 
 
