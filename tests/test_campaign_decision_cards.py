@@ -239,3 +239,41 @@ def test_a_definitive_refusal_of_the_ruling_holds_the_campaign_again(world, monk
     monkeypatch.setattr(broker, "api", refuse_rule)
     assert answer(broker, reply("approve", card["id"])) == {"decided": "failed"}
     assert [p[1].rsplit("/", 1)[1] for p in api.posts] == ["resume", "pause"] and api.state == "paused"
+
+
+@pytest.fixture
+def gate_open(monkeypatch):
+    from runtime.campaigns.evidence import Evidence
+    real = Evidence.handle
+    monkeypatch.setattr(Evidence, "handle", lambda self, command, args: {"gates": [GATE]} if command == "progress"
+                        else real(self, command, args))
+
+
+def test_a_crew_hold_at_an_open_gate_gets_a_card_with_the_cutoff(world, gate_open):
+    # 2026-11-01: an evidence_size_hold at campaign 4's Tags gate left the owner no way to answer.
+    from runtime.campaigns.automation import Automation
+    broker, api, clock = world
+    api.state = "awaiting_ruling"
+    hold = "evidence_size_hold: complete evidence exceeds the single-call review limit; owner inspection required"
+    Automation(broker, now=NOW).park(CID, hold)
+    job = broker.handle("mother", {"command": "decision-card-claim", "args": {}})
+    assert "proposal v3 for the next increment is held at the gate" in job["content"]
+    assert "too large for a single review call" in job["content"] and "without a crew review" in job["content"]
+    assert "stops at its cutoff, 7:00 pm ET, Sun Nov 1, whether or not this is answered" in job["content"]
+    card = sign("mother", job["content"], [["h", CHANNEL], ["e", THREAD, "", "reply"]], NOW)
+    broker.handle("mother", {"command": "decision-card-posted", "args": {"card": job["id"]}, "decision_event": card})
+    clock[0] = NOW + 120
+    assert answer(broker, reply("approve", card["id"])) == {"decided": "approved"}
+    notes = api.posts[-1][2]["notes"]
+    assert notes.startswith("Approved by the owner in Buzz") and "without a crew review" in notes
+    assert broker.store.db.execute("SELECT state FROM automation WHERE campaign=?", (CID,)).fetchone()[0] == "active"
+
+
+def test_squadops_own_pause_and_ripleys_escalation_make_no_extra_card(world, gate_open):
+    from runtime.campaigns.automation import CARD_HOLD, Automation
+    broker, api, _ = world
+    escalate(broker)
+    Automation(broker, now=NOW).park(CID, CARD_HOLD)
+    Automation(broker, now=NOW).park(CID, "runtime requires an owner decision")
+    cards = broker.handle("mother", {"command": "decision-cards", "args": {}})
+    assert len(cards) == 1

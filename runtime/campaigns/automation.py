@@ -50,6 +50,9 @@ def evidence_key(meta):
 
 # The park reason a decision card answers; only this hold is lifted by the owner's approve.
 CARD_HOLD = "Ripley needs your decision; answer her decision card in this thread"
+# Holds that get no card: SquadOps' own pause or escalation (the owner's defaults keep cards to the
+# crew's holds), and Ripley's escalation, which makes its own card first.
+OWN_HOLDS = {"runtime requires an owner decision", CARD_HOLD}
 
 
 class Automation:
@@ -132,7 +135,15 @@ class Automation:
         self.db.execute("UPDATE automation SET state='parked',reason=? WHERE campaign=?", (reason, cid))
         self.db.execute("UPDATE review_jobs SET state='cancelled' WHERE campaign=? AND state='queued'", (cid,))
         self.b.store.save()
-        return self.stop(cid, "pause", reason)
+        result = self.stop(cid, "pause", reason)
+        if reason not in OWN_HOLDS:
+            # A crew hold at an open gate is the owner's decision: give them a card to answer.
+            try:
+                from .decision_cards import DecisionCards
+                DecisionCards(self.b, now=self.now).for_hold(cid, reason)
+            except Exception:
+                pass  # the hold stands; the watcher still tells the owner
+        return result
 
     def stop(self, cid, command, reason):
         # The stable receipt survives restarts and lost responses. Never invent a new write ID.

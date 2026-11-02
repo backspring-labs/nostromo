@@ -39,13 +39,36 @@ def card_view(notes):
     return view if len(view) <= 600 else view[:597].rstrip() + "..."
 
 
-def card_text(product, version, view, can_approve):
-    from .drafting import shown
-    lines = [f"**{shown(product)}: Ripley needs your decision on proposal v{version} for the next increment.**",
-             "", f"Her view: {shown(view)}", ""]
+# Crew holds, in plain words. Anything else is shown as the hold's own text.
+HOLDS = {"evidence_size_hold": "its evidence was too large for a single review call, so Ripley and Dallas couldn't "
+                               "review it",
+         "Dallas has blocking findings": "Dallas found a blocking problem with Ripley's ruling",
+         "review allowance exhausted": "the campaign's review allowance is used up, so no review can run",
+         "required evidence missing": "evidence the review needs is missing",
+         "insufficient time for a bounded review": "there isn't enough time left for a review"}
+
+
+def plain_hold(reason):
+    for key, words in HOLDS.items():
+        if str(reason).startswith(key):
+            return words
+    return " ".join(str(reason).split())[:300]
+
+
+def card_text(product, version, view, can_approve, cutoff=None, hold=None):
+    from .drafting import et, shown
+    if hold is None:
+        lines = [f"**{shown(product)}: Ripley needs your decision on proposal v{version} for the next increment.**",
+                 "", f"Her view: {shown(view)}", ""]
+        go = "Reply **approve** to this card to go ahead with it (her notes go to the build plan), "
+    else:
+        lines = [f"**{shown(product)}: proposal v{version} for the next increment is held at the gate.**", "",
+                 f"Why: {shown(plain_hold(hold))}.", ""]
+        go = "Reply **approve** to this card to go ahead with it without a crew review, "
+    if cutoff:
+        lines += [f"The campaign stops at its cutoff, {et(cutoff)}, whether or not this is answered.", ""]
     if can_approve:
-        lines.append("Reply **approve** to this card to go ahead with it (her notes go to the build plan), "
-                     "or **abort** to stop the campaign.")
+        lines.append(go + "or **abort** to stop the campaign.")
     else:
         lines.append("Reply **abort** to this card to stop the campaign.")
     lines.append("Anything else goes to Mother as conversation.")
@@ -59,23 +82,50 @@ class DecisionCards:
 
     def create(self, cid, payload, result):
         """Called when Ripley's ruling is needs_owner. Stores the card; the controller posts it."""
+        from .automation import CARD_HOLD
         from .review import decision_request
-        from .watch import product
         gate = payload.get("gate") or {}
-        item = self.b.store.campaign(cid)
-        request, version = None, "?"
+        request = None
         if gate.get("gate") == "progress_increment_ruling":
             try:
                 request = decision_request(cid, payload, {**result, "decision": "approved"})
-                version = request["args"]["binding"]["version"]
             except Exception:
                 request = None
+        project = (payload["packet"].get("campaign") or {}).get("project_id")
+        return self.store_card(cid, gate, request, card_view(result["notes"]), project, CARD_HOLD, None)
+
+    def for_hold(self, cid, reason):
+        """Any other crew hold while an increment gate is open: the owner can approve the proposal at
+        the gate or abort. On 2026-11-01 an evidence_size_hold at campaign 4's third gate left the
+        owner no way to answer from Buzz, and the cutoff aborted it. The binding is read live."""
+        from .evidence import Evidence
+        gates = [g for g in Evidence(self.b).handle("progress", {"campaign": cid})["gates"]
+                 if g.get("gate") == "progress_increment_ruling"]
+        if len(gates) != 1:
+            return None
+        gate = gates[0]
+        rows = [r for r in self.b.read("ledger", {"campaign": cid}) or []
+                if r.get("cycle_id") == gate["cycle"] and r.get("run_id") == gate["run"] and not r.get("ruling")]
+        if len(rows) != 1:
+            return None
+        binding = {k: rows[0][k] for k in ("proposal_id", "version", "content_hash", "baseline_tree")}
+        request = {"command": "increment", "args": {"campaign": cid, "cycle": gate["cycle"], "run": gate["run"],
+                                                    "decision": "approved", "binding": binding}}
+        project = self.b.read("status", {"campaign": cid}).get("project_id")
+        return self.store_card(cid, gate, request, "", project, reason, reason)
+
+    def store_card(self, cid, gate, request, view, project, park_reason, hold):
+        from .watch import product
+        item = self.b.store.campaign(cid)
         cid_row = identifier(cid)
         card = "card_" + digest({"campaign": cid_row, "gate": gate})[:32]
-        project = (payload["packet"].get("campaign") or {}).get("project_id")
-        view = card_view(result["notes"])
+        version = request["args"]["binding"]["version"] if request else "?"
+        control = self.db.execute("SELECT deadline FROM automation WHERE campaign=?", (cid_row,)).fetchone()
+        cutoff = control[0] if control else None
         body = {"campaign": cid_row, "gate": gate, "request": request, "view": view, "channel": item["channel"],
-                "content": card_text(product(project) + " campaign", version, view, request is not None)}
+                "hold": park_reason, "unreviewed": hold is not None,
+                "content": card_text(product(project) + " campaign", version, view, request is not None, cutoff, hold)}
+        # One card per gate: Ripley's own escalation, or the first hold at it, whichever came first.
         self.db.execute("INSERT OR IGNORE INTO decision_cards(id,campaign,thread,state,body,created) VALUES(?,?,?,?,?,?)",
                         (card, cid_row, item["thread"], "drafted", canonical(body), self.now))
         self.b.store.save()
@@ -207,7 +257,11 @@ class DecisionCards:
         path = (f"/api/v1/projects/{project}/cycles/{identifier(args['cycle'])}/runs/{identifier(args['run'])}"
                 "/gates/progress_increment_ruling")
         # Ripley's notes first, and about the build: SquadOps shows approval notes to the framing run.
-        notes = body["view"] + f"\n\nApproved by the owner in Buzz, event {eid}."
+        if body.get("unreviewed"):
+            notes = (f"Approved by the owner in Buzz, event {eid}, without a crew review: "
+                     f"{plain_hold(body['hold'])}.")
+        else:
+            notes = body["view"] + f"\n\nApproved by the owner in Buzz, event {eid}."
         try:
             self.b.api("review", "POST", path, {"decision": "approved", "notes": notes, "decided_by_kind": "human",
                                                 "binding": args["binding"], "idempotency_key": key + "-rule"})
@@ -222,7 +276,7 @@ class DecisionCards:
         from .automation import CARD_HOLD
         # Lift only the hold this card answers.
         self.db.execute("UPDATE automation SET state='active',reason=NULL WHERE campaign=? AND state='parked' AND reason=?",
-                        (cid, CARD_HOLD))
+                        (cid, body.get("hold", CARD_HOLD)))
         return self.done(card, "approved")
 
     def done(self, card, state):
