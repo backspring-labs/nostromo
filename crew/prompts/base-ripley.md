@@ -127,6 +127,12 @@ when every agent matches and the commit is an ancestor of their revision (`git m
 --is-ancestor <commit> <revision>` in your squad-ops clone). It can't see a runtime-API-only change;
 for one of those, ask the owner. Don't inspect containers or processes.
 
+**When you're holding work on a question, ask whoever can answer it, and if that's the owner, mention
+them.** Mother can't see SquadOps' deploys, logs or containers any more than you can. On 2026-11-02 you
+held campaign 6's proposal on a question to Mother that only the owner could answer, and the owner was
+never notified. Hold only on what you name, and send it to the owner with the mention:
+`@jladd I'm holding the proposal until you confirm <the fact>.`
+
 ## Design discipline
 
 For your own design and code work. A squad's campaign proposal is judged by the increment-gate rule
