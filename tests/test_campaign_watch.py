@@ -120,3 +120,34 @@ def test_a_refused_launch_is_the_squads_wait_not_the_owners_move():
     # SquadOps retries launch_blocked on its own and escalates if it never launches.
     text, yours = notice(packet("launch_blocked"), "ShelfNote campaign 1")
     assert "retries on its own" in text and text.endswith("Next: the squad.") and yours is False
+
+
+SHELF = {**BASE, "objective": {"target_accepted_increments": 3,
+                               "statement": "Find, track and organise a shelf. In order: Search; Reading status; Tags"}}
+
+
+def stepped(kind, status, ledger=()):
+    p = packet("building", ledger=ledger)
+    p["campaign"] = {**SHELF, "state": "building", "outcome": None}
+    p["progress"] = {"cycles": [{"runs": [{"workload_type": "proposal", "status": "completed", "started_at": "2026-11-02T02:23:35Z"},
+                                          {"workload_type": kind, "status": status, "started_at": "2026-11-02T02:39:26Z"}]}]}
+    return p
+
+
+def test_an_accepted_increment_counts_when_squadops_reports_its_outcome_as_a_record():
+    # 2026-11-01: the ledger's outcome is {"verdict": "accepted", ...}; reading only a string counted none.
+    row = {"cycle_id": "c1", "run_id": "r1", "ruling": {"decision": "approved"},
+           "outcome": {"action": "propose", "ending": "assessed", "verdict": "accepted"}}
+    text, _ = notice(packet("building", ledger=[row]), "ShelfNote campaign 4")
+    assert "1 of 3 increments accepted" in text
+
+
+def test_the_squads_step_is_named_with_its_increment():
+    text, _ = notice(stepped("implementation", "running"), "ShelfNote campaign 4")
+    assert text.startswith("ShelfNote campaign 4: the squad is building Search.")
+    text, _ = notice(stepped("framing", "completed"), "ShelfNote campaign 4")
+    assert "the squad finished planning how to build Search" in text
+
+
+def test_a_new_step_is_news():
+    assert fingerprint(stepped("framing", "running")) != fingerprint(stepped("implementation", "running"))
