@@ -48,6 +48,10 @@ def evidence_key(meta):
     return kind
 
 
+# The park reason a decision card answers; only this hold is lifted by the owner's approve.
+CARD_HOLD = "Ripley needs your decision; answer her decision card in this thread"
+
+
 class Automation:
     def __init__(self, broker, now=None):
         self.b, self.db = broker, broker.store.db
@@ -132,7 +136,12 @@ class Automation:
 
     def stop(self, cid, command, reason):
         # The stable receipt survives restarts and lost responses. Never invent a new write ID.
-        rid = "auto-" + digest({"campaign": cid, "command": command})[:32]
+        # One stable receipt per stop and park episode. An owner's answer to a decision card resumes
+        # the runtime, so each card applied starts a new episode; otherwise every later park would
+        # find the old receipt and send no pause (review of decision cards, 2026-11-01).
+        episode = self.db.execute("SELECT count(*) FROM decision_cards WHERE campaign=? AND state IN ('approved','failed')",
+                                  (cid,)).fetchone()[0]
+        rid = "auto-" + digest({"campaign": cid, "command": command, **({"episode": episode} if episode else {})})[:32]
         old = self.db.execute("SELECT state,result FROM receipts WHERE id=?", (rid,)).fetchone()
         if old and old["state"] == "pending":
             log = self.b.read("log", {"campaign": cid})
@@ -394,7 +403,7 @@ class Automation:
             if result["decision"] == "needs_owner":
                 from .decision_cards import DecisionCards
                 DecisionCards(self.b, now=self.now).create(cid, payload, result)
-                self.park(cid, "Ripley needs your decision; answer her decision card in this thread")
+                self.park(cid, CARD_HOLD)
             else:
                 if result["decision"] == "returned_for_revision":
                     try:

@@ -32,11 +32,15 @@ def answer_of(text):
     return word if word in ANSWERS else None
 
 
-def card_text(product, version, notes, can_approve):
-    from .drafting import shown
-    # One line of Ripley's view: the card is a question, not her ruling, which is posted already.
+def card_view(notes):
+    """Ripley's view as the card shows it: one line, at most 600 characters. The owner approves
+    exactly this, and exactly this becomes the build guidance; nothing past it is sent."""
     view = " ".join(str(notes).split())
-    view = view if len(view) <= 600 else view[:597].rstrip() + "..."
+    return view if len(view) <= 600 else view[:597].rstrip() + "..."
+
+
+def card_text(product, version, view, can_approve):
+    from .drafting import shown
     lines = [f"**{shown(product)}: Ripley needs your decision on proposal v{version} for the next increment.**",
              "", f"Her view: {shown(view)}", ""]
     if can_approve:
@@ -69,9 +73,9 @@ class DecisionCards:
         cid_row = identifier(cid)
         card = "card_" + digest({"campaign": cid_row, "gate": gate})[:32]
         project = (payload["packet"].get("campaign") or {}).get("project_id")
-        body = {"campaign": cid_row, "gate": gate, "request": request, "notes": result["notes"],
-                "channel": item["channel"],
-                "content": card_text(product(project) + " campaign", version, result["notes"], request is not None)}
+        view = card_view(result["notes"])
+        body = {"campaign": cid_row, "gate": gate, "request": request, "view": view, "channel": item["channel"],
+                "content": card_text(product(project) + " campaign", version, view, request is not None)}
         self.db.execute("INSERT OR IGNORE INTO decision_cards(id,campaign,thread,state,body,created) VALUES(?,?,?,?,?,?)",
                         (card, cid_row, item["thread"], "drafted", canonical(body), self.now))
         self.b.store.save()
@@ -133,7 +137,7 @@ class DecisionCards:
 
     def answer(self, card, event):
         row = self.row(card)
-        if row["state"] in {"approved", "aborted"}:
+        if row["state"] in {"approved", "aborted", "stale", "failed"}:
             if (event or {}).get("id") == row["answer_event"]:
                 return {"decided": row["state"], "replayed": True}
             raise Refused("this decision card has already been answered")
@@ -179,6 +183,13 @@ class DecisionCards:
             return self.done(card, "aborted")
         args = body["request"]["args"]
         current = self.b.read("status", {"campaign": cid})
+        # Before any write: the proposal the card shows must still be the one waiting at the gate.
+        # SquadOps would refuse a stale binding, but only after the resume had already happened.
+        rows = [r for r in self.b.read("ledger", {"campaign": cid}) or []
+                if r.get("cycle_id") == args["cycle"] and r.get("run_id") == args["run"] and not r.get("ruling")]
+        live = [{k: r.get(k) for k in ("proposal_id", "version", "content_hash", "baseline_tree")} for r in rows]
+        if current["state"] not in {"paused", "awaiting_ruling"} or live != [args["binding"]]:
+            return self.done(card, "stale")
         if current["state"] == "paused":
             # The supervisor's own pause: resume without an action, back to awaiting_ruling.
             self.b.api("control", "POST", f"/api/v1/campaigns/{cid}/resume",
@@ -186,15 +197,23 @@ class DecisionCards:
                         "idempotency_key": key + "-resume", "expected_state": "paused"})
             current = self.b.read("status", {"campaign": cid})
         if current["state"] != "awaiting_ruling":
-            raise Refused(f"the campaign is {current['state']}, not waiting for this ruling; owner inspection required")
+            # Resumed but not at the gate any more: hold it again (a new pause episode) and stop.
+            from .automation import Automation
+            self.done(card, "failed")
+            Automation(self.b, now=self.now).park(cid, f"the campaign was {current['state']} after the resume, not "
+                                                      "waiting for this ruling; owner inspection required")
+            return {"decided": "failed"}
         project = identifier(self.b.read("status", {"campaign": cid})["project_id"])
         path = (f"/api/v1/projects/{project}/cycles/{identifier(args['cycle'])}/runs/{identifier(args['run'])}"
                 "/gates/progress_increment_ruling")
         # Ripley's notes first, and about the build: SquadOps shows approval notes to the framing run.
-        notes = body["notes"].rstrip() + f"\n\nApproved by the owner in Buzz, event {eid}."
+        notes = body["view"] + f"\n\nApproved by the owner in Buzz, event {eid}."
         self.b.api("review", "POST", path, {"decision": "approved", "notes": notes, "decided_by_kind": "human",
                                             "binding": args["binding"], "idempotency_key": key + "-rule"})
-        self.db.execute("UPDATE automation SET state='active',reason=NULL WHERE campaign=? AND state='parked'", (cid,))
+        from .automation import CARD_HOLD
+        # Lift only the hold this card answers.
+        self.db.execute("UPDATE automation SET state='active',reason=NULL WHERE campaign=? AND state='parked' AND reason=?",
+                        (cid, CARD_HOLD))
         return self.done(card, "approved")
 
     def done(self, card, state):
