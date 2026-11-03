@@ -280,6 +280,11 @@ Mother holds her own Buzz key and the broker can't otherwise tell which card the
 approval creates the allowance, approves the definition and queues the launch, in one transaction.
 A revised card supersedes the earlier one, which can then no longer be approved. See `docs/specs/plain-language-campaigns.md`.
 
+**Starting point.** `draft` refuses while an earlier campaign of the product accepted work that can't
+be in its integrated tree yet (the product hasn't moved off the commit that campaign started from):
+that work must be contributed and synced first. `campaignctl source` (`{"project","path"}`) reads one
+file of the product at its integrated commit, for drafting and challenging against the real code.
+
 **Which SquadOps is live.** `campaignctl squadops-deploy` (`{}`) reads SquadOps' public
 `/health/agents`: each agent's built revision, the latest deploy record's revision for its service,
 and whether they match. A commit is live for the agents when all match and it is an ancestor of their

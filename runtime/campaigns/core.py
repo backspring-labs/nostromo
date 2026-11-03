@@ -186,6 +186,15 @@ class Broker:
         if command == "tracked":
             exact(args, set())
             return [dict(row) for row in self.store.db.execute("SELECT * FROM campaigns ORDER BY id")]
+        if command == "source":
+            # Read-only: one text file of a product, from SquadOps' managed clone at its integrated
+            # commit, the tree the next campaign starts from. Dallas couldn't check the code a draft
+            # assumed (2026-11-03).
+            if caller not in {"mother", "ripley", "dallas", "owner"}:
+                raise Refused("reading a product's source belongs to the crew's drafting roles or the owner")
+            exact(args, {"project", "path"})
+            from .drafting import product_file
+            return product_file(self, args["project"], args["path"])
         if command == "squadops-deploy":
             # Read-only: which SquadOps revision the squad's agents run (#54). On 2026-11-02 Ripley
             # held a card until the owner confirmed squad-ops #2859 was live; no crew role could see it.

@@ -30,6 +30,11 @@ the thread:
      everything accepted before it still passes") isn't right.
    If `goals` refuses, tell the owner in the thread that the goals couldn't be read and stop. Never
    rebuild the list from earlier campaigns or from memory; a stale list launched on 2026-11-01.
+   Draft from what the product's code has, not from what earlier campaigns accepted: accepted work
+   reaches the product only when it's merged and synced. To check the code, `campaignctl source`
+   with `{"project", "path"}` reads one file at the integrated commit (for example
+   `backend/routes.py`). If `draft` refuses because earlier campaign work isn't in the product yet,
+   tell the owner in plain words, with the mention, and stop.
 2. **Check it builds:** `campaignctl draft` with `{"project", "goal", "thread", "goals_commit",
    "size"}`, where `goals_commit` is the commit `goals` returned. It stores
    nothing and shows the card the owner will see.
