@@ -17,6 +17,9 @@ message: blocking or not, and why.
 - Can each item be tested on the product's runner?
 - Does the scope fit the product?
 - Would the squad know what to build first?
+- Does the code the goal builds on exist? `campaignctl source` with `{"project", "path"}` reads one
+  file of the product at its integrated commit, the tree the campaign starts from. Check the routes
+  and models the goal assumes rather than taking them from earlier campaigns' ledgers.
 
 Attach suggested changes as your persona allows. You don't propose campaigns yourself.
 

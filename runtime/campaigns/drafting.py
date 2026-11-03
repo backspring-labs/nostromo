@@ -66,6 +66,22 @@ def entry(project):
     return value
 
 
+def product_file(broker, project, path):
+    """One file of the product at its integrated commit, through SquadOps' read-only source-file route."""
+    registered = entry(project)
+    if not isinstance(path, str) or not re.fullmatch(r"[A-Za-z0-9._/-]{1,200}", path) or ".." in path.split("/") \
+            or path.startswith("/"):
+        raise Refused("name a file by its path in the product, for example backend/routes.py")
+    try:
+        found = broker.api("read", "GET", f"/api/v1/projects/{identifier(registered['project_id'])}/source-file",
+                           None, query={"path": path})
+    except Refused as error:
+        raise Refused(f"{path} couldn't be read from SquadOps ({error})") from None
+    if not (isinstance(found, dict) and found.get("path") == path and isinstance(found.get("content"), str)):
+        raise Refused(f"{path} couldn't be read from SquadOps")
+    return {"path": path, "commit": found.get("commit"), "content": found["content"]}
+
+
 def goals(broker, project):
     """The product's current goals, as SquadOps will run them: the registry's requirements file, read
     from the project's managed clone at its integrated commit. There is no fallback. On 2026-11-01
@@ -120,6 +136,35 @@ def free_name(store, project, now):
     raise Refused("no free campaign name today")
 
 
+def unmerged_work(broker, project_id, integrated):
+    """Earlier campaigns of this product whose accepted work can't be in its integrated tree: they
+    accepted at least one increment, and the product hasn't moved off the commit they started from.
+    Twice (campaigns 5 and 7) a draft assumed accepted work that was still only on a campaign's
+    branch. A stand-in until SquadOps can say which accepted work is uncontributed."""
+    import json
+    found, number = [], 0
+    rows = broker.store.db.execute("SELECT c.id, d.body FROM campaigns c JOIN definitions d ON d.name=c.definition "
+                                   "ORDER BY c.rowid").fetchall()
+    for cid, body in rows:
+        if json.loads(body)["definition"].get("project_id") != project_id:
+            continue
+        number += 1
+        try:
+            log = broker.read("log", {"campaign": cid}) or []
+            ledger = broker.read("ledger", {"campaign": cid}) or []
+        except Exception:
+            continue
+        accepted = sum(1 for r in ledger if isinstance(r, dict) and isinstance(r.get("outcome"), dict)
+                       and str(r["outcome"].get("verdict", "")).startswith("accept"))
+        # The commit it started from: its start entry's calibration record (status's "accepted" moves
+        # with each accepted increment, so it can't say where the campaign began).
+        started = next((str(((e.get("binding") or {}).get("calibration_record") or {}).get("commit") or "")
+                        for e in log if isinstance(e, dict) and e.get("operation") == "start"), "")
+        if accepted and started and integrated.startswith(started[:12]) and started.startswith(integrated[:12]):
+            found.append((number, accepted))
+    return found
+
+
 def campaign_number(store, project_id):
     """This product's next campaign number, counting the campaigns already created for it."""
     import json
@@ -140,6 +185,15 @@ def draft(broker, args, now=None):
     source = goals(broker, args["project"])
     if args["goals_commit"] != source["commit"]:
         raise Refused(f"{source['path']} has changed since it was read (now at {source['commit'][:7]}); read it again")
+    # Never draft past accepted work that isn't in the product yet: the next campaign would build on
+    # code without it.
+    pending = unmerged_work(broker, registered["project_id"], source["commit"])
+    if pending:
+        name = registered.get("display_name", registered["project_id"])
+        said = "; ".join(f"campaign {n} accepted {k} increment{'s' if k != 1 else ''}" for n, k in pending)
+        raise Refused(f"{name} doesn't have earlier campaign work yet ({said}, still only on that campaign's branch, "
+                      f"not in {source['commit'][:7]}). Tell the owner it needs merging into {name} and syncing "
+                      "before the next campaign is drafted.")
     goal = args["goal"]
     exact(goal, {"title", "statement"}, {"items", "measurement"})
     for field in ("title", "statement"):

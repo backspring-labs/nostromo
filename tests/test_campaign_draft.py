@@ -135,3 +135,55 @@ def test_the_crew_can_read_which_squadops_revision_is_live(broker):
     result = broker.handle("ripley", {"command": "squadops-deploy", "args": {}})
     assert result["revision"] == "1068c094" and result["all_match_deploy"] is True
     assert "runtime-API-only change isn't visible" in result["covers"]
+
+
+def earlier_campaign(broker, monkeypatch, started, verdicts):
+    """An earlier ShelfNote campaign that started from `started` and reached these ledger verdicts."""
+    import json as _json
+    spec = draft(broker, {"project": "shelfnote", "goal": GOAL, "thread": THREAD, "goals_commit": GOALS_COMMIT}, NOW)
+    broker.store.db.execute("INSERT INTO definitions(name,body,sha) VALUES(?,?,?)",
+                            ("crew-shelfnote-old", _json.dumps({"definition": spec["approval"]["definition"]}), "x"))
+    broker.store.db.execute("INSERT INTO campaigns VALUES(?,?,?,?,?)", ("cmp_old", "crew-shelfnote-old", "c", "t", "mother"))
+    broker.store.db.commit()
+    real = broker.api
+
+    def api(principal, method, path, body, **kwargs):
+        if path == "/api/v1/campaigns/cmp_old":
+            return {"campaign_id": "cmp_old", "state": "completed", "accepted": {"commit": "f" * 40}}
+        if path == "/api/v1/campaigns/cmp_old/control-log":
+            return [{"operation": "create"}, {"operation": "start", "binding": {"calibration_record": {"commit": started}}}]
+        if path == "/api/v1/campaigns/cmp_old/ledger":
+            return [{"outcome": {"verdict": v}} for v in verdicts]
+        return real(principal, method, path, body, **kwargs)
+    monkeypatch.setattr(broker, "api", api)
+
+
+def test_a_draft_refuses_while_earlier_accepted_work_isnt_in_the_product(broker, monkeypatch):
+    # Campaigns 5 and 7: the draft assumed accepted work that was still only on a campaign's branch.
+    earlier_campaign(broker, monkeypatch, GOALS_COMMIT, ["accepted", "rejected", "accepted"])
+    with pytest.raises(Refused, match="campaign 1 accepted 2 increments, still only on that campaign's branch"):
+        draft(broker, {"project": "shelfnote", "goal": GOAL, "thread": THREAD, "goals_commit": GOALS_COMMIT}, NOW)
+
+
+def test_a_draft_proceeds_once_the_product_has_moved_past_that_campaign(broker, monkeypatch):
+    earlier_campaign(broker, monkeypatch, "e5ac050" + "0" * 33, ["accepted"])
+    assert draft(broker, {"project": "shelfnote", "goal": GOAL, "thread": THREAD, "goals_commit": GOALS_COMMIT}, NOW)["card"]
+
+
+def test_a_campaign_that_accepted_nothing_doesnt_block_the_next(broker, monkeypatch):
+    earlier_campaign(broker, monkeypatch, GOALS_COMMIT, ["rejected"])
+    assert draft(broker, {"project": "shelfnote", "goal": GOAL, "thread": THREAD, "goals_commit": GOALS_COMMIT}, NOW)["card"]
+
+
+def test_the_crew_can_read_a_product_file_but_not_outside_it(broker, monkeypatch):
+    def api(principal, method, path, body, *, query=None):
+        assert "?" not in path
+        return {"path": query["path"], "commit": GOALS_COMMIT, "content": "def list_books(): ..."}
+    monkeypatch.setattr(broker, "api", api)
+    found = broker.handle("dallas", {"command": "source", "args": {"project": "shelfnote", "path": "backend/routes.py"}})
+    assert found["content"].startswith("def list_books")
+    for bad in ("../etc/passwd", "/etc/passwd", "backend/../../x"):
+        with pytest.raises(Refused, match="name a file by its path"):
+            broker.handle("dallas", {"command": "source", "args": {"project": "shelfnote", "path": bad}})
+    with pytest.raises(Refused, match="drafting roles or the owner"):
+        broker.handle("parker", {"command": "source", "args": {"project": "shelfnote", "path": "backend/routes.py"}})
