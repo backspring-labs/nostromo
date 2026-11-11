@@ -303,3 +303,21 @@ def test_the_controller_answers_a_near_miss_on_the_card_once(world):
     results = relay_approvals(lambda request: broker.handle("mother", request), lambda c, t: events, owner)
     assert len(results) == 1 and results[0]["hint"]["id"] == "hint-" + events[0]["id"]
     assert "reply to the card with just **approve**" in results[0]["hint"]["content"]
+
+
+def test_the_thread_reader_asks_for_full_json_so_signatures_survive(monkeypatch):
+    # block/buzz #8234: buzz-acp sets BUZZ_OUTPUT_FORMAT=agent, which drops each event's sig.
+    import json as _json
+    import subprocess
+    from runtime.campaigns import launch_worker
+    seen = {}
+    event = {"id": "e" * 64, "pubkey": "p" * 64, "sig": "s" * 128, "tags": [], "content": "approve", "kind": 9,
+             "created_at": 1}
+
+    def run(argv, **kwargs):
+        seen["argv"], seen["env"] = argv, kwargs.get("env", {})
+        return subprocess.CompletedProcess(argv, 0, _json.dumps({"messages": [event]}), "")
+    monkeypatch.setattr(launch_worker, "secret", lambda name: "fixture-only")
+    monkeypatch.setattr(subprocess, "run", run)
+    assert launch_worker.thread_reader()("chan", "t" * 64) == [event]
+    assert seen["argv"][1:3] == ["--format", "json"], "the format flag goes before the subcommand"

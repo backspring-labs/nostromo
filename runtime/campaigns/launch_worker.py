@@ -246,7 +246,9 @@ def thread_reader():
            "TOKIO_WORKER_THREADS": "2"}
 
     def read(channel, thread):
-        result = subprocess.run(["/opt/nostromo/runtime/bin/buzz", "messages", "thread", "--channel", channel,
+        # --format json explicitly: from block/buzz #8234 buzz-acp sets BUZZ_OUTPUT_FORMAT=agent, which
+        # drops each event's sig, and walk() below needs the signed event to verify the owner's replies.
+        result = subprocess.run(["/opt/nostromo/runtime/bin/buzz", "--format", "json", "messages", "thread", "--channel", channel,
                                  "--event", thread, "--limit", "1000"], capture_output=True, text=True, env=env, timeout=60)
         if result.returncode:
             raise Refused("thread unreadable")
