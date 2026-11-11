@@ -86,4 +86,6 @@ echo "$COMMIT" > "$BIN/buzz-build.commit"
 (cd "$BIN" && sha256sum "${BINS[@]}") > "$BIN/buzz-build.sha256"
 say "installed ${COMMIT:0:10}; no role runs it until restarted"
 echo "   canary: crewctl restart mother, then the rest"
-echo "   rollback: cp -p $BK/{buzz,buzz-acp,buzz-agent,buzz-dev-mcp} $BIN/ && echo $RUNNING > $BIN/buzz-build.commit, then restart"
+# Restore by rename, as the install does: cp onto a running buzz-acp or buzz-agent fails with "Text file
+# busy" partway, leaving a mixed set. Restores the checksum record too.
+echo "   rollback: stop the roles, then: for b in ${BINS[*]}; do install -m 755 $BK/\$b $BIN/.\$b.old && mv -f $BIN/.\$b.old $BIN/\$b; done; echo $RUNNING > $BIN/buzz-build.commit; (cd $BIN && sha256sum ${BINS[*]}) > $BIN/buzz-build.sha256; then restart the roles"

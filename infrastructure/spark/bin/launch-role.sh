@@ -209,6 +209,12 @@ else
   echo "launch-$ROLE: WARNING no buzz_auth_tag in the manifest — core memory will not persist," >&2
   echo "launch-$ROLE:         and the harness nudges for one every turn. See mint-auth-tags.py." >&2
 fi
+# Keep each role's own Git identity. From block/buzz #7819/#8024, buzz-acp installs its own Git
+# environment for every harness (GIT_CONFIG_* user.name/email as <pubkey>@<relay>, commit.gpgSign via
+# git-sign-nostr), overriding the GitHub App bot identity provision-clone.sh sets in each clone: every
+# commit would carry the wrong author and a signature GitHub can't verify. `user` keeps today's
+# behaviour. Binaries before those PRs ignore it.
+export BUZZ_GIT_IDENTITY=user
 
 
 # ---- provider ---------------------------------------------------------------------------------
